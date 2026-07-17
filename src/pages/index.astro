@@ -26,29 +26,40 @@
         position: relative;
         overflow: hidden;
       }
-      /* soft color glow patches, similar to the reference image */
-      body::before,
-      body::after {
-        content: "";
+      .glow {
         position: absolute;
         border-radius: 50%;
-        filter: blur(60px);
+        filter: blur(70px);
         pointer-events: none;
         z-index: 0;
       }
-      body::before {
+      .glow-blue {
         width: 500px;
         height: 500px;
         top: -10%;
         right: -5%;
-        background: radial-gradient(circle, rgba(60, 140, 220, 0.12), transparent 70%);
+        background: radial-gradient(circle, rgba(60, 140, 220, 0.14), transparent 70%);
       }
-      body::after {
+      .glow-teal {
         width: 400px;
         height: 400px;
         bottom: -10%;
         left: 5%;
-        background: radial-gradient(circle, rgba(60, 200, 190, 0.10), transparent 70%);
+        background: radial-gradient(circle, rgba(60, 200, 190, 0.12), transparent 70%);
+      }
+      .glow-pink {
+        width: 350px;
+        height: 350px;
+        top: 10%;
+        left: -8%;
+        background: radial-gradient(circle, rgba(230, 160, 200, 0.10), transparent 70%);
+      }
+      .glow-purple {
+        width: 380px;
+        height: 380px;
+        bottom: 5%;
+        right: 0%;
+        background: radial-gradient(circle, rgba(180, 150, 230, 0.10), transparent 70%);
       }
       .container {
         padding: 2rem;
@@ -65,12 +76,26 @@
         font-size: 1.1rem;
         margin: 0;
       }
+      .handle {
+        position: absolute;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        color: #a3a3a3;
+        font-size: 1.1rem;
+        margin: 0;
+        z-index: 1;
+      }
     </style>
   </head>
   <body>
+    <div class="glow glow-blue"></div>
+    <div class="glow glow-teal"></div>
+    <div class="glow glow-pink"></div>
+    <div class="glow glow-purple"></div>
     <div class="container">
       <h1>Coming Soon</h1>
       <p>We're working on something. Check back shortly.</p>
     </div>
+    <p class="handle">@designedbykoda</p>
   </body>
 </html>
