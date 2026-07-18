@@ -1,5 +1,5 @@
 ---
-title: "Smart Energy Meter \"Puck\""
+title: "Power Puck"
 tagline: "A magnetically mounted energy monitor, targeting ~6 months per charge"
 description: "A low-power, magnetically mounted energy monitoring device, currently in development."
 category: "Smart Home"
