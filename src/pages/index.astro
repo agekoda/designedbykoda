@@ -4,12 +4,34 @@ import Layout from '../layouts/Layout.astro';
 import ProjectCard from '../components/ProjectCard.astro';
 import { SITE_DESCRIPTION } from '../consts';
 
-const projects = (await getCollection('projects')).sort((a, b) => a.data.order - b.data.order);
+// Controls the order projects appear in on the homepage grid specifically.
+// Read left-to-right, top-to-bottom. Anything not listed here falls in
+// afterwards, sorted by its `order` field in the content frontmatter.
+const homepageOrder = [
+	'phantomware',
+	'vfd-display-board',
+	'smart-energy-meter-puck',
+	'rf-tool',
+	'lora-portable-messenger',
+	'nrf-box',
+	'air-quality-monitor',
+	'nrf24-audio-radio',
+];
+
+const allProjects = await getCollection('projects');
+const byOrderField = [...allProjects].sort((a, b) => a.data.order - b.data.order);
+
+const projects = [
+	...homepageOrder
+		.map((slug) => allProjects.find((p) => p.id === slug))
+		.filter((p) => p !== undefined),
+	...byOrderField.filter((p) => !homepageOrder.includes(p.id)),
+];
 ---
 
 <Layout title="designedbykoda" description={SITE_DESCRIPTION}>
 	<section class="hero">
-		<h2>Hi, I'm Koda 👋</h2>
+		<h1>Hi, I'm Koda 👋</h1>
 		<p>
 			Custom PCBs, ESP32 firmware, RF tools, and the occasional resin enclosure that fits
 			together better than it has any right to.
@@ -104,8 +126,18 @@ const projects = (await getCollection('projects')).sort((a, b) => a.data.order -
 	}
 	.grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+		grid-template-columns: repeat(3, 1fr);
 		gap: 1.4em;
+	}
+	@media (max-width: 720px) {
+		.grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+	@media (max-width: 480px) {
+		.grid {
+			grid-template-columns: 1fr;
+		}
 	}
 	@media (max-width: 520px) {
 		.hero h1 {
