@@ -9,6 +9,7 @@ heroImage: "/images/projects/neopixel-ambient-light-panel/hero.jpg"
 gallery:
   - "/images/projects/neopixel-ambient-light-panel/1.jpg"
   - "/images/projects/neopixel-ambient-light-panel/2.jpg"
+  - "/images/projects/neopixel-ambient-light-panel/3.jpg"
 ---
 
 A smart lighting system designed for both ambient display and Home Assistant integration.
