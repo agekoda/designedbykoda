@@ -31,6 +31,10 @@ const projects = defineCollection({
 		// placeholder automatically until a matching file is added.
 		heroImage: z.string().optional(),
 		gallery: z.array(z.string()).default([]),
+		// Aspect ratio (CSS aspect-ratio value) for the gallery images on this
+		// project's page. Defaults to landscape; set to "3 / 4" for portrait
+		// photos instead.
+		galleryRatio: z.string().default("4 / 3"),
 	}),
 });
 
