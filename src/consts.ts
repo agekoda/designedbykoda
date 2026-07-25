@@ -3,9 +3,9 @@
 
 export const SITE_TITLE = "designedbykoda";
 export const SITE_DESCRIPTION =
-	"Custom PCBs, ESP32 hardware, and RF tools designed and built by Koda.";
+	"Custom PCBs, ESP32 hardware, and RF tools designed and built by koda.";
 export const SITE_HANDLE = "@designedbykoda";
-export const GITHUB_URL = "https://github.com/agekoda/designedbykoda";
+export const GITHUB_URL = "https://github.com/agekoda/";
 export const TIKTOK_URL = "https://www.tiktok.com/@designedbykoda";
 export const YOUTUBE_URL = "https://youtube.com/@zdhd";
 export const INSTAGRAM_URL = "https://www.instagram.com/designedby.koda/";
