@@ -3,7 +3,7 @@ title: "LoRa Portable Messenger"
 tagline: "A rugged, GPS-aware handheld built for infrastructure-free messaging"
 description: "A rugged, feature-packed handheld messenger built around LoRa for long-range, infrastructure-free communication."
 category: "Portable & Wearable"
-status: "Upcoming"
+status: "Complete"
 order: 9
 heroImage: "/images/projects/lora-portable-messenger/hero.jpg"
 gallery:
