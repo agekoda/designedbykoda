@@ -46,17 +46,41 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 			</div>
 			<script src="/scripts/model-viewer.min.js" type="module"></script>
 			<script define:vars={{ id }}>
-				// If the .glb 404s or otherwise fails to load, hide the viewer and
-				// show the placeholder instead — same fallback pattern as photos.
 				const wrap = document.getElementById(id);
 				if (wrap) {
 					const mv = wrap.querySelector('model-viewer');
 					if (mv) {
+						// If the .glb 404s or otherwise fails to load, hide the viewer
+						// and show the placeholder instead — same fallback pattern as
+						// photos.
 						mv.addEventListener('error', () => {
 							mv.style.display = 'none';
 							const ph = wrap.querySelector('.placeholder');
 							if (ph) ph.style.display = 'flex';
 						});
+
+						// model-viewer sets its own grab/grabbing cursor directly via
+						// JS (inline style), which plain CSS can't reliably beat.
+						// Force it back to "none" every time it tries to change, so
+						// our custom cursor dot shows instead — but only when the
+						// custom cursor is actually active (real mouse, no
+						// reduced-motion), otherwise leave its default alone.
+						const hideCursor = () => {
+							if (
+								document.documentElement.classList.contains('has-custom-cursor') &&
+								mv.style.cursor !== 'none'
+							) {
+								mv.style.setProperty('cursor', 'none', 'important');
+							}
+						};
+						hideCursor();
+						new MutationObserver(hideCursor).observe(mv, {
+							attributes: true,
+							attributeFilter: ['style'],
+						});
+						mv.addEventListener('pointerdown', hideCursor);
+						mv.addEventListener('pointermove', hideCursor);
+						mv.addEventListener('pointerup', hideCursor);
 					}
 				}
 			</script>
