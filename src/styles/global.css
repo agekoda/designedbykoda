@@ -308,3 +308,62 @@ hr {
 	color: #e0c07a;
 	border-color: #4a3f22;
 }
+
+/* ---------- Custom cursor ---------- */
+/* Hides the native cursor and shows a custom dot instead. Only active when
+   interactions.js confirms a real mouse is present (adds this class to
+   <html>) — otherwise the native cursor stays untouched. */
+html.has-custom-cursor,
+html.has-custom-cursor a,
+html.has-custom-cursor button {
+	cursor: none;
+}
+.custom-cursor {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #fff;
+	mix-blend-mode: difference;
+	pointer-events: none;
+	z-index: 9999;
+	transform: translate(-50%, -50%);
+	transition:
+		width 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+		height 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+		opacity 0.2s ease;
+}
+.custom-cursor.is-hovering {
+	width: 48px;
+	height: 48px;
+}
+.custom-cursor.is-active {
+	width: 10px;
+	height: 10px;
+}
+.custom-cursor.is-hidden {
+	opacity: 0;
+}
+
+/* ---------- Nav island pill ---------- */
+.nav-pill {
+	position: absolute;
+	top: 0;
+	left: 0;
+	background: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	opacity: 0;
+	pointer-events: none;
+	z-index: -1;
+	transition:
+		transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+		width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+		height 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+		opacity 0.25s ease;
+}
+.nav-pill.is-visible {
+	opacity: 1;
+}

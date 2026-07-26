@@ -30,6 +30,10 @@ const projects = defineCollection({
 		// These paths don't need to exist yet — the site falls back to a
 		// placeholder automatically until a matching file is added.
 		heroImage: z.string().optional(),
+		// Optional .glb path for an interactive 3D model, shown instead of the
+		// flat hero photo when present. Same placeholder convention as photos:
+		// the path doesn't need to exist yet.
+		model: z.string().optional(),
 		gallery: z.array(z.string()).default([]),
 		// Aspect ratio (CSS aspect-ratio value) for the gallery images on this
 		// project's page. Defaults to landscape; set to "3 / 4" for portrait

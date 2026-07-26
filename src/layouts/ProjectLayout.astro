@@ -1,6 +1,7 @@
 ---
 import Layout from './Layout.astro';
 import ProjectImage from '../components/ProjectImage.astro';
+import ProjectModel from '../components/ProjectModel.astro';
 
 interface Props {
 	title: string;
@@ -9,6 +10,7 @@ interface Props {
 	category: string;
 	status: 'Complete' | 'Upcoming';
 	heroImage?: string;
+	model?: string;
 	gallery?: string[];
 	galleryRatio?: string;
 }
@@ -20,6 +22,7 @@ const {
 	category,
 	status,
 	heroImage,
+	model,
 	gallery = [],
 	galleryRatio = '4 / 3',
 } = Astro.props;
@@ -37,7 +40,16 @@ const {
 		<p class="tagline">{tagline}</p>
 	</div>
 
-	<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
+	{
+		model ? (
+			<>
+				<ProjectModel src={model} alt={title} poster={heroImage} />
+				<p class="model-hint">Drag to rotate — flick to spin it, it'll ease to a stop.</p>
+			</>
+		) : (
+			<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
+		)
+	}
 
 	<article class="prose">
 		<slot />
@@ -97,5 +109,11 @@ const {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 		gap: 1em;
+	}
+	.model-hint {
+		margin: 0.6em 0 0 0;
+		font-size: 0.85em;
+		color: var(--muted-dim);
+		text-align: center;
 	}
 </style>
