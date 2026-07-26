@@ -29,10 +29,13 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 				disable-pan
 				disable-tap
 				interaction-prompt="none"
-				interpolation-decay="45"
+				interpolation-decay="40"
 				shadow-intensity="1"
 				exposure="1"
 				environment-image="neutral"
+				auto-rotate
+				auto-rotate-delay="0"
+				rotation-per-second="8deg/s"
 			>
 				<div slot="progress-bar" />
 			</model-viewer>
@@ -59,28 +62,48 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 							if (ph) ph.style.display = 'flex';
 						});
 
-						// model-viewer sets its own grab/grabbing cursor directly via
-						// JS (inline style), which plain CSS can't reliably beat.
-						// Force it back to "none" every time it tries to change, so
-						// our custom cursor dot shows instead — but only when the
-						// custom cursor is actually active (real mouse, no
-						// reduced-motion), otherwise leave its default alone.
-						const hideCursor = () => {
-							if (
-								document.documentElement.classList.contains('has-custom-cursor') &&
-								mv.style.cursor !== 'none'
-							) {
-								mv.style.setProperty('cursor', 'none', 'important');
+						// Auto-rotate slowly on load, but stop for good the first time
+						// the person actually grabs and drags it — model-viewer's
+						// default behaviour is to pause then resume after 3s, which
+						// isn't what we want, so we remove the attribute entirely on
+						// the first user-driven camera change.
+						mv.addEventListener('camera-change', (e) => {
+							if (e.detail && e.detail.source === 'user-interaction') {
+								mv.removeAttribute('auto-rotate');
 							}
-						};
-						hideCursor();
-						new MutationObserver(hideCursor).observe(mv, {
-							attributes: true,
-							attributeFilter: ['style'],
 						});
-						mv.addEventListener('pointerdown', hideCursor);
-						mv.addEventListener('pointermove', hideCursor);
-						mv.addEventListener('pointerup', hideCursor);
+
+						// model-viewer sets its own grab/grabbing cursor, and it may
+						// do so on an element inside its shadow root (e.g. the
+						// canvas), not just the host — which a plain CSS rule or an
+						// observer on the host alone can't always catch. Brute-force
+						// fix: while the pointer is over it, force cursor:none on the
+						// host and anything inside its shadow root, every frame, for
+						// as long as the custom cursor system is active.
+						let rafId = null;
+						function forceCursorNone() {
+							if (document.documentElement.classList.contains('has-custom-cursor')) {
+								mv.style.setProperty('cursor', 'none', 'important');
+								const root = mv.shadowRoot;
+								if (root) {
+									root.querySelectorAll('*').forEach((el) => {
+										if (el.style && el.style.cursor && el.style.cursor !== 'none') {
+											el.style.setProperty('cursor', 'none', 'important');
+										}
+									});
+								}
+							}
+							rafId = requestAnimationFrame(forceCursorNone);
+						}
+						mv.addEventListener('pointerenter', () => {
+							if (rafId === null) forceCursorNone();
+						});
+						mv.addEventListener('pointerleave', () => {
+							if (rafId !== null) {
+								cancelAnimationFrame(rafId);
+								rafId = null;
+							}
+						});
 					}
 				}
 			</script>
