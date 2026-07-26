@@ -42,10 +42,7 @@ const {
 
 	{
 		model ? (
-			<>
-				<ProjectModel src={model} alt={title} poster={heroImage} />
-				<p class="model-hint">Drag to rotate — flick to spin it, it'll ease to a stop.</p>
-			</>
+			<ProjectModel src={model} alt={title} poster={heroImage} />
 		) : (
 			<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
 		)
@@ -109,11 +106,5 @@ const {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 		gap: 1em;
-	}
-	.model-hint {
-		margin: 0.6em 0 0 0;
-		font-size: 0.85em;
-		color: var(--muted-dim);
-		text-align: center;
 	}
 </style>
