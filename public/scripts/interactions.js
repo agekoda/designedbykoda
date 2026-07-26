@@ -55,7 +55,7 @@
 	// tuned per-element via data attributes, with sane defaults.
 	const magnets = document.querySelectorAll('[data-magnetic]');
 	magnets.forEach((el) => {
-		const strength = parseFloat(el.dataset.magneticStrength || '0.35');
+		const strength = parseFloat(el.dataset.magneticStrength || '0.2');
 		const radius = parseFloat(el.dataset.magneticRadius || '70');
 
 		el.addEventListener('mousemove', (e) => {
