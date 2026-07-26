@@ -11,6 +11,7 @@ interface Props {
 	status: 'Complete' | 'Upcoming';
 	heroImage?: string;
 	model?: string;
+	cameraOrbit?: string;
 	gallery?: string[];
 	galleryRatio?: string;
 }
@@ -23,6 +24,7 @@ const {
 	status,
 	heroImage,
 	model,
+	cameraOrbit,
 	gallery = [],
 	galleryRatio = '4 / 3',
 } = Astro.props;
@@ -42,7 +44,7 @@ const {
 
 	{
 		model ? (
-			<ProjectModel src={model} alt={title} poster={heroImage} />
+			<ProjectModel src={model} alt={title} poster={heroImage} cameraOrbit={cameraOrbit} />
 		) : (
 			<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
 		)

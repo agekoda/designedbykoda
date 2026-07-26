@@ -34,6 +34,10 @@ const projects = defineCollection({
 		// flat hero photo when present. Same placeholder convention as photos:
 		// the path doesn't need to exist yet.
 		model: z.string().optional(),
+		// Initial camera angle for the 3D model, as "azimuth polar radius"
+		// (model-viewer's camera-orbit format). Defaults to a slightly
+		// top-down angle in ProjectModel.astro if not set here.
+		cameraOrbit: z.string().optional(),
 		gallery: z.array(z.string()).default([]),
 		// Aspect ratio (CSS aspect-ratio value) for the gallery images on this
 		// project's page. Defaults to landscape; set to "3 / 4" for portrait
