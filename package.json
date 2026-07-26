@@ -20,6 +20,7 @@
 		"typescript": "5.9.3"
 	},
 	"devDependencies": {
+		"sharp": "^0.34.5",
 		"wrangler": "4.88.0"
 	},
 	"engines": {
@@ -33,6 +34,7 @@
 		"check": "astro build && tsc && wrangler deploy --dry-run",
 		"deploy": "wrangler deploy",
 		"dev": "astro dev",
+		"optimize-images": "node scripts/optimize-images.js",
 		"preview": "astro build && wrangler dev"
 	},
 	"type": "module"
