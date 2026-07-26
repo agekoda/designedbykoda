@@ -31,7 +31,7 @@ const projects = [
 
 <Layout title="designedbykoda" description={SITE_DESCRIPTION}>
 	<section class="hero">
-		<h1>Hi, I'm Koda 👋</h1>
+		<h1>Hi, I'm koda 👋</h1>
 		<p>
 			Custom PCBs, ESP32 firmware, RF tools, and smart home hardware, along with the enclosures
 			they live in<br />— all designed and built from scratch.
@@ -49,15 +49,17 @@ const projects = [
 		</div>
 		<div class="grid">
 			{
-				projects.map((project) => (
-					<ProjectCard
-						slug={project.id}
-						title={project.data.title}
-						tagline={project.data.tagline}
-						category={project.data.category}
-						status={project.data.status}
-						heroImage={project.data.heroImage}
-					/>
+				projects.map((project, i) => (
+					<div class="reveal" style={`transition-delay: ${(i % 3) * 0.08}s`}>
+						<ProjectCard
+							slug={project.id}
+							title={project.data.title}
+							tagline={project.data.tagline}
+							category={project.data.category}
+							status={project.data.status}
+							heroImage={project.data.heroImage}
+						/>
+					</div>
 				))
 			}
 		</div>
@@ -128,6 +130,12 @@ const projects = [
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
 		gap: 1.4em;
+	}
+	.reveal {
+		display: flex;
+	}
+	.reveal :global(a.card) {
+		flex: 1;
 	}
 	@media (max-width: 720px) {
 		.grid {

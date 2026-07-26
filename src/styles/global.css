@@ -309,6 +309,29 @@ hr {
 	border-color: #4a3f22;
 }
 
+/* ---------- Scroll reveal ---------- */
+/* Elements fade + float up into place as they enter the viewport — see
+   revealOnScroll() in interactions.js. Elements already in view on page
+   load reveal almost immediately rather than waiting for a scroll. */
+.reveal {
+	opacity: 0;
+	transform: translateY(24px);
+	transition:
+		opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+		transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.is-visible {
+	opacity: 1;
+	transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+	.reveal {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
+}
+
 /* ---------- Custom cursor ---------- */
 /* Hides the native cursor and shows a custom dot instead. Only active when
    interactions.js confirms a real mouse is present (adds this class to

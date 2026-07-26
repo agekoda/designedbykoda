@@ -1,12 +1,32 @@
-// Global interaction layer: custom cursor (mix-blend-mode "difference" dot
-// that inverts whatever is under it), magnetic pull on buttons/pills, and a
-// sliding "island" highlight behind the hovered nav link.
-//
-// Only runs when the input device is a real mouse (pointer: fine) and the
-// person hasn't asked for reduced motion — on touch devices this script
-// does nothing, since none of this makes sense without a cursor.
+// Global interaction layer:
+// - custom cursor, magnetic buttons, nav island pill — only on real mice
+// - scroll reveal — runs everywhere (touch included), since it's not
+//   cursor-dependent; only prefers-reduced-motion skips it, via CSS.
 
 (function () {
+	// ---------- Scroll reveal ----------
+	// Fades + floats elements up into place as they enter the viewport.
+	// Anything already visible on load reveals almost immediately rather
+	// than waiting for a scroll.
+	const revealEls = document.querySelectorAll('.reveal');
+	if (revealEls.length) {
+		const observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						entry.target.classList.add('is-visible');
+						observer.unobserve(entry.target);
+					}
+				});
+			},
+			{ threshold: 0.15, rootMargin: '0px 0px -40px 0px' }
+		);
+		revealEls.forEach((el) => observer.observe(el));
+	}
+
+	// ---------- Cursor / magnetic buttons / nav pill ----------
+	// Only makes sense with a real mouse — skipped entirely on touch
+	// devices and when reduced motion is requested.
 	const canHover = window.matchMedia('(pointer: fine)').matches;
 	const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 	if (!canHover || reducedMotion) return;
@@ -55,7 +75,7 @@
 	// tuned per-element via data attributes, with sane defaults.
 	const magnets = document.querySelectorAll('[data-magnetic]');
 	magnets.forEach((el) => {
-		const strength = parseFloat(el.dataset.magneticStrength || '0.2');
+		const strength = parseFloat(el.dataset.magneticStrength || '0.35');
 		const radius = parseFloat(el.dataset.magneticRadius || '70');
 
 		el.addEventListener('mousemove', (e) => {
