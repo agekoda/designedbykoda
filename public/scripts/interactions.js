@@ -42,7 +42,7 @@
 	let mouseY = window.innerHeight / 2;
 	let cursorX = mouseX;
 	let cursorY = mouseY;
-	const trail = 0.4; // lower = laggier/smoother trailing, higher = tighter/snappier
+	const trail = 0.2; // lower = laggier/smoother trailing, higher = tighter/snappier
 
 	window.addEventListener('mousemove', (e) => {
 		mouseX = e.clientX;
