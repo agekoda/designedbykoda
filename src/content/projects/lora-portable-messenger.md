@@ -10,6 +10,9 @@ gallery:
   - "/images/projects/lora-portable-messenger/1.jpg"
   - "/images/projects/lora-portable-messenger/2.jpg"
   - "/images/projects/lora-portable-messenger/3.jpg"
+  - "/images/projects/lora-portable-messenger/4.jpg"
+  - "/images/projects/lora-portable-messenger/5.jpg"
+  - "/images/projects/lora-portable-messenger/6.jpg"
 galleryRatio: "3 / 4"
 ---
 
