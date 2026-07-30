@@ -42,7 +42,7 @@
 	let mouseY = window.innerHeight / 2;
 	let cursorX = mouseX;
 	let cursorY = mouseY;
-	const trail = 0.2; // lower = laggier/smoother trailing, higher = tighter/snappier
+	const trail = 0.4; // lower = laggier/smoother trailing, higher = tighter/snappier
 
 	window.addEventListener('mousemove', (e) => {
 		mouseX = e.clientX;
@@ -110,9 +110,15 @@
 			if (!el) return;
 			const navRect = nav.getBoundingClientRect();
 			const rect = el.getBoundingClientRect();
+			// Match the link's horizontal position/width exactly, but centre
+			// vertically within the nav row itself, rather than copying the
+			// link's own box top — every link should be the same height, so
+			// this keeps the pill visually centred regardless of any small
+			// padding/line-height quirk on the anchor.
+			const top = (navRect.height - rect.height) / 2;
 			pill.style.width = `${rect.width}px`;
 			pill.style.height = `${rect.height}px`;
-			pill.style.transform = `translate(${rect.left - navRect.left}px, ${rect.top - navRect.top}px)`;
+			pill.style.transform = `translate(${rect.left - navRect.left}px, ${top}px)`;
 			pill.classList.add('is-visible');
 		}
 
