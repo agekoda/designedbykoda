@@ -42,15 +42,18 @@ const {
 		<p class="tagline">{tagline}</p>
 	</div>
 
-	<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
-
-	{
-		model && (
-			<div class="model-section">
-				<ProjectModel src={model} alt={title} poster={heroImage} cameraOrbit={cameraOrbit} />
-			</div>
-		)
-	}
+	<div class="hero-row">
+		{
+			model && (
+				<div class="hero-row-model">
+					<ProjectModel src={model} alt={title} cameraOrbit={cameraOrbit} />
+				</div>
+			)
+		}
+		<div class="hero-row-image">
+			<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
+		</div>
+	</div>
 
 	<article class="prose">
 		<slot />
@@ -111,7 +114,56 @@ const {
 		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 		gap: 1em;
 	}
-	.model-section {
-		margin-top: 1.5em;
+
+	/* ---------- Hero + 3D model side-by-side row ---------- */
+	/* On desktop: model is a fixed-size square on the left, hero fills the
+	   remaining width at the same height (cropped via object-fit, same as
+	   everywhere else). Below the breakpoint they stack, each back to its
+	   own natural aspect ratio — squeezing both into a narrow phone width
+	   would make each too small to be worth much. */
+	.hero-row {
+		display: flex;
+		gap: 1em;
+		height: 300px;
+	}
+	.hero-row-model {
+		flex: 0 0 300px;
+	}
+	.hero-row-model :global(.model-slot) {
+		width: 300px;
+		height: 300px;
+		max-width: none;
+		margin: 0;
+		aspect-ratio: unset;
+	}
+	.hero-row-image {
+		flex: 1;
+		min-width: 0;
+	}
+	.hero-row-image :global(.img-slot) {
+		height: 100%;
+		aspect-ratio: unset;
+	}
+	@media (max-width: 640px) {
+		.hero-row {
+			flex-direction: column;
+			height: auto;
+		}
+		.hero-row-model {
+			flex: none;
+			width: 100%;
+		}
+		.hero-row-model :global(.model-slot) {
+			width: 100%;
+			height: auto;
+			aspect-ratio: 1 / 1;
+		}
+		.hero-row-image {
+			width: 100%;
+		}
+		.hero-row-image :global(.img-slot) {
+			height: auto;
+			aspect-ratio: 16 / 9;
+		}
 	}
 </style>
