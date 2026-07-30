@@ -42,11 +42,13 @@ const {
 		<p class="tagline">{tagline}</p>
 	</div>
 
+	<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
+
 	{
-		model ? (
-			<ProjectModel src={model} alt={title} poster={heroImage} cameraOrbit={cameraOrbit} />
-		) : (
-			<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
+		model && (
+			<div class="model-section">
+				<ProjectModel src={model} alt={title} poster={heroImage} cameraOrbit={cameraOrbit} />
+			</div>
 		)
 	}
 
@@ -108,5 +110,8 @@ const {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 		gap: 1em;
+	}
+	.model-section {
+		margin-top: 1.5em;
 	}
 </style>
