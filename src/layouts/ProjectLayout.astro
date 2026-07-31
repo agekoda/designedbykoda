@@ -115,37 +115,31 @@ const {
 		gap: 1em;
 	}
 
-	/* ---------- Hero + 3D model ---------- */
-	/* Bleeds to the full width of the browser window (not just the centered
-	   content column) via the standard "100vw + negative margin" trick —
-	   self-contained and viewport-relative, so unlike the earlier
-	   position:absolute approach it never depends on how much space
-	   happens to exist outside the column, and can't clip on a narrower
-	   screen.
-	   The row height and the model's width both come from the same
-	   clamp() expression — a definite value that doesn't depend on the
-	   other side to resolve first (the previous version relied on
-	   "stretch to fit children", a circular dependency some browsers
-	   failed to resolve, collapsing the model to nothing). */
+	/* ---------- Hero + 3D model side-by-side row ---------- */
+	/* On desktop: model is a fixed-size square on the left, hero fills the
+	   remaining width at the same height. Below the breakpoint they stack,
+	   each back to its own natural aspect ratio. Bleeds to the full width
+	   of the browser window (not just the centered content column) via
+	   the standard "100vw + negative margin" trick. */
 	.hero-row {
 		display: flex;
 		gap: 1em;
-		height: clamp(180px, 22vw, 320px);
+		height: 300px;
 		width: 100vw;
 		margin-left: calc(-50vw + 50%);
 	}
 	.hero-row-model {
-		flex: 0 0 clamp(180px, 22vw, 320px);
+		flex: 0 0 300px;
 	}
 	.hero-row-model :global(.model-slot) {
-		width: 100%;
-		height: 100%;
+		width: 300px;
+		height: 300px;
 		max-width: none;
 		margin: 0;
 		aspect-ratio: unset;
 	}
 	.hero-row-image {
-		flex: 1 1 auto;
+		flex: 1;
 		min-width: 0;
 	}
 	.hero-row-image :global(.img-slot) {
