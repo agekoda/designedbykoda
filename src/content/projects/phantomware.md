@@ -39,3 +39,36 @@ A fully custom-built multi-tool device based on the ESP32-S3, designed for wirel
 - Modular UI with multiple menu styles
 - File uploads over WiFi (SPIFFS)
 - Fully extensible tool framework
+
+## Phantomware vs. Flipper Zero
+
+| Feature | Phantomware | Flipper Zero* |
+| --- | --- | --- |
+| Microcontroller | ESP32 S3 Dual-core XTensa LX7 | STM32WB55RG |
+| Bluetooth and WiFi? | Bluetooth 5 & WiFi 4 | Bluetooth 5.4 |
+| Display | 2" 240x320 TFT LCD | 1.4" 128x64 Monochrome |
+| IR Transceiver | 3x VSMY14940 LEDs + TSOP75438WTR | 3x VSMY14940 + TSOP75338TR |
+| NFC Support | PN532 via SPI | ST25R3916 |
+| Battery & Power Mgmt | 3000mAh LiPo + TP4056 + MAX17055 | 2100mAh + BQ25896 + BQ27220 |
+| Expansion Options | Micro SD + 16 GPIOs | Micro SD + 18 GPIOs |
+| Target Use Case | Signal analysis, RFID/NFC, IR, tinkering | Sub-GHz, RFID/NFC, IR, utility |
+| Open Source? | Open Source & fully customisable | Open Source with limitations |
+| Typical Price Point | ~$50 USD | $200 USD |
+
+*Information for Flipper Zero is based on publicly available specifications and may vary.*
+
+## Schematics & Drawings
+
+Front, back, 3D views, PCB layout, and schematic.
+
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1em; margin: 1.5em 0;">
+  <img src="/images/projects/phantomware/schematics/front.png" alt="Front of PCB" />
+  <img src="/images/projects/phantomware/schematics/back.png" alt="Back of PCB" />
+  <img src="/images/projects/phantomware/schematics/pcb.png" alt="PCB wiring / routing" />
+  <img src="/images/projects/phantomware/schematics/3d-1.png" alt="3D view — angle 1" />
+  <img src="/images/projects/phantomware/schematics/3d-2.png" alt="3D view — angle 2" />
+  <img src="/images/projects/phantomware/schematics/3d-3.png" alt="3D view — angle 3" />
+  <img src="/images/projects/phantomware/schematics/3d-4.png" alt="3D view — angle 4" />
+</div>
+
+[View full schematic (PDF)](/images/projects/phantomware/schematics/schematic.pdf)

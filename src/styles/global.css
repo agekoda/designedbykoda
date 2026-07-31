@@ -140,6 +140,34 @@ input {
 }
 table {
 	width: 100%;
+	border-collapse: collapse;
+	display: block;
+	overflow-x: auto;
+	margin: 1.5em 0;
+	font-size: 0.92em;
+}
+th,
+td {
+	text-align: left;
+	padding: 0.7em 1em;
+	border-bottom: 1px solid var(--border);
+	white-space: nowrap;
+}
+thead th {
+	background: var(--bg-raised);
+	color: var(--fg);
+	font-weight: 700;
+	border-bottom: 2px solid var(--accent-dark);
+}
+tbody td:first-child {
+	color: var(--fg);
+	font-weight: 700;
+}
+tbody td {
+	color: var(--muted);
+}
+tbody tr:last-child td {
+	border-bottom: none;
 }
 img {
 	max-width: 100%;
