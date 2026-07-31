@@ -117,10 +117,10 @@ const {
 
 	/* ---------- Hero + 3D model side-by-side row ---------- */
 	/* On desktop: model is a fixed-size square on the left, hero fills the
-	   remaining width at the same height. Below the breakpoint they stack,
-	   each back to its own natural aspect ratio. Bleeds to the full width
-	   of the browser window (not just the centered content column) via
-	   the standard "100vw + negative margin" trick. */
+	   remaining width at the same height (cropped via object-fit, same as
+	   everywhere else). Below the breakpoint they stack, each back to its
+	   own natural aspect ratio — squeezing both into a narrow phone width
+	   would make each too small to be worth much. */
 	.hero-row {
 		display: flex;
 		gap: 1em;
