@@ -61,7 +61,7 @@ A fully custom-built multi-tool device based on the ESP32-S3, designed for wirel
 
 Front, back, 3D views, PCB layout, and schematic.
 
-<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1em; margin: 1.5em 0;">
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1em; margin: 1.5em 0;">
   <img src="/images/projects/phantomware/schematics/front.png" alt="Front of PCB" />
   <img src="/images/projects/phantomware/schematics/back.png" alt="Back of PCB" />
   <img src="/images/projects/phantomware/schematics/pcb.png" alt="PCB wiring / routing" />
