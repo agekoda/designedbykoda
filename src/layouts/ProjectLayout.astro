@@ -116,19 +116,23 @@ const {
 	}
 
 	/* ---------- Hero + 3D model ---------- */
-	/* Both the row height and the model's width use the same clamp()
-	   expression — a definite, self-contained value that scales with the
-	   viewport but never depends on the other element to resolve. The
-	   previous version relied on the model stretching to "100% of its
-	   flex container's height", but that container's own height was only
-	   defined by stretching to fit its children — a circular dependency
-	   some browsers fail to resolve, collapsing the model to zero size.
-	   Definite values on both sides sidesteps that entirely, and stays
-	   consistent across any screen width without ever clipping. */
+	/* Bleeds to the full width of the browser window (not just the centered
+	   content column) via the standard "100vw + negative margin" trick —
+	   self-contained and viewport-relative, so unlike the earlier
+	   position:absolute approach it never depends on how much space
+	   happens to exist outside the column, and can't clip on a narrower
+	   screen.
+	   The row height and the model's width both come from the same
+	   clamp() expression — a definite value that doesn't depend on the
+	   other side to resolve first (the previous version relied on
+	   "stretch to fit children", a circular dependency some browsers
+	   failed to resolve, collapsing the model to nothing). */
 	.hero-row {
 		display: flex;
 		gap: 1em;
 		height: clamp(180px, 22vw, 320px);
+		width: 100vw;
+		margin-left: calc(-50vw + 50%);
 	}
 	.hero-row-model {
 		flex: 0 0 clamp(180px, 22vw, 320px);
