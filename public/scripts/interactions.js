@@ -2,32 +2,8 @@
 // - custom cursor, magnetic buttons, nav island pill — only on real mice
 // - scroll reveal — runs everywhere (touch included), since it's not
 //   cursor-dependent; only prefers-reduced-motion skips it, via CSS.
-// - full-bleed hero row — runs everywhere, fixes a CSS-only limitation.
 
 (function () {
-	// ---------- Full-bleed hero row ----------
-	// The CSS width:100vw + negative-margin trick is subject to a common
-	// gotcha: 100vw includes the width of the scrollbar, but the actually
-	// visible content area doesn't — so on any browser/OS with a visible
-	// scrollbar, the math is off by that many pixels, leaving a small gap
-	// on one side. Measuring the real position and width directly in JS
-	// sidesteps the issue entirely rather than fighting the CSS formula.
-	function updateHeroBleed() {
-		document.querySelectorAll('.hero-row').forEach((el) => {
-			// Reset first so getBoundingClientRect measures the row's
-			// natural (un-bled) position before re-offsetting it.
-			el.style.marginLeft = '';
-			el.style.width = '';
-			const rect = el.getBoundingClientRect();
-			el.style.marginLeft = `${-rect.left}px`;
-			el.style.width = `${document.documentElement.clientWidth}px`;
-		});
-	}
-	if (document.querySelector('.hero-row')) {
-		updateHeroBleed();
-		window.addEventListener('resize', updateHeroBleed);
-	}
-
 	// ---------- Scroll reveal ----------
 	// Fades + floats elements up into place as they enter the viewport.
 	// Anything already visible on load reveals almost immediately rather
