@@ -114,22 +114,21 @@ const {
 	}
 
 	/* ---------- Hero + 3D model ---------- */
-	/* The hero image is completely untouched — full column width, natural
-	   16:9 shape, same as every other project. The 3D model (when present)
-	   floats as an extra square box in the left margin/gutter next to it,
-	   sized to match the hero's rendered height, bleeding toward the
-	   screen edge on that side only. Below ~1100px there usually isn't
-	   enough gutter space for this to look right, so it stacks above the
-	   hero instead. */
+	/* Model sits inside the normal content column, directly beside the hero
+	   photo — not floated into the outer page margin. That margin-based
+	   approach looked fine on a wide monitor but broke (clipped/pushed
+	   off-screen) on narrower laptop screens, since it depended on how much
+	   space happened to exist outside the centered column. Keeping both
+	   elements in normal flex flow means the layout is identical on every
+	   screen size — the model just scales down proportionally along with
+	   the hero on a narrower screen, rather than ever clipping. */
 	.hero-row {
-		position: relative;
+		display: flex;
+		align-items: stretch;
+		gap: 1em;
 	}
 	.hero-row-model {
-		position: absolute;
-		top: 0;
-		bottom: 0;
-		right: calc(100% + 1em);
-		aspect-ratio: 1 / 1;
+		flex: 0 0 auto;
 	}
 	.hero-row-model :global(.model-slot) {
 		width: auto;
@@ -138,12 +137,16 @@ const {
 		margin: 0;
 		aspect-ratio: 1 / 1;
 	}
-	@media (max-width: 1100px) {
+	.hero-row-image {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+	@media (max-width: 640px) {
+		.hero-row {
+			flex-direction: column;
+		}
 		.hero-row-model {
-			position: static;
 			width: 100%;
-			aspect-ratio: 1 / 1;
-			margin-bottom: 1em;
 		}
 		.hero-row-model :global(.model-slot) {
 			width: 100%;
