@@ -435,7 +435,7 @@ html.has-custom-cursor .lightbox-overlay img {
 	background: #fff;
 	mix-blend-mode: difference;
 	pointer-events: none;
-	z-index: 9999;
+	z-index: 10001;
 	transform: translate(-50%, -50%);
 	transition:
 		width 0.25s cubic-bezier(0.16, 1, 0.3, 1),
