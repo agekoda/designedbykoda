@@ -50,9 +50,7 @@ const {
 				</div>
 			)
 		}
-		<div class="hero-row-image">
-			<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
-		</div>
+		<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
 	</div>
 
 	<article class="prose">
@@ -115,57 +113,41 @@ const {
 		gap: 1em;
 	}
 
-	/* ---------- Hero + 3D model side-by-side row ---------- */
-	/* On desktop: model is a fixed-size square on the left, hero fills the
-	   remaining width at the same height (cropped via object-fit, same as
-	   everywhere else). Below the breakpoint they stack, each back to its
-	   own natural aspect ratio — squeezing both into a narrow phone width
-	   would make each too small to be worth much. */
+	/* ---------- Hero + 3D model ---------- */
+	/* The hero image is completely untouched — full column width, natural
+	   16:9 shape, same as every other project. The 3D model (when present)
+	   floats as an extra square box in the left margin/gutter next to it,
+	   sized to match the hero's rendered height, bleeding toward the
+	   screen edge on that side only. Below ~1100px there usually isn't
+	   enough gutter space for this to look right, so it stacks above the
+	   hero instead. */
 	.hero-row {
-		display: flex;
-		gap: 1em;
-		height: 300px;
-		width: 100vw;
-		margin-left: calc(-50vw + 50%);
+		position: relative;
 	}
 	.hero-row-model {
-		flex: 0 0 300px;
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		right: calc(100% + 1em);
+		aspect-ratio: 1 / 1;
 	}
 	.hero-row-model :global(.model-slot) {
-		width: 300px;
-		height: 300px;
+		width: auto;
+		height: 100%;
 		max-width: none;
 		margin: 0;
-		aspect-ratio: unset;
+		aspect-ratio: 1 / 1;
 	}
-	.hero-row-image {
-		flex: 1;
-		min-width: 0;
-	}
-	.hero-row-image :global(.img-slot) {
-		height: 100%;
-		aspect-ratio: unset;
-	}
-	@media (max-width: 640px) {
-		.hero-row {
-			flex-direction: column;
-			height: auto;
-		}
+	@media (max-width: 1100px) {
 		.hero-row-model {
-			flex: none;
+			position: static;
 			width: 100%;
+			aspect-ratio: 1 / 1;
+			margin-bottom: 1em;
 		}
 		.hero-row-model :global(.model-slot) {
 			width: 100%;
 			height: auto;
-			aspect-ratio: 1 / 1;
-		}
-		.hero-row-image {
-			width: 100%;
-		}
-		.hero-row-image :global(.img-slot) {
-			height: auto;
-			aspect-ratio: 16 / 9;
 		}
 	}
 </style>
