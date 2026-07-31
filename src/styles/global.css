@@ -151,7 +151,6 @@ td {
 	text-align: left;
 	padding: 0.7em 1em;
 	border-bottom: 1px solid var(--border);
-	white-space: nowrap;
 }
 thead th {
 	background: var(--bg-raised);
@@ -335,6 +334,62 @@ hr {
 .tag.status-upcoming {
 	color: #e0c07a;
 	border-color: #4a3f22;
+}
+
+/* ---------- Image lightbox ---------- */
+/* Every image gets a subtle hover-zoom and opens fullscreen on click,
+   except project card thumbnails (those are links to the project page,
+   not standalone images) — excluded via :not(.card img) below. Overlay
+   markup/behaviour lives in interactions.js. */
+main img:not(.card img) {
+	cursor: zoom-in;
+	transition: transform 0.25s ease;
+}
+main img:not(.card img):hover {
+	transform: scale(1.03);
+}
+.lightbox-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(5, 5, 5, 0.94);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 10000;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.25s ease;
+	padding: 3em 2em;
+}
+.lightbox-overlay.is-open {
+	opacity: 1;
+	pointer-events: auto;
+}
+.lightbox-overlay img {
+	max-width: 90vw;
+	max-height: 88vh;
+	border-radius: 10px;
+	box-shadow: var(--box-shadow);
+	cursor: default;
+	transition: none;
+}
+.lightbox-overlay img:hover {
+	transform: none;
+}
+.lightbox-close {
+	position: absolute;
+	top: 1.2em;
+	right: 1.5em;
+	background: none;
+	border: none;
+	color: var(--fg);
+	font-size: 2.4em;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0.2em 0.35em;
+}
+.lightbox-close:hover {
+	color: var(--accent);
 }
 
 /* ---------- Scroll reveal ---------- */

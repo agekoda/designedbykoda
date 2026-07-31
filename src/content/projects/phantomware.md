@@ -71,4 +71,10 @@ Front, back, 3D views, PCB layout, and schematic.
   <img src="/images/projects/phantomware/schematics/3d-4.png" alt="3D view — angle 4" />
 </div>
 
-[View full schematic (PDF)](/images/projects/phantomware/schematics/schematic.pdf)
+**Schematic (PDF)**
+
+<div style="margin: 1.5em 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden;">
+  <iframe src="/images/projects/phantomware/schematics/schematic.pdf" style="width:100%; height:600px; border:none; display:block; background:#fff;" title="Phantomware schematic PDF"></iframe>
+</div>
+
+[Open schematic in a new tab](/images/projects/phantomware/schematics/schematic.pdf)

@@ -2,8 +2,49 @@
 // - custom cursor, magnetic buttons, nav island pill — only on real mice
 // - scroll reveal — runs everywhere (touch included), since it's not
 //   cursor-dependent; only prefers-reduced-motion skips it, via CSS.
+// - image lightbox — runs everywhere, click any non-card image to view
+//   it fullscreen.
 
 (function () {
+	// ---------- Image lightbox ----------
+	// Every <img> inside <main> opens fullscreen on click, except project
+	// card thumbnails (those navigate to the project page instead — see
+	// the .card exclusion below). Works on any image on the site,
+	// including plain <img> tags typed directly into markdown content
+	// (e.g. the schematic photos), not just ones from our own components.
+	const overlay = document.createElement('div');
+	overlay.className = 'lightbox-overlay';
+	overlay.innerHTML = '<button class="lightbox-close" aria-label="Close">&times;</button><img alt="" />';
+	document.body.appendChild(overlay);
+	const overlayImg = overlay.querySelector('img');
+	const closeBtn = overlay.querySelector('.lightbox-close');
+
+	function openLightbox(src, alt) {
+		overlayImg.src = src;
+		overlayImg.alt = alt || '';
+		overlay.classList.add('is-open');
+		document.body.style.overflow = 'hidden';
+	}
+	function closeLightbox() {
+		overlay.classList.remove('is-open');
+		document.body.style.overflow = '';
+	}
+
+	document.querySelectorAll('main img:not(.card img)').forEach((img) => {
+		img.addEventListener('click', () => {
+			openLightbox(img.currentSrc || img.src, img.alt);
+		});
+	});
+	// Clicking anywhere in the overlay except the enlarged image itself
+	// closes it — covers the close button and clicking the dark
+	// background/sides around the image.
+	overlay.addEventListener('click', (e) => {
+		if (e.target !== overlayImg) closeLightbox();
+	});
+	document.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape') closeLightbox();
+	});
+
 	// ---------- Scroll reveal ----------
 	// Fades + floats elements up into place as they enter the viewport.
 	// Anything already visible on load reveals almost immediately rather
