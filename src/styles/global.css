@@ -370,7 +370,6 @@ main img:not(.card img):hover {
 	max-height: 88vh;
 	border-radius: 10px;
 	box-shadow: var(--box-shadow);
-	cursor: default;
 	transition: none;
 }
 .lightbox-overlay img:hover {
@@ -421,7 +420,9 @@ main img:not(.card img):hover {
    <html>) — otherwise the native cursor stays untouched. */
 html.has-custom-cursor,
 html.has-custom-cursor a,
-html.has-custom-cursor button {
+html.has-custom-cursor button,
+html.has-custom-cursor main img:not(.card img),
+html.has-custom-cursor .lightbox-overlay img {
 	cursor: none;
 }
 .custom-cursor {
