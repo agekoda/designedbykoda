@@ -155,14 +155,21 @@ const {
 		position: absolute;
 		top: 50%;
 		transform: translateY(-50%);
-		width: 280px;
+		max-width: 480px;
 		aspect-ratio: 1 / 1;
 	}
 	.hero-row-model-left {
 		right: calc(100% + 1em);
+		/* Pulls the left edge out to the true viewport edge — same trick
+		   as the full-bleed hero row used elsewhere. Combined with the
+		   right anchor above and no explicit width, the browser sizes
+		   this box to automatically fill the entire gap, whatever that
+		   happens to be at the current screen width. */
+		left: calc(-50vw + 50%);
 	}
 	.hero-row-model-right {
 		left: calc(100% + 1em);
+		right: calc(-50vw + 50%);
 	}
 	.hero-row-model :global(.model-slot) {
 		width: 100%;
@@ -180,6 +187,7 @@ const {
 		.hero-row-model {
 			position: static;
 			width: 100%;
+			max-width: none;
 			aspect-ratio: 1 / 1;
 		}
 		.hero-row-model :global(.model-slot) {
