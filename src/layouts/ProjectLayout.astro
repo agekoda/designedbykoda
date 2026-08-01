@@ -173,15 +173,19 @@ const {
 	.hero-row-model-left {
 		right: calc(100% + 1em);
 		/* Pulls the left edge out to the true viewport edge — same trick
-		   as the full-bleed hero row used elsewhere. Combined with the
-		   right anchor above and no explicit width, the browser sizes
-		   this box to automatically fill the entire gap, whatever that
-		   happens to be at the current screen width. */
-		left: calc(-50vw + 50%);
+		   as the full-bleed hero row used elsewhere. The +12px nudge is a
+		   safety margin: the vw-based math can land a couple of pixels
+		   into negative territory depending on the browser's actual
+		   scrollbar width, which barely matters for the model itself but
+		   was clipping the first pixel or two of left-aligned caption
+		   text. Combined with the right anchor above and no explicit
+		   width, the browser still sizes this box to fill essentially the
+		   entire gap, just with a small buffer against that edge case. */
+		left: calc(-50vw + 50% + 12px);
 	}
 	.hero-row-model-right {
 		left: calc(100% + 1em);
-		right: calc(-50vw + 50%);
+		right: calc(-50vw + 50% + 12px);
 	}
 	.hero-row-model-box {
 		width: 100%;

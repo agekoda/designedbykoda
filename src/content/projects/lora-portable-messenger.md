@@ -16,7 +16,7 @@ gallery:
 galleryRatio: "3 / 4"
 model: "/models/projects/lora-portable-messenger/model.glb"
 modelCaption: "Assembled PCB"
-cameraOrbit: "0deg 40deg 110%"
+cameraOrbit: "0deg 40deg auto"
 ---
 
 A rugged, feature-packed handheld messenger built around LoRa for long-range, infrastructure-free communication.
