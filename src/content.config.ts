@@ -41,12 +41,16 @@ const projects = defineCollection({
 		// Auto-rotate speed, e.g. "8deg/s" or "-8deg/s" for the other
 		// direction. Defaults to ProjectModel.astro's own default if unset.
 		rotationSpeed: z.string().optional(),
+		// Small caption shown below the left model, left-aligned.
+		modelCaption: z.string().optional(),
 		// Optional second 3D model, shown on the right of the hero instead
 		// of the left. Fully independent of the first — its own camera
 		// angle and rotation speed, both optional with the same defaults.
 		model2: z.string().optional(),
 		cameraOrbit2: z.string().optional(),
 		rotationSpeed2: z.string().optional(),
+		// Small caption shown below the right model, right-aligned.
+		model2Caption: z.string().optional(),
 		gallery: z.array(z.string()).default([]),
 		// Aspect ratio (CSS aspect-ratio value) for the gallery images on this
 		// project's page. Defaults to landscape; set to "3 / 4" for portrait
