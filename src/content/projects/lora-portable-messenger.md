@@ -14,6 +14,7 @@ gallery:
   - "/images/projects/lora-portable-messenger/5.jpg"
   - "/images/projects/lora-portable-messenger/6.jpg"
 galleryRatio: "3 / 4"
+model: "/models/projects/lora-portable-messenger/model.glb"
 ---
 
 A rugged, feature-packed handheld messenger built around LoRa for long-range, infrastructure-free communication.
