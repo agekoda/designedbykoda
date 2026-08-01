@@ -15,6 +15,7 @@ gallery:
   - "/images/projects/lora-portable-messenger/6.jpg"
 galleryRatio: "3 / 4"
 model: "/models/projects/lora-portable-messenger/model.glb"
+modelCaption: "Assembled PCB"
 cameraOrbit: "0deg 40deg 110%"
 ---
 

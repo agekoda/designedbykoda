@@ -8,7 +8,10 @@ order: 12
 heroImage: "/images/projects/smart-energy-meter-puck/hero.jpg"
 gallery: []
 model: "/models/projects/smart-energy-meter-puck/model.glb"
+modelCaption: "Power Puck and Hub"
 model2: "/models/projects/smart-energy-meter-puck/model2.glb"
+model2Caption: "Power Puck PCB"
+cameraOrbit: "0deg 50deg auto"
 ---
 
 A low-power, magnetically mounted energy monitoring device. Currently in development.
