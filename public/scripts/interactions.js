@@ -12,19 +12,26 @@
 	// in ProjectLayout.astro, in case JS fails to run) is subject to a
 	// common gotcha: 100vw includes the width of the scrollbar, but the
 	// actually visible content area doesn't — so on any browser/OS with a
-	// visible scrollbar, the math is off by that many pixels, leaving a
-	// small gap on one side (this is exactly what caused it to only look
-	// right at 100% browser zoom on some screens). Measuring the real
-	// position and width directly in JS sidesteps the issue entirely
-	// rather than fighting the CSS formula.
+	// visible scrollbar, the math is off, leaving a small gap on one side.
+	//
+	// Fixing that precisely in JS requires measuring the row's *natural*
+	// (un-bled) position — but by the time this script runs, the CSS rule
+	// has already shifted it. Measuring the row itself at that point means
+	// measuring the already-corrected position, computing a near-zero
+	// "correction" from that, and that correction (as an inline style)
+	// then overrides and cancels the CSS rule's bleed entirely — which is
+	// exactly what caused the row to collapse back into the centered
+	// column while its forced width still overflowed the other side.
+	//
+	// Fix: measure <main> instead, which never has this margin trick
+	// applied to it, so its position is always a reliable, stable
+	// reference — regardless of what the row's own CSS already did.
 	function updateHeroBleed() {
+		const main = document.querySelector('main');
+		if (!main) return;
+		const mainRect = main.getBoundingClientRect();
 		document.querySelectorAll('.hero-row').forEach((el) => {
-			// Reset first so getBoundingClientRect measures the row's
-			// natural (un-bled) position before re-offsetting it.
-			el.style.marginLeft = '';
-			el.style.width = '';
-			const rect = el.getBoundingClientRect();
-			el.style.marginLeft = `${-rect.left}px`;
+			el.style.marginLeft = `${-mainRect.left}px`;
 			el.style.width = `${document.documentElement.clientWidth}px`;
 		});
 	}
