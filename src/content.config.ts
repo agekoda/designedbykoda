@@ -38,6 +38,9 @@ const projects = defineCollection({
 		// (model-viewer's camera-orbit format). Defaults to a slightly
 		// top-down angle in ProjectModel.astro if not set here.
 		cameraOrbit: z.string().optional(),
+		// Auto-rotate speed, e.g. "8deg/s" or "-8deg/s" for the other
+		// direction. Defaults to ProjectModel.astro's own default if unset.
+		rotationSpeed: z.string().optional(),
 		gallery: z.array(z.string()).default([]),
 		// Aspect ratio (CSS aspect-ratio value) for the gallery images on this
 		// project's page. Defaults to landscape; set to "3 / 4" for portrait

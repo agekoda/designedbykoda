@@ -12,9 +12,16 @@ interface Props {
 	alt?: string;
 	poster?: string;
 	cameraOrbit?: string;
+	rotationSpeed?: string;
 }
 
-const { src, alt = '3D model', poster, cameraOrbit = '0deg 55deg auto' } = Astro.props;
+const {
+	src,
+	alt = '3D model',
+	poster,
+	cameraOrbit = '0deg 55deg auto',
+	rotationSpeed = '-8deg/s',
+} = Astro.props;
 const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 ---
 
@@ -36,7 +43,7 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 				environment-image="neutral"
 				auto-rotate
 				auto-rotate-delay="0"
-				rotation-per-second="-8deg/s"
+				rotation-per-second={rotationSpeed}
 				camera-orbit={cameraOrbit}
 			>
 				<div slot="progress-bar" />

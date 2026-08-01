@@ -12,6 +12,7 @@ interface Props {
 	heroImage?: string;
 	model?: string;
 	cameraOrbit?: string;
+	rotationSpeed?: string;
 	gallery?: string[];
 	galleryRatio?: string;
 }
@@ -25,6 +26,7 @@ const {
 	heroImage,
 	model,
 	cameraOrbit,
+	rotationSpeed,
 	gallery = [],
 	galleryRatio = '4 / 3',
 } = Astro.props;
@@ -46,7 +48,12 @@ const {
 		{
 			model && (
 				<div class="hero-row-model">
-					<ProjectModel src={model} alt={title} cameraOrbit={cameraOrbit} />
+					<ProjectModel
+						src={model}
+						alt={title}
+						cameraOrbit={cameraOrbit}
+						rotationSpeed={rotationSpeed}
+					/>
 				</div>
 			)
 		}
