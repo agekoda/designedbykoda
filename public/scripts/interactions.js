@@ -4,8 +4,35 @@
 //   cursor-dependent; only prefers-reduced-motion skips it, via CSS.
 // - image lightbox — runs everywhere, click any non-card image to view
 //   it fullscreen.
+// - full-bleed hero row — runs everywhere, fixes a CSS-only limitation.
 
 (function () {
+	// ---------- Full-bleed hero row ----------
+	// The CSS width:100vw + negative-margin trick (still set as a baseline
+	// in ProjectLayout.astro, in case JS fails to run) is subject to a
+	// common gotcha: 100vw includes the width of the scrollbar, but the
+	// actually visible content area doesn't — so on any browser/OS with a
+	// visible scrollbar, the math is off by that many pixels, leaving a
+	// small gap on one side (this is exactly what caused it to only look
+	// right at 100% browser zoom on some screens). Measuring the real
+	// position and width directly in JS sidesteps the issue entirely
+	// rather than fighting the CSS formula.
+	function updateHeroBleed() {
+		document.querySelectorAll('.hero-row').forEach((el) => {
+			// Reset first so getBoundingClientRect measures the row's
+			// natural (un-bled) position before re-offsetting it.
+			el.style.marginLeft = '';
+			el.style.width = '';
+			const rect = el.getBoundingClientRect();
+			el.style.marginLeft = `${-rect.left}px`;
+			el.style.width = `${document.documentElement.clientWidth}px`;
+		});
+	}
+	if (document.querySelector('.hero-row')) {
+		updateHeroBleed();
+		window.addEventListener('resize', updateHeroBleed);
+	}
+
 	// ---------- Image lightbox ----------
 	// Every <img> inside <main> opens fullscreen on click, except project
 	// card thumbnails (those navigate to the project page instead — see
