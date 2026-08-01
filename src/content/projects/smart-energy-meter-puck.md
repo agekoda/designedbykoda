@@ -8,6 +8,7 @@ order: 12
 heroImage: "/images/projects/smart-energy-meter-puck/hero.jpg"
 gallery: []
 model: "/models/projects/smart-energy-meter-puck/model.glb"
+model2: "/models/projects/smart-energy-meter-puck/model2.glb"
 ---
 
 A low-power, magnetically mounted energy monitoring device. Currently in development.

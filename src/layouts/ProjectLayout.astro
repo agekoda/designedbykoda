@@ -53,7 +53,7 @@ const {
 	<div class="hero-row">
 		{
 			model && (
-				<div class="hero-row-model">
+				<div class="hero-row-model hero-row-model-left">
 					<ProjectModel
 						src={model}
 						alt={title}
@@ -63,12 +63,10 @@ const {
 				</div>
 			)
 		}
-		<div class="hero-row-image">
-			<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
-		</div>
+		<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
 		{
 			model2 && (
-				<div class="hero-row-model">
+				<div class="hero-row-model hero-row-model-right">
 					<ProjectModel
 						src={model2}
 						alt={title}
@@ -141,58 +139,55 @@ const {
 	}
 
 	/* ---------- Hero + 3D model(s) ---------- */
-	/* Up to two models can flank the hero photo — one on the left, one on
-	   the right — plus the hero itself in the middle. All three (or two,
-	   or one) sit in a normal flex row, in document flow. The row height
-	   and each model's width both come from the same clamp() expression:
-	   a definite value that doesn't depend on anything else to resolve
-	   first, so it can't collapse or clip regardless of how many of the
-	   three slots are actually present, or how narrow the screen is. */
+	/* The hero photo is completely untouched — same fixed column width,
+	   same natural 16:9 shape, whether a model is present or not. Models
+	   (up to one on each side) are purely decorative extras, positioned
+	   with position:absolute anchored to the hero's own box, extending
+	   out into the page margin — they never affect the hero's own size
+	   or position in any way.
+	   Below MODEL_BREAKPOINT there usually isn't enough margin space for
+	   this to look right (or not clip), so models stack above/below the
+	   hero instead — verified against real rendered widths, not guessed. */
 	.hero-row {
-		display: flex;
-		gap: 1em;
-		height: clamp(180px, 22vw, 320px);
-		width: 100vw;
-		margin-left: calc(-50vw + 50%);
+		position: relative;
 	}
 	.hero-row-model {
-		flex: 0 0 clamp(180px, 22vw, 320px);
+		position: absolute;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 280px;
+		aspect-ratio: 1 / 1;
+	}
+	.hero-row-model-left {
+		right: calc(100% + 1em);
+	}
+	.hero-row-model-right {
+		left: calc(100% + 1em);
 	}
 	.hero-row-model :global(.model-slot) {
 		width: 100%;
 		height: 100%;
 		max-width: none;
 		margin: 0;
-		aspect-ratio: unset;
+		aspect-ratio: 1 / 1;
 	}
-	.hero-row-image {
-		flex: 1 1 auto;
-		min-width: 0;
-	}
-	.hero-row-image :global(.img-slot) {
-		height: 100%;
-		aspect-ratio: unset;
-	}
-	@media (max-width: 640px) {
+	@media (max-width: 1500px) {
 		.hero-row {
+			display: flex;
 			flex-direction: column;
-			height: auto;
+			gap: 1em;
 		}
 		.hero-row-model {
-			flex: none;
+			position: static;
 			width: 100%;
+			aspect-ratio: 1 / 1;
 		}
 		.hero-row-model :global(.model-slot) {
 			width: 100%;
 			height: auto;
-			aspect-ratio: 1 / 1;
 		}
-		.hero-row-image {
-			width: 100%;
-		}
-		.hero-row-image :global(.img-slot) {
-			height: auto;
-			aspect-ratio: 16 / 9;
+		.hero-row-model-left {
+			order: -1;
 		}
 	}
 </style>
