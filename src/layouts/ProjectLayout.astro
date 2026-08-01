@@ -13,6 +13,9 @@ interface Props {
 	model?: string;
 	cameraOrbit?: string;
 	rotationSpeed?: string;
+	model2?: string;
+	cameraOrbit2?: string;
+	rotationSpeed2?: string;
 	gallery?: string[];
 	galleryRatio?: string;
 }
@@ -27,6 +30,9 @@ const {
 	model,
 	cameraOrbit,
 	rotationSpeed,
+	model2,
+	cameraOrbit2,
+	rotationSpeed2,
 	gallery = [],
 	galleryRatio = '4 / 3',
 } = Astro.props;
@@ -57,7 +63,21 @@ const {
 				</div>
 			)
 		}
-		<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
+		<div class="hero-row-image">
+			<ProjectImage src={heroImage} alt={title} ratio="16 / 9" />
+		</div>
+		{
+			model2 && (
+				<div class="hero-row-model">
+					<ProjectModel
+						src={model2}
+						alt={title}
+						cameraOrbit={cameraOrbit2}
+						rotationSpeed={rotationSpeed2}
+					/>
+				</div>
+			)
+		}
 	</div>
 
 	<article class="prose">
@@ -120,41 +140,57 @@ const {
 		gap: 1em;
 	}
 
-	/* ---------- Hero + 3D model ---------- */
-	/* The hero image is completely untouched — full column width, natural
-	   16:9 shape, same as every other project. The 3D model (when present)
-	   floats as an extra square box in the left margin/gutter next to it,
-	   sized to match the hero's rendered height, bleeding toward the
-	   screen edge on that side only. Below ~1100px there usually isn't
-	   enough gutter space for this to look right, so it stacks above the
-	   hero instead. */
+	/* ---------- Hero + 3D model(s) ---------- */
+	/* Up to two models can flank the hero photo — one on the left, one on
+	   the right — plus the hero itself in the middle. All three (or two,
+	   or one) sit in a normal flex row, in document flow. The row height
+	   and each model's width both come from the same clamp() expression:
+	   a definite value that doesn't depend on anything else to resolve
+	   first, so it can't collapse or clip regardless of how many of the
+	   three slots are actually present, or how narrow the screen is. */
 	.hero-row {
-		position: relative;
+		display: flex;
+		gap: 1em;
+		height: clamp(180px, 22vw, 320px);
 	}
 	.hero-row-model {
-		position: absolute;
-		top: 0;
-		bottom: 0;
-		right: calc(100% + 1em);
-		aspect-ratio: 1 / 1;
+		flex: 0 0 clamp(180px, 22vw, 320px);
 	}
 	.hero-row-model :global(.model-slot) {
-		width: auto;
+		width: 100%;
 		height: 100%;
 		max-width: none;
 		margin: 0;
-		aspect-ratio: 1 / 1;
+		aspect-ratio: unset;
 	}
-	@media (max-width: 1100px) {
+	.hero-row-image {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+	.hero-row-image :global(.img-slot) {
+		height: 100%;
+		aspect-ratio: unset;
+	}
+	@media (max-width: 640px) {
+		.hero-row {
+			flex-direction: column;
+			height: auto;
+		}
 		.hero-row-model {
-			position: static;
+			flex: none;
 			width: 100%;
-			aspect-ratio: 1 / 1;
-			margin-bottom: 1em;
 		}
 		.hero-row-model :global(.model-slot) {
 			width: 100%;
 			height: auto;
+			aspect-ratio: 1 / 1;
+		}
+		.hero-row-image {
+			width: 100%;
+		}
+		.hero-row-image :global(.img-slot) {
+			height: auto;
+			aspect-ratio: 16 / 9;
 		}
 	}
 </style>

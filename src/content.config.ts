@@ -32,7 +32,7 @@ const projects = defineCollection({
 		heroImage: z.string().optional(),
 		// Optional .glb path for an interactive 3D model, shown instead of the
 		// flat hero photo when present. Same placeholder convention as photos:
-		// the path doesn't need to exist yet.
+		// the path doesn't need to exist yet. Sits on the left of the hero.
 		model: z.string().optional(),
 		// Initial camera angle for the 3D model, as "azimuth polar radius"
 		// (model-viewer's camera-orbit format). Defaults to a slightly
@@ -41,6 +41,12 @@ const projects = defineCollection({
 		// Auto-rotate speed, e.g. "8deg/s" or "-8deg/s" for the other
 		// direction. Defaults to ProjectModel.astro's own default if unset.
 		rotationSpeed: z.string().optional(),
+		// Optional second 3D model, shown on the right of the hero instead
+		// of the left. Fully independent of the first — its own camera
+		// angle and rotation speed, both optional with the same defaults.
+		model2: z.string().optional(),
+		cameraOrbit2: z.string().optional(),
+		rotationSpeed2: z.string().optional(),
 		gallery: z.array(z.string()).default([]),
 		// Aspect ratio (CSS aspect-ratio value) for the gallery images on this
 		// project's page. Defaults to landscape; set to "3 / 4" for portrait
