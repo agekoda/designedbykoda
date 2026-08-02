@@ -11,7 +11,8 @@ model: "/models/projects/smart-energy-meter-puck/model.glb"
 modelCaption: "Power Puck and Hub"
 model2: "/models/projects/smart-energy-meter-puck/model2.glb"
 model2Caption: "Power Puck PCB"
-cameraOrbit: "180deg 45deg auto"
+cameraOrbit: "0deg 55deg auto"
+cameraOrbit2: "180deg 45deg auto"
 ---
 
 A low-power, magnetically mounted energy monitoring device. Currently in development.
