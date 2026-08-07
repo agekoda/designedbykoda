@@ -10,6 +10,7 @@ gallery:
   - "/images/projects/eink-family-calendar/1.jpg"
   - "/images/projects/eink-family-calendar/2.jpg"
   - "/images/projects/eink-family-calendar/3.jpg"
+  - "/images/projects/eink-family-calendar/4.jpg"
 galleryRatio: "3 / 4"
 ---
 
