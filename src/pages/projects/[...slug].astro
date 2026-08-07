@@ -28,6 +28,8 @@ const {
 	model2Caption,
 	gallery,
 	galleryRatio,
+	waitlist,
+	waitlistLabel,
 } = project.data;
 const { Content } = await render(project);
 ---
@@ -49,6 +51,8 @@ const { Content } = await render(project);
 	model2Caption={model2Caption}
 	gallery={gallery}
 	galleryRatio={galleryRatio}
+	waitlist={waitlist}
+	waitlistLabel={waitlistLabel}
 >
 	<Content />
 </ProjectLayout>

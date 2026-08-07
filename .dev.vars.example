@@ -1,0 +1,9 @@
+# Copy this file to .dev.vars (no extension change needed, just drop the
+# ".example") and fill in your real values for local testing with `astro dev`.
+# .dev.vars is already gitignored — never commit your real API key.
+#
+# For production, these same two values need to be set as Cloudflare
+# secrets instead — see the waitlist setup instructions.
+
+BREVO_API_KEY=your-brevo-api-key-here
+BREVO_LIST_ID=your-brevo-list-id-here

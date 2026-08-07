@@ -2,6 +2,7 @@
 import Layout from './Layout.astro';
 import ProjectImage from '../components/ProjectImage.astro';
 import ProjectModel from '../components/ProjectModel.astro';
+import WaitlistForm from '../components/WaitlistForm.astro';
 
 interface Props {
 	title: string;
@@ -20,6 +21,8 @@ interface Props {
 	model2Caption?: string;
 	gallery?: string[];
 	galleryRatio?: string;
+	waitlist?: boolean;
+	waitlistLabel?: string;
 }
 
 const {
@@ -39,6 +42,8 @@ const {
 	model2Caption,
 	gallery = [],
 	galleryRatio = '4 / 3',
+	waitlist = false,
+	waitlistLabel,
 } = Astro.props;
 ---
 
@@ -53,6 +58,8 @@ const {
 		<h1>{title}</h1>
 		<p class="tagline">{tagline}</p>
 	</div>
+
+	{waitlist && <WaitlistForm label={waitlistLabel} />}
 
 	<div class="hero-row">
 		{

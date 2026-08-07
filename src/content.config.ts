@@ -56,6 +56,10 @@ const projects = defineCollection({
 		// project's page. Defaults to landscape; set to "3 / 4" for portrait
 		// photos instead.
 		galleryRatio: z.string().default("4 / 3"),
+		// Set to true to show an email waitlist signup form near the top of
+		// this project's page. Optional custom label text for it.
+		waitlist: z.boolean().default(false),
+		waitlistLabel: z.string().optional(),
 	}),
 });
 

@@ -1,0 +1,141 @@
+---
+interface Props {
+	label?: string;
+}
+
+const { label = 'Join the waitlist — get notified when this launches' } = Astro.props;
+const formId = `waitlist-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<div class="waitlist" id={formId}>
+	<p class="waitlist-label">{label}</p>
+	<form class="waitlist-form" novalidate>
+		<label for={`${formId}-email`} class="sr-only">Email address</label>
+		<input
+			type="email"
+			id={`${formId}-email`}
+			name="email"
+			placeholder="you@example.com"
+			autocomplete="email"
+			required
+		/>
+		<button type="submit">Notify me</button>
+	</form>
+	<p class="waitlist-message" aria-live="polite"></p>
+</div>
+
+<script define:vars={{ formId }}>
+	const root = document.getElementById(formId);
+	const form = root.querySelector('.waitlist-form');
+	const input = root.querySelector('input');
+	const button = root.querySelector('button');
+	const message = root.querySelector('.waitlist-message');
+
+	form.addEventListener('submit', async (e) => {
+		e.preventDefault();
+		const email = input.value.trim();
+		if (!email) return;
+
+		button.disabled = true;
+		input.disabled = true;
+		button.textContent = 'Joining…';
+		message.textContent = '';
+		message.classList.remove('is-error');
+
+		try {
+			const res = await fetch('/api/waitlist', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ email }),
+			});
+			const data = await res.json().catch(() => ({}));
+
+			if (res.ok && data.ok) {
+				form.style.display = 'none';
+				message.textContent = "You're on the list — I'll email you when it's ready.";
+			} else {
+				message.textContent = data.error || 'Something went wrong — try again shortly.';
+				message.classList.add('is-error');
+				button.disabled = false;
+				input.disabled = false;
+				button.textContent = 'Notify me';
+			}
+		} catch {
+			message.textContent = 'Something went wrong — try again shortly.';
+			message.classList.add('is-error');
+			button.disabled = false;
+			input.disabled = false;
+			button.textContent = 'Notify me';
+		}
+	});
+</script>
+
+<style>
+	.waitlist {
+		margin: 1.5em 0;
+		padding: 1.3em 1.4em;
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+	}
+	.waitlist-label {
+		margin: 0 0 0.9em 0;
+		color: var(--fg);
+		font-weight: 700;
+		font-size: 1em;
+	}
+	.waitlist-form {
+		display: flex;
+		gap: 0.6em;
+		flex-wrap: wrap;
+	}
+	.waitlist-form input {
+		flex: 1 1 220px;
+		min-width: 0;
+		padding: 0.7em 1em;
+		border-radius: 999px;
+		border: 1px solid var(--border);
+		background: var(--bg);
+		color: var(--fg);
+		font-family: inherit;
+		font-size: 0.95em;
+	}
+	.waitlist-form input::placeholder {
+		color: var(--muted-dim);
+	}
+	.waitlist-form input:focus {
+		outline: none;
+		border-color: var(--accent-dark);
+	}
+	.waitlist-form button {
+		flex: 0 0 auto;
+		padding: 0.7em 1.4em;
+		border: none;
+		border-radius: 999px;
+		background: var(--fg);
+		color: var(--bg);
+		font-weight: 700;
+		font-size: 0.95em;
+		font-family: inherit;
+		cursor: pointer;
+	}
+	.waitlist-form button:hover:not(:disabled) {
+		background: var(--accent);
+	}
+	.waitlist-form button:disabled,
+	.waitlist-form input:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
+	.waitlist-message {
+		margin: 0.8em 0 0 0;
+		font-size: 0.88em;
+		color: var(--muted);
+	}
+	.waitlist-message.is-error {
+		color: #e08a8a;
+	}
+	.waitlist-message:empty {
+		display: none;
+	}
+</style>
