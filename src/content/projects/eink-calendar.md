@@ -14,6 +14,9 @@ gallery:
 galleryRatio: "3 / 4"
 waitlist: true
 waitlistLabel: "Want one for yourself? Join the waitlist and I'll email you when it's ready."
+model: "/models/projects/eink-calendar/model.glb"
+modelCaption: "E-Ink Calendar"
+cameraOrbit2: "0deg 45deg auto"
 ---
 
 A low-power e-ink display that syncs with Google Calendar, built for months of unattended battery life.
