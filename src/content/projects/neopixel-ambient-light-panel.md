@@ -10,7 +10,11 @@ gallery:
   - "/images/projects/neopixel-ambient-light-panel/1.jpg"
   - "/images/projects/neopixel-ambient-light-panel/2.jpg"
   - "/images/projects/neopixel-ambient-light-panel/3.jpg"
+model: "/models/projects/neopixel-ambient-light-panel/model.glb"
+modelCaption: "Neopixel Ambient Light Panel - Credit @madebydww"
+cameraOrbit: "0deg 45deg 120%"
 ---
+
 
 A smart lighting system designed for both ambient display and Home Assistant integration.
 
