@@ -6,28 +6,88 @@
 //   it fullscreen.
 
 (function () {
-	// ---------- Image lightbox ----------
+	// ---------- Image + model lightbox ----------
 	// Every <img> inside <main> opens fullscreen on click, except project
 	// card thumbnails (those navigate to the project page instead — see
 	// the .card exclusion below). Works on any image on the site,
 	// including plain <img> tags typed directly into markdown content
 	// (e.g. the schematic photos), not just ones from our own components.
+	// 3D models use the same overlay (see ProjectModel.astro, which calls
+	// window.openModelLightbox on a genuine click — not a drag-to-rotate).
 	const overlay = document.createElement('div');
 	overlay.className = 'lightbox-overlay';
-	overlay.innerHTML = '<button class="lightbox-close" aria-label="Close">&times;</button><img alt="" />';
+	overlay.innerHTML = '<button class="lightbox-close" aria-label="Close">&times;</button>';
 	document.body.appendChild(overlay);
-	const overlayImg = overlay.querySelector('img');
 	const closeBtn = overlay.querySelector('.lightbox-close');
+	let media = null; // whichever <img> or <model-viewer> is currently shown
+
+	function clearMedia() {
+		if (media) {
+			media.remove();
+			media = null;
+		}
+	}
 
 	function openLightbox(src, alt) {
-		overlayImg.src = src;
-		overlayImg.alt = alt || '';
+		clearMedia();
+		media = document.createElement('img');
+		media.src = src;
+		media.alt = alt || '';
+		overlay.appendChild(media);
 		overlay.classList.add('is-open');
 		document.body.style.overflow = 'hidden';
 	}
+
+	function openModelLightbox(src, cameraOrbit) {
+		clearMedia();
+		media = document.createElement('model-viewer');
+		media.setAttribute('src', src);
+		media.setAttribute('camera-controls', '');
+		media.setAttribute('auto-rotate', '');
+		media.setAttribute('interaction-prompt', 'none');
+		media.setAttribute('shadow-intensity', '1');
+		media.setAttribute('exposure', '1');
+		media.setAttribute('environment-image', 'neutral');
+		if (cameraOrbit) media.setAttribute('camera-orbit', cameraOrbit);
+		overlay.appendChild(media);
+		overlay.classList.add('is-open');
+		document.body.style.overflow = 'hidden';
+
+		// Same grab-cursor override as the inline models — model-viewer sets
+		// its own cursor (possibly inside its shadow root), which our
+		// custom-cursor system can't reach with plain CSS alone.
+		let rafId = null;
+		function forceCursorNone() {
+			if (document.documentElement.classList.contains('has-custom-cursor')) {
+				media.style.setProperty('cursor', 'none', 'important');
+				const root = media.shadowRoot;
+				if (root) {
+					root.querySelectorAll('*').forEach((el) => {
+						if (el.style && el.style.cursor && el.style.cursor !== 'none') {
+							el.style.setProperty('cursor', 'none', 'important');
+						}
+					});
+				}
+			}
+			rafId = requestAnimationFrame(forceCursorNone);
+		}
+		media.addEventListener('pointerenter', () => {
+			if (rafId === null) forceCursorNone();
+		});
+		media.addEventListener('pointerleave', () => {
+			if (rafId !== null) {
+				cancelAnimationFrame(rafId);
+				rafId = null;
+			}
+		});
+	}
+	// Exposed so ProjectModel.astro's click-vs-drag detection can call it.
+	window.openModelLightbox = openModelLightbox;
+
 	function closeLightbox() {
 		overlay.classList.remove('is-open');
 		document.body.style.overflow = '';
+		clearMedia();
 	}
 
 	document.querySelectorAll('main img:not(.card img)').forEach((img) => {
@@ -35,11 +95,10 @@
 			openLightbox(img.currentSrc || img.src, img.alt);
 		});
 	});
-	// Clicking anywhere in the overlay except the enlarged image itself
-	// closes it — covers the close button and clicking the dark
-	// background/sides around the image.
+	// Clicking anywhere in the overlay except the media itself closes it —
+	// covers the close button and clicking the dark background/sides.
 	overlay.addEventListener('click', (e) => {
-		if (e.target !== overlayImg) closeLightbox();
+		if (e.target !== media) closeLightbox();
 	});
 	document.addEventListener('keydown', (e) => {
 		if (e.key === 'Escape') closeLightbox();

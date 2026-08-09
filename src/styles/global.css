@@ -375,6 +375,12 @@ main img:not(.card img):hover {
 .lightbox-overlay img:hover {
 	transform: none;
 }
+.lightbox-overlay model-viewer {
+	width: min(90vw, 800px);
+	height: min(88vh, 800px);
+	border-radius: 10px;
+	background: transparent;
+}
 .lightbox-close {
 	position: absolute;
 	top: 1.2em;
@@ -423,6 +429,9 @@ html.has-custom-cursor a,
 html.has-custom-cursor button,
 html.has-custom-cursor main img:not(.card img),
 html.has-custom-cursor .lightbox-overlay img {
+	cursor: none;
+}
+html.has-custom-cursor .lightbox-overlay model-viewer {
 	cursor: none;
 }
 .custom-cursor {
