@@ -10,6 +10,9 @@ gallery:
   - "/images/projects/vfd-display-board/1.jpg"
   - "/images/projects/vfd-display-board/2.jpg"
   - "/images/projects/vfd-display-board/3.jpg"
+model: "/models/project/vfd-display-board/model.glb"
+modelCaption: "VFD Display Board"
+cameraOrbit: "0deg 40deg 120%"
 ---
 
 A custom two-VFD-tube desk display combining retro VFD aesthetics with modern smart-home connectivity. Full custom PCB and assembly — black resin back, 8001 transparent front, with a USB-C port lined up on the back with more precision than I can really explain.
