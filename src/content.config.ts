@@ -52,6 +52,9 @@ const projects = defineCollection({
 		// Small caption shown below the right model, right-aligned.
 		model2Caption: z.string().optional(),
 		gallery: z.array(z.string()).default([]),
+		// Optional small CTA banner shown at the bottom of this project's
+		// card on the homepage/projects grid, e.g. "Join the waitlist".
+		cardBanner: z.string().optional(),
 		// Aspect ratio (CSS aspect-ratio value) for the gallery images on this
 		// project's page. Defaults to landscape; set to "3 / 4" for portrait
 		// photos instead.

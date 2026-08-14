@@ -14,6 +14,7 @@ gallery:
   - "/images/projects/eink-calendar/5.jpg"
 galleryRatio: "3 / 4"
 waitlist: true
+cardBanner: "Join the waitlist now"
 waitlistLabel: "Want one for yourself? Join the waitlist and I'll email you when it's ready."
 model: "/models/projects/eink-calendar/model.glb"
 modelCaption: "E-Ink Calendar"
