@@ -5,6 +5,7 @@ import ProjectModel from '../components/ProjectModel.astro';
 import WaitlistForm from '../components/WaitlistForm.astro';
 
 interface Props {
+	slug: string;
 	title: string;
 	tagline: string;
 	description: string;
@@ -26,6 +27,7 @@ interface Props {
 }
 
 const {
+	slug,
 	title,
 	tagline,
 	description,
@@ -59,7 +61,7 @@ const {
 		<p class="tagline">{tagline}</p>
 	</div>
 
-	{waitlist && <WaitlistForm label={waitlistLabel} />}
+	{waitlist && <WaitlistForm label={waitlistLabel} listKey={slug} />}
 
 	<div class="hero-row">
 		{

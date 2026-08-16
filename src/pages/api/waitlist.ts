@@ -5,11 +5,28 @@ export const prerender = false;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Maps a project's slug to the Cloudflare env var holding that project's
+// own Brevo list ID — so different projects' waitlists land in separate
+// lists, and you can email each group about only what's relevant to them.
+// The client sends the slug (safe, public info — it's just the URL), never
+// a raw list ID directly, so there's no way to submit to an arbitrary list
+// by guessing numbers.
+// To add a new project's waitlist: add a line here, then set the matching
+// secret in Cloudflare (see the waitlist setup instructions).
+const LIST_ID_ENV_BY_SLUG = {
+	'eink-calendar': 'BREVO_LIST_ID_EINK_CALENDAR',
+	'smart-energy-meter-puck': 'BREVO_LIST_ID_POWER_PUCK',
+};
+// Used only if a request arrives with no slug, or one not yet in the map
+// above — not tied to any specific project.
+const FALLBACK_LIST_ENV = 'BREVO_LIST_ID';
+
 export async function POST({ request, locals }) {
-	let email;
+	let email, listKey;
 	try {
 		const body = await request.json();
 		email = typeof body.email === 'string' ? body.email.trim() : '';
+		listKey = typeof body.listKey === 'string' ? body.listKey.trim() : '';
 	} catch {
 		return json({ error: 'Invalid request.' }, 400);
 	}
@@ -20,7 +37,8 @@ export async function POST({ request, locals }) {
 
 	const env = locals.runtime?.env ?? {};
 	const apiKey = env.BREVO_API_KEY;
-	const listId = env.BREVO_LIST_ID;
+	const listEnvVar = LIST_ID_ENV_BY_SLUG[listKey] || FALLBACK_LIST_ENV;
+	const listId = env[listEnvVar];
 
 	if (!apiKey || !listId) {
 		// Not configured yet — see .dev.vars.example / the waitlist setup

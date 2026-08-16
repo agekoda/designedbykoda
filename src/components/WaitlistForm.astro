@@ -1,9 +1,13 @@
 ---
 interface Props {
 	label?: string;
+	listKey?: string;
 }
 
-const { label = 'Join the waitlist — get notified when this launches' } = Astro.props;
+const {
+	label = 'Join the waitlist — get notified when this launches',
+	listKey = '',
+} = Astro.props;
 const formId = `waitlist-${Math.random().toString(36).slice(2, 9)}`;
 ---
 
@@ -24,7 +28,7 @@ const formId = `waitlist-${Math.random().toString(36).slice(2, 9)}`;
 	<p class="waitlist-message" aria-live="polite"></p>
 </div>
 
-<script define:vars={{ formId }}>
+<script define:vars={{ formId, listKey }}>
 	const root = document.getElementById(formId);
 	const form = root.querySelector('.waitlist-form');
 	const input = root.querySelector('input');
@@ -46,7 +50,7 @@ const formId = `waitlist-${Math.random().toString(36).slice(2, 9)}`;
 			const res = await fetch('/api/waitlist', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ email }),
+				body: JSON.stringify({ email, listKey }),
 			});
 			const data = await res.json().catch(() => ({}));
 

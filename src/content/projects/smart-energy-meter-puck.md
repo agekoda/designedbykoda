@@ -13,6 +13,9 @@ model2: "/models/projects/smart-energy-meter-puck/model2.glb"
 model2Caption: "Power Puck PCB"
 cameraOrbit: "0deg 55deg auto"
 cameraOrbit2: "180deg 45deg auto"
+waitlist: true
+waitlistLabel: "Want one for yourself? Join the waitlist and I'll email you when it's ready."
+cardBanner: "Join the waitlist now"
 ---
 
 A low-power, magnetically mounted energy monitoring device. Currently in development.

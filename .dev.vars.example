@@ -2,8 +2,12 @@
 # ".example") and fill in your real values for local testing with `astro dev`.
 # .dev.vars is already gitignored — never commit your real API key.
 #
-# For production, these same two values need to be set as Cloudflare
-# secrets instead — see the waitlist setup instructions.
+# For production, these same values need to be set as Cloudflare secrets
+# instead — see the waitlist setup instructions.
+#
+# Each project's waitlist gets its own list ID env var, named
+# BREVO_LIST_ID_<PROJECT> — see the mapping in src/pages/api/waitlist.ts.
 
 BREVO_API_KEY=your-brevo-api-key-here
-BREVO_LIST_ID=your-brevo-list-id-here
+BREVO_LIST_ID_EINK_CALENDAR=your-eink-calendar-list-id-here
+BREVO_LIST_ID_POWER_PUCK=your-power-puck-list-id-here
