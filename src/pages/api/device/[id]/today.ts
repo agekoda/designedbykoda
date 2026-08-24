@@ -149,7 +149,16 @@ export async function GET({ params, request, locals }) {
 	}
 
 	const timezone = user.timezone || 'UTC';
-	const { start, end, offsetSec } = getTodayRangeUTC(timezone, new Date());
+	// Still needed for utcOffsetSec in the response (the device uses it for
+	// display + sleep-boundary timing) — but no longer used to restrict the
+	// calendar query itself. That was the actual bug: querying only
+	// midnight-to-midnight "today" meant a calendar with nothing scheduled
+	// for the literal current day returned zero events, even with things
+	// coming up later in the week. Fixed below to fetch the next N
+	// upcoming events from right now onward, same as the original firmware
+	// intended (7 upcoming events, whichever day they fall on).
+	const { offsetSec } = getTodayRangeUTC(timezone, new Date());
+	const rightNow = new Date();
 
 	let calendarIds: string[];
 	try {
@@ -160,7 +169,7 @@ export async function GET({ params, request, locals }) {
 	if (calendarIds.length === 0) calendarIds = ['primary'];
 
 	console.log(
-		`Fetching for device ${deviceId}: calendars=${JSON.stringify(calendarIds)} timezone=${timezone} range=${start.toISOString()} to ${end.toISOString()}`
+		`Fetching for device ${deviceId}: calendars=${JSON.stringify(calendarIds)} timezone=${timezone} from ${rightNow.toISOString()} onward`
 	);
 
 	const allEvents: { title: string; startUnix: number; allDay: boolean }[] = [];
@@ -169,8 +178,11 @@ export async function GET({ params, request, locals }) {
 		const eventsUrl = new URL(
 			`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`
 		);
-		eventsUrl.searchParams.set('timeMin', start.toISOString());
-		eventsUrl.searchParams.set('timeMax', end.toISOString());
+		eventsUrl.searchParams.set('timeMin', rightNow.toISOString());
+		// No timeMax — maxResults + orderBy=startTime is what actually
+		// gives us "the next N upcoming events", regardless of how many
+		// days out they fall.
+		eventsUrl.searchParams.set('maxResults', '15');
 		eventsUrl.searchParams.set('singleEvents', 'true');
 		eventsUrl.searchParams.set('orderBy', 'startTime');
 
@@ -204,8 +216,13 @@ export async function GET({ params, request, locals }) {
 		}
 	}
 
-	console.log(`Total events after merging all calendars: ${allEvents.length}`);
 	allEvents.sort((a, b) => a.startUnix - b.startUnix);
+	// Merging multiple calendars can exceed 15 combined even though each
+	// was capped individually — trim to the final cap here, after sorting,
+	// so we keep the chronologically-soonest ones across all calendars
+	// rather than e.g. all of one calendar's 15 and none of another's.
+	const trimmedEvents = allEvents.slice(0, 15);
+	console.log(`Total events after merging all calendars: ${allEvents.length}, sending ${trimmedEvents.length}`);
 
 	await db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(now, deviceId).run();
 
@@ -213,7 +230,7 @@ export async function GET({ params, request, locals }) {
 		{
 			utcOffsetSec: offsetSec,
 			refreshIntervalSec: device.refresh_interval_sec || 86400,
-			events: allEvents,
+			events: trimmedEvents,
 		},
 		200
 	);
