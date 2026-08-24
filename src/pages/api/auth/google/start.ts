@@ -1,7 +1,10 @@
-// Kicks off the Google OAuth flow. No params needed yet — later this can
-// accept a query param for where to send the user afterward (e.g. straight
-// into device pairing), but for now it always lands on the plain success
-// page in callback.ts.
+// Kicks off the Google OAuth flow. Accepts an optional ?code= query param
+// (a device pairing code, from scanning the QR on its screen) — Google's
+// OAuth round trip only lets us carry back whatever's in `state`, so
+// anything else about the original request (like this code) needs to be
+// stashed somewhere that survives the trip. Same cookie pattern as the
+// CSRF `state` value below, not baked into `state` itself, to keep the
+// two concerns separate.
 export const prerender = false;
 
 const REDIRECT_URI = 'https://designedbykoda.com/api/auth/callback';
@@ -9,7 +12,7 @@ const REDIRECT_URI = 'https://designedbykoda.com/api/auth/callback';
 // Auth Platform → Clients → Authorized redirect URIs. Any mismatch
 // (trailing slash, http vs https) causes a redirect_uri_mismatch error.
 
-export async function GET({ locals, redirect }) {
+export async function GET({ request, locals, redirect }) {
 	const env = locals.runtime?.env ?? {};
 	const clientId = env.GOOGLE_CLIENT_ID;
 
@@ -44,5 +47,15 @@ export async function GET({ locals, redirect }) {
 		'Set-Cookie',
 		`oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Path=/`
 	);
+
+	const url = new URL(request.url);
+	const pairingCode = url.searchParams.get('code');
+	if (pairingCode) {
+		response.headers.append(
+			'Set-Cookie',
+			`pending_pair_code=${encodeURIComponent(pairingCode)}; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Path=/`
+		);
+	}
+
 	return response;
 }

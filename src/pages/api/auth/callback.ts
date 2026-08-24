@@ -127,8 +127,20 @@ export async function GET({ request, locals }) {
 	// would produce one malformed header instead of two valid cookies.
 	// A redirect response can carry Set-Cookie exactly the same way a
 	// normal 200 can — the browser applies the cookie before following it.
-	const headers = new Headers({ Location: '/setup' });
+	//
+	// If a pairing code was stashed before heading to Google (scanning the
+	// QR on the device while not yet signed in), restore it here so
+	// /setup?code=... arrives with the code still filled in — without
+	// this, the whole point of the QR code is lost the moment someone
+	// needs to sign in first.
+	const pendingPairCode = getCookie(request, 'pending_pair_code');
+	const redirectLocation = pendingPairCode
+		? `/setup?code=${encodeURIComponent(pendingPairCode)}`
+		: '/setup';
+
+	const headers = new Headers({ Location: redirectLocation });
 	headers.append('Set-Cookie', 'oauth_state=; Max-Age=0; Path=/');
+	headers.append('Set-Cookie', 'pending_pair_code=; Max-Age=0; Path=/');
 	headers.append(
 		'Set-Cookie',
 		`session=${sessionId}; HttpOnly; Secure; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}; Path=/`

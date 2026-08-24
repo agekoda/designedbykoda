@@ -9,6 +9,14 @@ let userId: string | null = null;
 if (db) {
 	userId = await getSessionUserId(Astro.request, db);
 }
+
+// If this page was reached by scanning the device's QR code, carry the
+// code through to the sign-in link too — otherwise it's dropped right
+// here before the OAuth round trip even starts.
+const incomingCode = Astro.url.searchParams.get('code');
+const signInHref = incomingCode
+	? `/api/auth/google/start?code=${encodeURIComponent(incomingCode)}`
+	: '/api/auth/google/start';
 ---
 
 <Layout
@@ -22,7 +30,7 @@ if (db) {
 			!userId ? (
 				<div class="setup-card">
 					<p>Sign in with Google to connect your calendar.</p>
-					<a class="button" data-magnetic href="/api/auth/google/start">
+					<a class="button" data-magnetic href={signInHref}>
 						Sign in with Google
 					</a>
 				</div>
