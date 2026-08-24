@@ -10,5 +10,12 @@
 	"observability": {
 		"enabled": true
 	},
-	"upload_source_maps": true
+	"upload_source_maps": true,
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "eink-calendar-db",
+			"database_id": "c3533458-d51c-4761-b6f1-861fa3b57576"
+		}
+	]
 }
