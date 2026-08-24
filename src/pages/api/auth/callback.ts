@@ -121,25 +121,18 @@ export async function GET({ request, locals }) {
 		.bind(sessionId, userId, sessionExpiry)
 		.run();
 
-	const html = `<!doctype html>
-<html><head><meta charset="utf-8"><title>Connected</title></head>
-<body style="font-family: sans-serif; background:#0a0a0a; color:#f5f5f5; display:flex; align-items:center; justify-content:center; height:100vh; margin:0;">
-  <div style="text-align:center;">
-    <h1>Connected as ${email}</h1>
-    <p style="color:#a3a3a3;">Dashboard setup (choosing a calendar, pairing a device) is coming soon.</p>
-  </div>
-</body></html>`;
-
 	// Set-Cookie is the one header that genuinely needs multiple separate
 	// lines, not a comma-joined value — Headers.append (called twice) does
 	// this correctly, where a plain object literal with a joined string
 	// would produce one malformed header instead of two valid cookies.
-	const headers = new Headers({ 'Content-Type': 'text/html' });
+	// A redirect response can carry Set-Cookie exactly the same way a
+	// normal 200 can — the browser applies the cookie before following it.
+	const headers = new Headers({ Location: '/setup' });
 	headers.append('Set-Cookie', 'oauth_state=; Max-Age=0; Path=/');
 	headers.append(
 		'Set-Cookie',
 		`session=${sessionId}; HttpOnly; Secure; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}; Path=/`
 	);
 
-	return new Response(html, { status: 200, headers });
+	return new Response(null, { status: 302, headers });
 }

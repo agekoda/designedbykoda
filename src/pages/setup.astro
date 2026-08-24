@@ -27,32 +27,102 @@ if (db) {
 					</a>
 				</div>
 			) : (
-				<div class="setup-card">
-					<p>
-						Enter the pairing code shown on your device's screen — it's under "Almost
-						there!" on the display.
-					</p>
-					<form id="pair-form" novalidate>
-						<label for="pairing-code" class="sr-only">Pairing code</label>
-						<input
-							type="text"
-							id="pairing-code"
-							placeholder="XXXXXX"
-							maxlength="6"
-							autocomplete="off"
-							autocapitalize="characters"
-							required
-						/>
+				<>
+					<div class="setup-card">
+						<p>Which calendar(s) should your device show?</p>
+						<div id="calendar-list">
+							<p class="loading-text">Loading your calendars…</p>
+						</div>
+						<button type="button" id="save-calendars" data-magnetic disabled>
+							Save
+						</button>
+						<p id="calendar-message" aria-live="polite"></p>
+					</div>
+
+					<div class="setup-card">
+						<p>
+							Enter the pairing code shown on your device's screen — it's under "Almost
+							there!" on the display.
+						</p>
+						<form id="pair-form" novalidate>
+							<label for="pairing-code" class="sr-only">Pairing code</label>
+							<input
+								type="text"
+								id="pairing-code"
+								placeholder="XXXXXX"
+								maxlength="6"
+								autocomplete="off"
+								autocapitalize="characters"
+								required
+							/>
 						<button type="submit" data-magnetic>Pair device</button>
 					</form>
 					<p id="pair-message" aria-live="polite"></p>
-				</div>
+					</div>
+				</>
 			)
 		}
 	</div>
 </Layout>
 
 <script>
+	const calendarList = document.getElementById('calendar-list');
+	const saveBtn = document.getElementById('save-calendars') as HTMLButtonElement;
+	const calMessage = document.getElementById('calendar-message') as HTMLParagraphElement;
+
+	if (calendarList && saveBtn) {
+		fetch('/api/dashboard/calendars')
+			.then((res) => res.json())
+			.then((data) => {
+				if (!data.calendars || data.calendars.length === 0) {
+					calendarList.innerHTML = '<p class="loading-text">No calendars found.</p>';
+					return;
+				}
+				calendarList.innerHTML = data.calendars
+					.map((cal: any) => {
+						const checked = data.selected.includes(cal.id) ? 'checked' : '';
+						const label = cal.primary ? `${cal.summary} (primary)` : cal.summary;
+						return `<label class="calendar-item">
+							<input type="checkbox" value="${cal.id}" ${checked} />
+							<span>${label}</span>
+						</label>`;
+					})
+					.join('');
+				saveBtn.disabled = false;
+			})
+			.catch(() => {
+				calendarList.innerHTML = '<p class="loading-text">Could not load calendars.</p>';
+			});
+
+		saveBtn.addEventListener('click', async () => {
+			const checked = calendarList.querySelectorAll('input[type="checkbox"]:checked');
+			const calendarIds = Array.from(checked).map((el) => (el as HTMLInputElement).value);
+
+			saveBtn.disabled = true;
+			calMessage.textContent = '';
+			calMessage.classList.remove('is-error');
+
+			try {
+				const res = await fetch('/api/dashboard/calendars', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ calendarIds }),
+				});
+				const data = await res.json().catch(() => ({}));
+				if (res.ok && data.ok) {
+					calMessage.textContent = 'Saved.';
+				} else {
+					calMessage.textContent = data.error || 'Something went wrong.';
+					calMessage.classList.add('is-error');
+				}
+			} catch {
+				calMessage.textContent = 'Something went wrong.';
+				calMessage.classList.add('is-error');
+			}
+			saveBtn.disabled = false;
+		});
+	}
+
 	const form = document.getElementById('pair-form');
 	if (form) {
 		const input = document.getElementById('pairing-code') as HTMLInputElement;
@@ -114,10 +184,62 @@ if (db) {
 		background: var(--bg-raised);
 		border: 1px solid var(--border);
 		border-radius: 14px;
+		margin-bottom: 1.2em;
 	}
 	.setup-card p {
 		color: var(--muted);
 		margin: 0 0 1.2em 0;
+	}
+	.loading-text {
+		font-size: 0.9em;
+	}
+	#calendar-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6em;
+		margin-bottom: 1.2em;
+	}
+	.calendar-item {
+		display: flex;
+		align-items: center;
+		gap: 0.6em;
+		color: var(--fg);
+		font-size: 0.95em;
+		cursor: pointer;
+	}
+	.calendar-item input {
+		accent-color: var(--accent);
+		width: 16px;
+		height: 16px;
+	}
+	#save-calendars {
+		padding: 0.6em 1.3em;
+		border: none;
+		border-radius: 999px;
+		background: var(--fg);
+		color: var(--bg);
+		font-weight: 700;
+		font-size: 0.9em;
+		font-family: inherit;
+		cursor: pointer;
+	}
+	#save-calendars:hover:not(:disabled) {
+		background: var(--accent);
+	}
+	#save-calendars:disabled {
+		opacity: 0.5;
+		cursor: default;
+	}
+	#calendar-message {
+		margin: 0.8em 0 0 0;
+		font-size: 0.88em;
+		color: var(--muted);
+	}
+	#calendar-message.is-error {
+		color: #e08a8a;
+	}
+	#calendar-message:empty {
+		display: none;
 	}
 	.setup-card form {
 		display: flex;
