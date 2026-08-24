@@ -146,6 +146,17 @@ if (db) {
 		const button = form.querySelector('button') as HTMLButtonElement;
 		const message = document.getElementById('pair-message') as HTMLParagraphElement;
 
+		// Scanning the QR code on the device's own pairing screen links here
+		// with ?code=XXXXXX already attached — pre-fill it so scanning
+		// really does mean "one tap to pair" instead of retyping what's
+		// already right there on the screen. Not auto-submitted, since a
+		// scan isn't necessarily "yes, pair this right now."
+		const params = new URLSearchParams(window.location.search);
+		const prefilledCode = params.get('code');
+		if (prefilledCode) {
+			input.value = prefilledCode.toUpperCase();
+		}
+
 		form.addEventListener('submit', async (e) => {
 			e.preventDefault();
 			const code = input.value.trim().toUpperCase();
