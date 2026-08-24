@@ -29,17 +29,6 @@ if (db) {
 			) : (
 				<>
 					<div class="setup-card">
-						<p>Which calendar(s) should your device show?</p>
-						<div id="calendar-list">
-							<p class="loading-text">Loading your calendars…</p>
-						</div>
-						<button type="button" id="save-calendars" data-magnetic disabled>
-							Save
-						</button>
-						<p id="calendar-message" aria-live="polite"></p>
-					</div>
-
-					<div class="setup-card">
 						<p>
 							Enter the pairing code shown on your device's screen — it's under "Almost
 							there!" on the display.
@@ -59,6 +48,17 @@ if (db) {
 					</form>
 					<p id="pair-message" aria-live="polite"></p>
 					</div>
+
+					<div class="setup-card">
+						<p>Which calendar(s) should your device show?</p>
+						<div id="calendar-list">
+							<p class="loading-text">Loading your calendars…</p>
+						</div>
+						<button type="button" id="save-calendars" data-magnetic disabled>
+							Save
+						</button>
+						<p id="calendar-message" aria-live="polite"></p>
+					</div>
 				</>
 			)
 		}
@@ -66,6 +66,23 @@ if (db) {
 </Layout>
 
 <script>
+	// Fire-and-forget: the browser already knows the real timezone
+	// precisely, no reason to ask the person to pick one manually. This
+	// runs on every visit to /setup while logged in, keeping it correct
+	// even if someone travels or their system timezone changes later.
+	const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	if (detectedTimezone) {
+		fetch('/api/dashboard/timezone', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ timezone: detectedTimezone }),
+		}).catch(() => {
+			// Non-critical — if this fails, the account just keeps whatever
+			// timezone it already had rather than blocking anything else
+			// on this page from working.
+		});
+	}
+
 	const calendarList = document.getElementById('calendar-list');
 	const saveBtn = document.getElementById('save-calendars') as HTMLButtonElement;
 	const calMessage = document.getElementById('calendar-message') as HTMLParagraphElement;
