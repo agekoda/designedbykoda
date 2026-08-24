@@ -159,6 +159,10 @@ export async function GET({ params, request, locals }) {
 	}
 	if (calendarIds.length === 0) calendarIds = ['primary'];
 
+	console.log(
+		`Fetching for device ${deviceId}: calendars=${JSON.stringify(calendarIds)} timezone=${timezone} range=${start.toISOString()} to ${end.toISOString()}`
+	);
+
 	const allEvents: { title: string; startUnix: number; allDay: boolean }[] = [];
 
 	for (const calId of calendarIds) {
@@ -173,13 +177,25 @@ export async function GET({ params, request, locals }) {
 		const evRes = await fetch(eventsUrl.toString(), {
 			headers: { Authorization: `Bearer ${accessToken}` },
 		});
-		if (!evRes.ok) continue; // one bad/inaccessible calendar shouldn't sink the whole response
+		if (!evRes.ok) {
+			// Don't sink the whole response over one bad/inaccessible
+			// calendar — but log it, since silently returning zero events
+			// with no trace of why is exactly what made this hard to debug.
+			const errBody = await evRes.text();
+			console.error(`Calendar fetch failed for "${calId}": HTTP ${evRes.status} — ${errBody}`);
+			continue;
+		}
 
 		const evData = await evRes.json();
+		const itemCount = (evData.items || []).length;
+		console.log(`Calendar "${calId}": Google returned ${itemCount} raw item(s)`);
 		for (const item of evData.items || []) {
 			const isAllDay = !item.start?.dateTime;
 			const startValue = item.start?.dateTime || item.start?.date;
-			if (!startValue || !item.summary) continue;
+			if (!startValue || !item.summary) {
+				console.log(`Skipped an item on "${calId}" — missing start or summary: ${JSON.stringify(item.start)} / "${item.summary}"`);
+				continue;
+			}
 			allEvents.push({
 				title: item.summary,
 				startUnix: Math.floor(new Date(startValue).getTime() / 1000),
@@ -188,6 +204,7 @@ export async function GET({ params, request, locals }) {
 		}
 	}
 
+	console.log(`Total events after merging all calendars: ${allEvents.length}`);
 	allEvents.sort((a, b) => a.startUnix - b.startUnix);
 
 	await db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(now, deviceId).run();
