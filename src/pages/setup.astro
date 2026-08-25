@@ -1,5 +1,11 @@
 ---
 export const prerender = false;
+// TEMPORARY: setup is gated until Google verification completes, so
+// nobody stumbles onto the "unverified app" warning screen. Delete this
+// whole block once verification clears.
+if (!Astro.url.searchParams.has('preview')) {
+	return Astro.redirect('/setup-coming-soon');
+}
 import Layout from '../layouts/Layout.astro';
 import { getSessionUserId } from '../lib/session';
 
