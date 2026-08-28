@@ -33,7 +33,10 @@ const stats = [
 	},
 	{
 		platform: 'Instagram',
-		metrics: [{ label: 'Followers', value: formatNumber(env.INSTAGRAM_FOLLOWERS) }],
+		metrics: [
+			{ label: 'Followers', value: formatNumber(env.INSTAGRAM_FOLLOWERS) },
+			{ label: 'Total views', value: formatNumber(env.INSTAGRAM_VIEWS) },
+		],
 	},
 ];
 
