@@ -1,0 +1,158 @@
+---
+export const prerender = false;
+import Layout from '../layouts/Layout.astro';
+
+const env = Astro.locals.runtime?.env ?? {};
+
+// Plain Cloudflare "Variable" type — not secrets, since none of this is
+// sensitive (they're public follower/view counts). Update anytime via
+// Workers & Pages → Settings → Variables and Secrets → edit the value →
+// Deploy. No code change or redeploy-from-git needed for a number update.
+function formatNumber(raw: string | undefined): string {
+	const n = Number(raw);
+	if (!raw || isNaN(n)) return '—';
+	if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+	if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+	return n.toLocaleString();
+}
+
+const stats = [
+	{
+		platform: 'YouTube',
+		metrics: [
+			{ label: 'Subscribers', value: formatNumber(env.YOUTUBE_SUBSCRIBERS) },
+			{ label: 'Total views', value: formatNumber(env.YOUTUBE_VIEWS) },
+		],
+	},
+	{
+		platform: 'TikTok',
+		metrics: [
+			{ label: 'Followers', value: formatNumber(env.TIKTOK_FOLLOWERS) },
+			{ label: 'Total views', value: formatNumber(env.TIKTOK_VIEWS) },
+		],
+	},
+	{
+		platform: 'Instagram',
+		metrics: [{ label: 'Followers', value: formatNumber(env.INSTAGRAM_FOLLOWERS) }],
+	},
+];
+
+const lastUpdated = env.STATS_LAST_UPDATED || null;
+---
+
+<Layout
+	title="Press & Brands — designedbykoda"
+	description="Channel stats and collaboration info for designedbykoda."
+>
+	<div class="press-page">
+		<h1>Press &amp; Brands</h1>
+		<p class="intro">
+			Stats across designedbykoda's channels — for anyone exploring a collaboration or
+			sponsorship.
+		</p>
+
+		<div class="stats-grid">
+			{
+				stats.map((s) => (
+					<div class="stat-card">
+						<h2>{s.platform}</h2>
+						{s.metrics.map((m) => (
+							<div class="metric">
+								<span class="metric-value">{m.value}</span>
+								<span class="metric-label">{m.label}</span>
+							</div>
+						))}
+					</div>
+				))
+			}
+		</div>
+
+		{lastUpdated && <p class="updated-note">Last updated {lastUpdated}</p>}
+
+		<div class="contact-card">
+			<p>For collaboration or sponsorship enquiries, reach out via:</p>
+			<a class="button" data-magnetic href="mailto:hello@designedbykoda.com">
+				hello@designedbykoda.com
+			</a>
+		</div>
+	</div>
+</Layout>
+
+<style>
+	.press-page {
+		max-width: 700px;
+		margin: 0 auto;
+		padding: 2em 0;
+	}
+	.intro {
+		color: var(--muted);
+		margin-bottom: 2em;
+	}
+	.stats-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+		gap: 1em;
+		margin-bottom: 1em;
+	}
+	.stat-card {
+		padding: 1.3em 1.4em;
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+	}
+	.stat-card h2 {
+		font-size: 1em;
+		color: var(--muted);
+		font-weight: 700;
+		margin: 0 0 1em 0;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+	.metric {
+		display: flex;
+		flex-direction: column;
+		margin-bottom: 0.8em;
+	}
+	.metric:last-child {
+		margin-bottom: 0;
+	}
+	.metric-value {
+		font-size: 1.8em;
+		font-weight: 700;
+		color: var(--fg);
+		line-height: 1.1;
+	}
+	.metric-label {
+		font-size: 0.85em;
+		color: var(--muted);
+	}
+	.updated-note {
+		font-size: 0.85em;
+		color: var(--muted-dim);
+		margin-bottom: 2em;
+	}
+	.contact-card {
+		padding: 1.5em 1.6em;
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		text-align: center;
+	}
+	.contact-card p {
+		color: var(--muted);
+		margin: 0 0 1em 0;
+	}
+	.button {
+		display: inline-block;
+		padding: 0.7em 1.4em;
+		border-radius: 999px;
+		background: var(--fg);
+		color: var(--bg);
+		font-weight: 700;
+		font-size: 0.95em;
+	}
+	.button:hover {
+		background: var(--accent);
+		color: var(--bg);
+	}
+</style>
