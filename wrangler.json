@@ -17,5 +17,14 @@
 			"database_name": "eink-calendar-db",
 			"database_id": "c3533458-d51c-4761-b6f1-861fa3b57576"
 		}
-	]
+	],
+	"vars": {
+		"YOUTUBE_SUBSCRIBERS": "2238",
+		"YOUTUBE_VIEWS": "145903",
+		"TIKTOK_FOLLOWERS": "3025",
+		"TIKTOK_VIEWS": "888000",
+		"INSTAGRAM_FOLLOWERS": "2753",
+		"INSTAGRAM_VIEWS": "1232167",
+		"STATS_LAST_UPDATED": "28 Aug 2026"
+	}
 }
