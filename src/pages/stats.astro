@@ -100,7 +100,7 @@ const totalViewersExact = totalViewersRaw ? totalViewersRaw.toLocaleString() : '
 		if (!target || prefersReducedMotion) {
 			el.textContent = target ? target.toLocaleString() : '—';
 		} else {
-			const durationMs = 1600;
+			const durationMs = 3200;
 			const frameIntervalMs = 1000 / 30; // cap DOM text updates to 30fps —
 				// requestAnimationFrame can fire 240+ times/sec on high-refresh
 				// monitors, and updating text content that often reads as a
@@ -118,7 +118,13 @@ const totalViewersExact = totalViewersRaw ? totalViewersRaw.toLocaleString() : '
 				if (now - lastDrawTime >= frameIntervalMs || isDone) {
 					// Quadratic ease-out — fast start, gentle finish, but
 					// without cubic's noticeably long "hang" right at the end.
-					const eased = 1 - Math.pow(1 - progress, 2);
+					// Power-8 ease-out — for a number this large (millions),
+					// even a quintic curve's "slow" tail still moves several
+					// thousand per frame, which doesn't read as slowing down
+					// to the eye. Pushing the exponent much higher front-loads
+					// even more of the count into the first ~third of the
+					// animation, leaving a genuinely crawling finish.
+					const eased = 1 - Math.pow(1 - progress, 8);
 					const current = Math.floor(eased * target);
 					el.textContent = (isDone ? target : current).toLocaleString();
 					lastDrawTime = now;
@@ -147,7 +153,7 @@ const totalViewersExact = totalViewersRaw ? totalViewersRaw.toLocaleString() : '
 		margin-bottom: 0;
 	}
 	.hero-value {
-		margin-top: 0.8em;
+		margin-top: 0.2em;
 		font-size: 3.6em;
 		font-weight: 700;
 		color: var(--accent);
@@ -156,6 +162,7 @@ const totalViewersExact = totalViewersRaw ? totalViewersRaw.toLocaleString() : '
 	}
 	.hero-label {
 		margin-top: 0.4em;
+		margin-bottom: 1.6em;
 		color: var(--muted);
 		font-size: 0.95em;
 	}
