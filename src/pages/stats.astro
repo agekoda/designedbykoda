@@ -53,12 +53,12 @@ const totalViewersExact = totalViewersRaw ? totalViewersRaw.toLocaleString() : '
 		<h1>Press &amp; Brands</h1>
 
 		<div class="reach-block">
-			<span class="hero-value" id="hero-total" data-target={totalViewersRaw}>0</span>
-			<span class="hero-label">Individual people reached across YouTube, TikTok &amp; Instagram</span>
 			<p class="intro">
 				Stats across designedbykoda's channels — for anyone exploring a collaboration or
 				sponsorship.
 			</p>
+			<span class="hero-value" id="hero-total" data-target={totalViewersRaw}>0</span>
+			<span class="hero-label">Individual people reached across YouTube, TikTok &amp; Instagram</span>
 		</div>
 
 		<div class="stats-grid">
@@ -144,9 +144,10 @@ const totalViewersExact = totalViewersRaw ? totalViewersRaw.toLocaleString() : '
 		flex-direction: column;
 		align-items: flex-start;
 		text-align: left;
-		margin-bottom: 2em;
+		margin-bottom: 0;
 	}
 	.hero-value {
+		margin-top: 0.8em;
 		font-size: 3.6em;
 		font-weight: 700;
 		color: var(--accent);
@@ -159,7 +160,6 @@ const totalViewersExact = totalViewersRaw ? totalViewersRaw.toLocaleString() : '
 		font-size: 0.95em;
 	}
 	.intro {
-		margin-top: 0.8em;
 		color: var(--muted);
 	}
 	.stats-grid {
