@@ -41,7 +41,8 @@ const stats = [
 ];
 
 const lastUpdated = env.STATS_LAST_UPDATED || null;
-const totalViewersReached = formatNumber(env.TOTAL_VIEWERS_REACHED);
+const totalViewersRaw = Number(env.TOTAL_VIEWERS_REACHED) || 0;
+const totalViewersExact = totalViewersRaw ? totalViewersRaw.toLocaleString() : '—';
 ---
 
 <Layout
@@ -56,7 +57,7 @@ const totalViewersReached = formatNumber(env.TOTAL_VIEWERS_REACHED);
 		</p>
 
 		<div class="hero-stat">
-			<span class="hero-value">{totalViewersReached}</span>
+			<span class="hero-value" id="hero-total" data-target={totalViewersRaw}>0</span>
 			<span class="hero-label">Individual people reached across YouTube, TikTok &amp; Instagram</span>
 		</div>
 
@@ -87,6 +88,41 @@ const totalViewersReached = formatNumber(env.TOTAL_VIEWERS_REACHED);
 	</div>
 </Layout>
 
+<script>
+	// Counts up from 0 to the real number on load — respects reduced-motion
+	// preferences by just setting the final value instantly for anyone
+	// who's asked their system to minimise animation.
+	const el = document.getElementById('hero-total');
+	if (el) {
+		const target = Number(el.dataset.target || '0');
+		const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+		if (!target || prefersReducedMotion) {
+			el.textContent = target ? target.toLocaleString() : '—';
+		} else {
+			const durationMs = 1600;
+			const startTime = performance.now();
+
+			function tick(now: number) {
+				const elapsed = now - startTime;
+				const progress = Math.min(elapsed / durationMs, 1);
+				// Ease-out — starts fast, settles gently onto the final
+				// number rather than stopping abruptly.
+				const eased = 1 - Math.pow(1 - progress, 3);
+				const current = Math.floor(eased * target);
+				el.textContent = current.toLocaleString();
+
+				if (progress < 1) {
+					requestAnimationFrame(tick);
+				} else {
+					el.textContent = target.toLocaleString();
+				}
+			}
+			requestAnimationFrame(tick);
+		}
+	}
+</script>
+
 <style>
 	.press-page {
 		max-width: 700px;
@@ -109,10 +145,11 @@ const totalViewersReached = formatNumber(env.TOTAL_VIEWERS_REACHED);
 		border-radius: 18px;
 	}
 	.hero-value {
-		font-size: 3.2em;
+		font-size: 2em;
 		font-weight: 700;
 		color: var(--accent);
 		line-height: 1;
+		font-variant-numeric: tabular-nums;
 	}
 	.hero-label {
 		margin-top: 0.5em;
