@@ -51,14 +51,14 @@ const totalViewersExact = totalViewersRaw ? totalViewersRaw.toLocaleString() : '
 >
 	<div class="press-page">
 		<h1>Press &amp; Brands</h1>
-		<p class="intro">
-			Stats across designedbykoda's channels — for anyone exploring a collaboration or
-			sponsorship.
-		</p>
 
-		<div class="hero-stat">
+		<div class="reach-block">
 			<span class="hero-value" id="hero-total" data-target={totalViewersRaw}>0</span>
 			<span class="hero-label">Individual people reached across YouTube, TikTok &amp; Instagram</span>
+			<p class="intro">
+				Stats across designedbykoda's channels — for anyone exploring a collaboration or
+				sponsorship.
+			</p>
 		</div>
 
 		<div class="stats-grid">
@@ -101,21 +101,31 @@ const totalViewersExact = totalViewersRaw ? totalViewersRaw.toLocaleString() : '
 			el.textContent = target ? target.toLocaleString() : '—';
 		} else {
 			const durationMs = 1600;
+			const frameIntervalMs = 1000 / 30; // cap DOM text updates to 30fps —
+				// requestAnimationFrame can fire 240+ times/sec on high-refresh
+				// monitors, and updating text content that often reads as a
+				// blurry mess rather than a smooth count. The loop below still
+				// runs every frame for accurate timing, it just skips the
+				// actual DOM write unless enough time has passed.
 			const startTime = performance.now();
+			let lastDrawTime = 0;
 
 			function tick(now: number) {
 				const elapsed = now - startTime;
 				const progress = Math.min(elapsed / durationMs, 1);
-				// Ease-out — starts fast, settles gently onto the final
-				// number rather than stopping abruptly.
-				const eased = 1 - Math.pow(1 - progress, 3);
-				const current = Math.floor(eased * target);
-				el.textContent = current.toLocaleString();
+				const isDone = progress >= 1;
 
-				if (progress < 1) {
+				if (now - lastDrawTime >= frameIntervalMs || isDone) {
+					// Quadratic ease-out — fast start, gentle finish, but
+					// without cubic's noticeably long "hang" right at the end.
+					const eased = 1 - Math.pow(1 - progress, 2);
+					const current = Math.floor(eased * target);
+					el.textContent = (isDone ? target : current).toLocaleString();
+					lastDrawTime = now;
+				}
+
+				if (!isDone) {
 					requestAnimationFrame(tick);
-				} else {
-					el.textContent = target.toLocaleString();
 				}
 			}
 			requestAnimationFrame(tick);
@@ -129,33 +139,28 @@ const totalViewersExact = totalViewersRaw ? totalViewersRaw.toLocaleString() : '
 		margin: 0 auto;
 		padding: 2em 0;
 	}
-	.intro {
-		color: var(--muted);
-		margin-bottom: 2em;
-	}
-	.hero-stat {
+	.reach-block {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		text-align: center;
-		padding: 2em 1.5em;
+		align-items: flex-start;
+		text-align: left;
 		margin-bottom: 2em;
-		background: var(--bg-raised);
-		border: 1px solid var(--accent-dark);
-		border-radius: 18px;
 	}
 	.hero-value {
-		font-size: 2em;
+		font-size: 3.6em;
 		font-weight: 700;
 		color: var(--accent);
 		line-height: 1;
 		font-variant-numeric: tabular-nums;
 	}
 	.hero-label {
-		margin-top: 0.5em;
+		margin-top: 0.4em;
 		color: var(--muted);
 		font-size: 0.95em;
-		max-width: 380px;
+	}
+	.intro {
+		margin-top: 0.8em;
+		color: var(--muted);
 	}
 	.stats-grid {
 		display: grid;
