@@ -1,0 +1,53 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout
+	title="Page not found — designedbykoda"
+	description="This page doesn't exist."
+>
+	<div class="notfound-page">
+		<p class="eyebrow">404</p>
+		<h1>Page not found</h1>
+		<p class="intro">
+			Whatever you were looking for isn't here — might've moved, or never existed in the
+			first place.
+		</p>
+		<a class="button" data-magnetic href="/">Back to home</a>
+	</div>
+</Layout>
+
+<style>
+	.notfound-page {
+		max-width: 520px;
+		margin: 0 auto;
+		padding: 5em 0;
+		text-align: center;
+	}
+	.eyebrow {
+		color: var(--muted-dim);
+		font-size: 0.9em;
+		font-weight: 700;
+		letter-spacing: 0.1em;
+		margin: 0 0 0.5em 0;
+	}
+	.notfound-page h1 {
+		margin: 0 0 0.6em 0;
+	}
+	.intro {
+		color: var(--muted);
+		margin: 0 0 2em 0;
+	}
+	.button {
+		display: inline-block;
+		padding: 0.7em 1.4em;
+		border-radius: 999px;
+		background: var(--fg);
+		color: var(--bg);
+		font-weight: 700;
+		font-size: 0.95em;
+	}
+	.button:hover {
+		background: var(--accent);
+		color: var(--bg);
+	}
+</style>
