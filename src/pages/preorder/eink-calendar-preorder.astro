@@ -1,0 +1,217 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import WaitlistForm from '../../components/WaitlistForm.astro';
+---
+<Layout
+	title="Preorder - E-Ink Calendar - designedbykoda"
+	description="Preorder the E-Ink Calendar, a low-power e-ink display that syncs with Google Calendar."
+>
+	<div class="preorder-page">
+		<div class="top-bar">
+			<span></span>
+			<label class="currency-select">
+				<span class="sr-only">Currency</span>
+				<select id="currency-picker">
+					<option value="USD" data-symbol="$" data-rate="1">USD - US Dollar</option>
+					<option value="EUR" data-symbol="€" data-rate="0.86">EUR - Euro</option>
+					<option value="GBP" data-symbol="£" data-rate="0.74">GBP - British Pound</option>
+					<option value="AUD" data-symbol="A$" data-rate="1.52">AUD - Australian Dollar</option>
+					<option value="CAD" data-symbol="C$" data-rate="1.38">CAD - Canadian Dollar</option>
+				</select>
+			</label>
+		</div>
+
+		<div class="hero-grid">
+			<img
+				src="/images/projects/eink-calendar/preorder-hero.jpg"
+				alt="E-Ink Calendar mounted on a wall, showing the current date and upcoming events"
+				class="hero-image"
+			/>
+			<div class="hero-info">
+				<p class="eyebrow">Preorder</p>
+				<h1>E-Ink Calendar</h1>
+				<p class="tagline">
+					A low-power e-ink display that syncs with your Google Calendar. Mount it on the
+					wall or leave it on a desk, and see your upcoming events at a glance, no phone
+					required.
+				</p>
+
+				<div class="price-block">
+					<span class="price" id="price-display">$70</span>
+					<span class="price-note">one-time purchase</span>
+				</div>
+
+				<button class="preorder-btn" data-magnetic id="preorder-btn">Preorder Now</button>
+
+				<div id="preorder-waitlist" class="waitlist-wrap" hidden>
+					<p class="waitlist-note">
+						Preorders aren't open yet, join the waitlist and I'll email you the moment they
+						are.
+					</p>
+					<WaitlistForm label="" listKey="eink-calendar" />
+				</div>
+			</div>
+		</div>
+
+		<div class="overview">
+			<h2>Overview</h2>
+			<p>
+				The E-Ink Calendar connects directly to your Google Calendar, including shared or
+				family calendars. Once set up, it refreshes automatically, either hourly or daily,
+				your choice, and shows your day, upcoming events, and the current month at a
+				glance.
+			</p>
+			<p>
+				Because it uses an e-ink display, the screen only draws power when it actually
+				changes, meaning the device runs for months on a single charge rather than needing
+				to be plugged in permanently.
+			</p>
+
+			<h3>Features</h3>
+			<ul>
+				<li>Syncs with Google Calendar, including shared and family calendars</li>
+				<li>Hourly or daily automatic refresh, your choice</li>
+				<li>3-4 months of battery life per charge</li>
+				<li>Wall-mountable or freestanding on a desk</li>
+				<li>Simple setup: scan a QR code, sign in, pick a calendar</li>
+			</ul>
+		</div>
+	</div>
+</Layout>
+
+<script>
+	const picker = document.getElementById('currency-picker') as HTMLSelectElement;
+	const priceDisplay = document.getElementById('price-display') as HTMLSpanElement;
+	const BASE_PRICE_USD = 70;
+
+	function updatePrice() {
+		const selected = picker.options[picker.selectedIndex];
+		const symbol = selected.dataset.symbol || '$';
+		const rate = parseFloat(selected.dataset.rate || '1');
+		const converted = Math.round(BASE_PRICE_USD * rate);
+		priceDisplay.textContent = `${symbol}${converted}`;
+	}
+	picker.addEventListener('change', updatePrice);
+	updatePrice();
+
+	const preorderBtn = document.getElementById('preorder-btn');
+	const waitlistWrap = document.getElementById('preorder-waitlist');
+	preorderBtn?.addEventListener('click', () => {
+		waitlistWrap?.removeAttribute('hidden');
+		waitlistWrap?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	});
+</script>
+
+<style>
+	.preorder-page {
+		max-width: 900px;
+		margin: 0 auto;
+		padding: 1.5em 0 4em 0;
+	}
+	.top-bar {
+		display: flex;
+		justify-content: flex-end;
+		margin-bottom: 1.5em;
+	}
+	.currency-select select {
+		background: var(--bg-raised);
+		color: var(--fg);
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		padding: 0.4em 1em;
+		font-size: 0.85em;
+		font-family: inherit;
+	}
+	.hero-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 2.5em;
+		align-items: center;
+		margin-bottom: 3em;
+	}
+	.hero-image {
+		width: 100%;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+	}
+	.eyebrow {
+		color: var(--muted-dim);
+		font-size: 0.9em;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		margin: 0 0 0.4em 0;
+	}
+	.hero-info h1 {
+		margin: 0 0 0.5em 0;
+	}
+	.tagline {
+		color: var(--muted);
+		line-height: 1.6;
+		margin-bottom: 1.5em;
+	}
+	.price-block {
+		display: flex;
+		align-items: baseline;
+		gap: 0.6em;
+		margin-bottom: 1.5em;
+	}
+	.price {
+		font-size: 2.4em;
+		font-weight: 700;
+		color: var(--fg);
+		font-variant-numeric: tabular-nums;
+	}
+	.price-note {
+		color: var(--muted);
+		font-size: 0.9em;
+	}
+	.preorder-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.8em 1.8em;
+		border: none;
+		border-radius: 999px;
+		background: var(--fg);
+		color: var(--bg);
+		font-weight: 700;
+		font-size: 1em;
+		font-family: inherit;
+		cursor: pointer;
+	}
+	.preorder-btn:hover {
+		background: var(--accent);
+	}
+	.waitlist-wrap {
+		margin-top: 1.5em;
+		padding: 1.3em 1.4em;
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+	}
+	.waitlist-note {
+		color: var(--muted);
+		font-size: 0.9em;
+		margin: 0 0 1em 0;
+	}
+	.overview {
+		border-top: 1px solid var(--border);
+		padding-top: 2em;
+	}
+	.overview p {
+		color: var(--muted);
+		line-height: 1.6;
+		margin-bottom: 1em;
+	}
+	.overview ul {
+		color: var(--muted);
+		line-height: 1.7;
+		padding-left: 1.3em;
+	}
+	@media (max-width: 700px) {
+		.hero-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>
