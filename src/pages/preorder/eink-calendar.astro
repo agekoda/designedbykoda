@@ -1,6 +1,5 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import WaitlistForm from '../../components/WaitlistForm.astro';
 ---
 <Layout
 	title="Preorder - E-Ink Calendar - designedbykoda"
@@ -42,14 +41,6 @@ import WaitlistForm from '../../components/WaitlistForm.astro';
 				</div>
 
 				<button class="preorder-btn" data-magnetic id="preorder-btn">Preorder Now</button>
-
-				<div id="preorder-waitlist" class="waitlist-wrap" hidden>
-					<p class="waitlist-note">
-						Preorders aren't open yet, join the waitlist and I'll email you the moment they
-						are.
-					</p>
-					<WaitlistForm label="" listKey="eink-calendar" />
-				</div>
 			</div>
 		</div>
 
@@ -94,11 +85,34 @@ import WaitlistForm from '../../components/WaitlistForm.astro';
 	picker.addEventListener('change', updatePrice);
 	updatePrice();
 
-	const preorderBtn = document.getElementById('preorder-btn');
-	const waitlistWrap = document.getElementById('preorder-waitlist');
-	preorderBtn?.addEventListener('click', () => {
-		waitlistWrap?.removeAttribute('hidden');
-		waitlistWrap?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	const preorderBtn = document.getElementById('preorder-btn') as HTMLButtonElement;
+	preorderBtn?.addEventListener('click', async () => {
+		const selected = picker.options[picker.selectedIndex];
+		const currency = selected.value;
+
+		preorderBtn.disabled = true;
+		const originalText = preorderBtn.textContent;
+		preorderBtn.textContent = 'Redirecting to checkout...';
+
+		try {
+			const res = await fetch('/api/checkout', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ currency }),
+			});
+			const data = await res.json();
+			if (res.ok && data.url) {
+				window.location.href = data.url;
+			} else {
+				alert(data.error || 'Could not start checkout. Please try again.');
+				preorderBtn.disabled = false;
+				preorderBtn.textContent = originalText;
+			}
+		} catch {
+			alert('Could not start checkout. Please try again.');
+			preorderBtn.disabled = false;
+			preorderBtn.textContent = originalText;
+		}
 	});
 </script>
 

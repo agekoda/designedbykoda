@@ -1,0 +1,39 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+<Layout title="Preorder confirmed - designedbykoda" description="Your E-Ink Calendar preorder is confirmed.">
+	<div class="success-page">
+		<h1>Preorder confirmed</h1>
+		<p>
+			Thanks for preordering the E-Ink Calendar. You'll get an email receipt from Stripe
+			shortly, and I'll be in touch with updates as your order gets closer to shipping.
+		</p>
+		<a class="button" data-magnetic href="/projects/eink-calendar">Back to the project page</a>
+	</div>
+</Layout>
+
+<style>
+	.success-page {
+		max-width: 520px;
+		margin: 0 auto;
+		padding: 5em 0;
+		text-align: center;
+	}
+	.success-page p {
+		color: var(--muted);
+		margin-bottom: 2em;
+	}
+	.button {
+		display: inline-block;
+		padding: 0.7em 1.4em;
+		border-radius: 999px;
+		background: var(--fg);
+		color: var(--bg);
+		font-weight: 700;
+		font-size: 0.95em;
+	}
+	.button:hover {
+		background: var(--accent);
+		color: var(--bg);
+	}
+</style>
