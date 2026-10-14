@@ -290,7 +290,9 @@
 	// the OS arrow), so this thin rounded bar shows there is more to scroll
 	// and can be dragged or clicked like a normal scrollbar.
 	if (root.classList.contains('has-custom-cursor')) {
-		const sb = el('div', 'x-sb', '<div class="x-sb-thumb"></div>');
+		const sb = el('div', 'x-sb is-pre', '<div class="x-sb-thumb"></div>');
+		// THUMB_MAX: longest the bar can get, in px. Lower = shorter bar.
+		const THUMB_MAX = 72;
 		sb.setAttribute('aria-hidden', 'true');
 		doc.body.appendChild(sb);
 		const thumb = $('.x-sb-thumb', sb);
@@ -301,7 +303,7 @@
 			sb.classList.toggle('is-needed', maxScroll > 4);
 			if (maxScroll <= 4) return;
 			trackH = sb.clientHeight;
-			thumbH = Math.max(36, Math.round(trackH * (innerHeight / root.scrollHeight)));
+			thumbH = Math.min(THUMB_MAX, Math.max(36, Math.round(trackH * (innerHeight / root.scrollHeight))));
 			thumb.style.height = thumbH + 'px';
 			place();
 		}
@@ -349,13 +351,16 @@
 			scrollTo({ top: Math.min(1, Math.max(0, p)) * maxScroll, behavior: 'smooth' });
 		});
 
-		// intro nudge, once per page load, only if there is something to scroll
-		if (maxScroll > 4) {
-			setTimeout(() => {
+		// intro nudge, once per page load, only if there is something to scroll.
+		// The thumb stays fully hidden (is-pre) until it starts.
+		setTimeout(() => {
+			layout();
+			sb.classList.remove('is-pre');
+			if (maxScroll > 4) {
 				sb.classList.add('is-intro');
 				setTimeout(() => sb.classList.remove('is-intro'), 2600);
-			}, 1200);
-		}
+			}
+		}, 1200);
 	}
 
 	// ---------- Command palette ----------

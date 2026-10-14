@@ -200,7 +200,7 @@ html.has-custom-cursor * { scrollbar-width: none; }
 
 /* ---------- Custom draggable scroll bar ---------- */
 /* Shown only where the native scrollbar is hidden (circle-cursor devices). */
-.x-sb { position: fixed; top: 10px; bottom: 10px; right: 2px; width: 22px; z-index: 9500; display: none; touch-action: none; }
+.x-sb { position: fixed; top: 10px; bottom: 10px; right: 2px; width: 22px; z-index: 10006; /* above the palette backdrop (10005), below the cursor */ display: none; touch-action: none; }
 html.has-custom-cursor .x-sb.is-needed { display: block; }
 .x-sb-thumb { position: absolute; right: 5px; top: 0; width: 5px; min-height: 36px; border-radius: 999px;
 	background: var(--accent); opacity: 0.32; transform-origin: 100% 50%;
@@ -209,13 +209,16 @@ html.has-custom-cursor .x-sb.is-needed { display: block; }
 .x-sb.is-scrolling .x-sb-thumb { opacity: 0.8; }
 .x-sb.is-drag .x-sb-thumb { opacity: 1; }
 html.has-custom-cursor .x-sb, html.has-custom-cursor .x-sb * { cursor: none; }
-/* intro nudge: slides in from the edge and bobs once so people notice it */
+/* Hidden until the intro starts, so it doesn't sit there and then vanish. */
+.x-sb.is-pre .x-sb-thumb { opacity: 0; translate: 26px 0; transition: none; }
+/* intro nudge: slides in from the edge and bobs once so people notice it.
+   Uses the separate `translate` property so it never fights the inline
+   transform that positions the thumb. */
 @keyframes x-sb-peek {
-	0% { transform: translateX(26px); opacity: 0; }
-	35% { transform: translateX(0); opacity: 1; }
-	55% { transform: translateY(14px); }
-	75% { transform: translateY(0); }
-	100% { opacity: 0.32; }
+	0% { translate: 26px 0; opacity: 0; }
+	35% { translate: 0 0; opacity: 1; }
+	55% { translate: 0 14px; }
+	75% { translate: 0 0; }
+	100% { translate: 0 0; opacity: 0.32; }
 }
 .x-sb.is-intro .x-sb-thumb { animation: x-sb-peek 2.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
-@media (prefers-reduced-motion: reduce) { .x-sb.is-intro .x-sb-thumb { animation: none; } }
