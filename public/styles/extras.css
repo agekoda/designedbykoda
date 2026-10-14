@@ -226,3 +226,6 @@ html.has-custom-cursor .x-sb, html.has-custom-cursor .x-sb * { cursor: none; }
 /* Palette list bar: sits inside the palette box, right of the GO TO / LINK labels. */
 .x-pal-scroll { position: relative; }
 .x-sb.x-sb-list { position: absolute; top: 6px; bottom: 6px; right: 2px; width: 16px; z-index: 2; }
+
+/* Keep list items (and the selected highlight) clear of the palette's scroll bar. */
+html.has-custom-cursor .x-pal ul { padding-right: 24px; }
