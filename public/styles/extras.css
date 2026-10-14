@@ -183,3 +183,17 @@ html.has-custom-cursor .x-pal li, html.has-custom-cursor .x-fab, html.has-custom
 	.x-reveal { opacity: 1; transform: none; transition: none; }
 	.hero-type .x-caret { animation: none; }
 }
+
+/* ---------- Cursor fixes (custom-cursor devices only) ---------- */
+/* Keep the circle cursor above the palette's blurred backdrop and toasts. */
+html body > .custom-cursor { z-index: 20000; }
+/* No native arrow/I-beam anywhere inside the palette. */
+html.has-custom-cursor .x-pal,
+html.has-custom-cursor .x-pal * { cursor: none; }
+/* Browsers always draw the native arrow over a scrollbar, and CSS can't
+   change that. With the circle cursor active, hide scrollbars instead; the
+   progress bar at the top and the back-to-top ring replace them. */
+html.has-custom-cursor { scrollbar-width: none; }
+html.has-custom-cursor::-webkit-scrollbar,
+html.has-custom-cursor *::-webkit-scrollbar { display: none; width: 0; height: 0; }
+html.has-custom-cursor * { scrollbar-width: none; }
