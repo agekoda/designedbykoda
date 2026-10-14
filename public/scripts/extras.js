@@ -285,6 +285,79 @@
 		}, { passive: true });
 	}
 
+	// ---------- Custom draggable scroll bar ----------
+	// The native scrollbar is hidden on circle-cursor devices (it would show
+	// the OS arrow), so this thin rounded bar shows there is more to scroll
+	// and can be dragged or clicked like a normal scrollbar.
+	if (root.classList.contains('has-custom-cursor')) {
+		const sb = el('div', 'x-sb', '<div class="x-sb-thumb"></div>');
+		sb.setAttribute('aria-hidden', 'true');
+		doc.body.appendChild(sb);
+		const thumb = $('.x-sb-thumb', sb);
+		let trackH = 0, thumbH = 0, maxScroll = 0, dragging = false, startY = 0, startScroll = 0, hideT;
+
+		function layout() {
+			maxScroll = Math.max(0, root.scrollHeight - innerHeight);
+			sb.classList.toggle('is-needed', maxScroll > 4);
+			if (maxScroll <= 4) return;
+			trackH = sb.clientHeight;
+			thumbH = Math.max(36, Math.round(trackH * (innerHeight / root.scrollHeight)));
+			thumb.style.height = thumbH + 'px';
+			place();
+		}
+		function place() {
+			const p = maxScroll ? Math.min(1, Math.max(0, scrollY / maxScroll)) : 0;
+			thumb.style.transform = `translateY(${p * (trackH - thumbH)}px)`;
+		}
+		addEventListener('scroll', () => {
+			place();
+			sb.classList.add('is-scrolling');
+			clearTimeout(hideT);
+			hideT = setTimeout(() => sb.classList.remove('is-scrolling'), 900);
+		}, { passive: true });
+		addEventListener('resize', layout);
+		if ('ResizeObserver' in window) new ResizeObserver(layout).observe(doc.body);
+		addEventListener('load', layout);
+		layout();
+
+		thumb.addEventListener('pointerdown', (e) => {
+			e.preventDefault();
+			dragging = true; startY = e.clientY; startScroll = scrollY;
+			thumb.setPointerCapture(e.pointerId);
+			sb.classList.add('is-drag', 'is-active');
+			root.style.scrollBehavior = 'auto';
+		});
+		thumb.addEventListener('pointermove', (e) => {
+			if (!dragging) return;
+			const travel = trackH - thumbH;
+			if (travel > 0) scrollTo(0, startScroll + ((e.clientY - startY) / travel) * maxScroll);
+		});
+		const endDrag = () => {
+			if (!dragging) return;
+			dragging = false;
+			sb.classList.remove('is-drag', 'is-active');
+			root.style.scrollBehavior = '';
+		};
+		thumb.addEventListener('pointerup', endDrag);
+		thumb.addEventListener('pointercancel', endDrag);
+		// click on the empty track: jump so the thumb centres on the click
+		sb.addEventListener('pointerdown', (e) => {
+			if (e.target === thumb) return;
+			const r = sb.getBoundingClientRect();
+			const travel = trackH - thumbH;
+			const p = travel > 0 ? (e.clientY - r.top - thumbH / 2) / travel : 0;
+			scrollTo({ top: Math.min(1, Math.max(0, p)) * maxScroll, behavior: 'smooth' });
+		});
+
+		// intro nudge, once per page load, only if there is something to scroll
+		if (maxScroll > 4) {
+			setTimeout(() => {
+				sb.classList.add('is-intro');
+				setTimeout(() => sb.classList.remove('is-intro'), 2600);
+			}, 1200);
+		}
+	}
+
 	// ---------- Command palette ----------
 	const go = (href) => () => { location.href = href; };
 	const ext = (href) => () => window.open(href, '_blank', 'noopener');
