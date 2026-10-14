@@ -196,7 +196,7 @@
 		const glyphs = 'abcdefghijklmnopqrstuvwxyz01<>/{}#%';
 		let raf;
 		// SCRAMBLE_SLOWNESS: frames per revealed letter. Bigger = slower (was 2.2).
-		const SCRAMBLE_SLOWNESS = 4.5;
+		const SCRAMBLE_SLOWNESS = 5;
 		// Freeze the logo's box so scrambled glyphs can't resize it and
 		// nudge the centred nav links around.
 		const lockLogo = () => {

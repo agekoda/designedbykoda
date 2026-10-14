@@ -86,10 +86,10 @@ header { animation: x-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .card { position: relative; transform-style: preserve-3d; will-change: transform; }
 .card::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
 	opacity: 0; transition: opacity 0.3s ease;
-	background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 22%, transparent), transparent 55%); }
+	background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 12%, transparent), transparent 55%); }
 .card:hover::before { opacity: 1; }
 .card::after { content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: inherit; padding: 1px;
-	background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), var(--accent), transparent 60%);
+	background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 60%, transparent), transparent 60%);
 	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
 	mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); opacity: 0; transition: opacity 0.3s ease; }
 .card:hover::after { opacity: 1; }
