@@ -224,8 +224,10 @@
 		const original = logo.textContent;
 		const glyphs = 'abcdefghijklmnopqrstuvwxyz01<>/{}#%';
 		let raf;
-		// SCRAMBLE_SLOWNESS: frames per revealed letter. Bigger = slower (was 2.2).
-		const SCRAMBLE_SLOWNESS = 6;
+		// SCRAMBLE_SLOWNESS: how many 60Hz frames each letter takes to settle.
+		// Bigger = slower. Timing is clock-based, so it feels identical on
+		// 60Hz, 144Hz, 240Hz etc. displays. 2.2 is the original feel.
+		const SCRAMBLE_SLOWNESS = 2.2;
 		// Freeze the logo's box so scrambled glyphs can't resize it and
 		// nudge the centred nav links around.
 		const lockLogo = () => {
@@ -238,11 +240,17 @@
 		addEventListener('resize', () => { logo.parentElement.style.width = ''; lockLogo(); });
 		logo.addEventListener('mouseenter', () => {
 			cancelAnimationFrame(raf);
-			let frame = 0;
-			(function step() {
-				const reveal = frame / SCRAMBLE_SLOWNESS;
-				logo.textContent = original.split('').map((ch, i) => (i < reveal ? ch : glyphs[(Math.random() * glyphs.length) | 0])).join('');
-				frame++;
+			const t0 = performance.now();
+			let lastTick = -1;
+			(function step(now) {
+				// Convert real elapsed time into "60Hz frames" so speed doesn't
+				// depend on the monitor's refresh rate.
+				const tick = Math.floor(((now || performance.now()) - t0) * 0.06);
+				const reveal = tick / SCRAMBLE_SLOWNESS;
+				if (tick !== lastTick) {
+					lastTick = tick;
+					logo.textContent = original.split('').map((ch, i) => (i < reveal ? ch : glyphs[(Math.random() * glyphs.length) | 0])).join('');
+				}
 				if (reveal < original.length) raf = requestAnimationFrame(step);
 				else logo.textContent = original;
 			})();
