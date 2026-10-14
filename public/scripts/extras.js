@@ -20,6 +20,21 @@
 		set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
 	};
 
+	// ---------- Reveal safety net ----------
+	// interactions.js reveals cards with an IntersectionObserver. If that ever
+	// misses (layout shifts while loading, restored scroll, back/forward cache),
+	// make sure anything on screen still fades in rather than staying hidden.
+	function rescueReveals() {
+		$$('.reveal:not(.is-visible)').forEach((e) => {
+			const r = e.getBoundingClientRect();
+			if (r.top < innerHeight && r.bottom > 0) e.classList.add('is-visible');
+		});
+	}
+	setTimeout(rescueReveals, 700);
+	addEventListener('load', () => setTimeout(rescueReveals, 300));
+	addEventListener('pageshow', () => setTimeout(rescueReveals, 100));
+	addEventListener('scroll', () => { clearTimeout(rescueReveals.t); rescueReveals.t = setTimeout(rescueReveals, 250); }, { passive: true });
+
 	// ---------- Toast ----------
 	const toast = el('div', 'x-toast');
 	toast.setAttribute('role', 'status');
@@ -120,7 +135,7 @@
 	// ---------- Ticker (homepage only) ----------
 	const featured = $('.featured');
 	if (hero && featured) {
-		const items = ['KiCad', 'ESP32', 'Custom PCBs', 'LoRa', 'mmWave', 'E-Ink', 'RF Tools', 'Firmware', 'Fusion 360', '3D Printing', 'Smart Home', 'Cloudflare Workers', 'Hand-soldered'];
+		const items = ['KiCad', 'ESP32', 'Custom PCBs', 'LoRa', 'mmWave', 'E-Ink', 'RF Tools', 'Firmware', '3D Printing', 'Smart Home', 'Hand-soldered'];
 		const run = el('div', 'x-ticker-track');
 		const one = items.map((t) => `<span>${t}</span>`).join('');
 		run.innerHTML = one + one;
@@ -128,6 +143,20 @@
 		ticker.setAttribute('aria-hidden', 'true');
 		ticker.appendChild(run);
 		hero.after(ticker);
+		// Ease the scroll speed down on hover instead of stopping it.
+		if (!calm && run.getAnimations) {
+			const anim = run.getAnimations()[0];
+			if (anim) {
+				const SLOW_RATE = 0.35; // 1 = normal speed, 0 = stopped
+				let want = 1;
+				ticker.addEventListener('mouseenter', () => (want = SLOW_RATE));
+				ticker.addEventListener('mouseleave', () => (want = 1));
+				(function ease() {
+					anim.playbackRate += (want - anim.playbackRate) * 0.08;
+					requestAnimationFrame(ease);
+				})();
+			}
+		}
 	}
 
 	// ---------- Heading: count badge + lit underline ----------
@@ -196,7 +225,7 @@
 		const glyphs = 'abcdefghijklmnopqrstuvwxyz01<>/{}#%';
 		let raf;
 		// SCRAMBLE_SLOWNESS: frames per revealed letter. Bigger = slower (was 2.2).
-		const SCRAMBLE_SLOWNESS = 5;
+		const SCRAMBLE_SLOWNESS = 4.5;
 		// Freeze the logo's box so scrambled glyphs can't resize it and
 		// nudge the centred nav links around.
 		const lockLogo = () => {
