@@ -147,7 +147,7 @@
 		if (!calm && run.getAnimations) {
 			const anim = run.getAnimations()[0];
 			if (anim) {
-				const SLOW_RATE = 0.35; // 1 = normal speed, 0 = stopped
+				const SLOW_RATE = 0.5; // 1 = normal speed, 0 = stopped
 				let want = 1;
 				ticker.addEventListener('mouseenter', () => (want = SLOW_RATE));
 				ticker.addEventListener('mouseleave', () => (want = 1));
@@ -225,7 +225,7 @@
 		const glyphs = 'abcdefghijklmnopqrstuvwxyz01<>/{}#%';
 		let raf;
 		// SCRAMBLE_SLOWNESS: frames per revealed letter. Bigger = slower (was 2.2).
-		const SCRAMBLE_SLOWNESS = 4.5;
+		const SCRAMBLE_SLOWNESS = 10;
 		// Freeze the logo's box so scrambled glyphs can't resize it and
 		// nudge the centred nav links around.
 		const lockLogo = () => {
