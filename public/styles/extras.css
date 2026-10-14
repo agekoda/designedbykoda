@@ -30,9 +30,6 @@ header { animation: x-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
 	z-index: 10002; pointer-events: none;
 }
 
-/* ---------- Particle constellation ---------- */
-.x-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: 0.7; }
-
 /* ---------- Glow parallax ---------- */
 .bg-fx .glow { transition: translate 0.9s cubic-bezier(0.16, 1, 0.3, 1); will-change: translate; }
 @keyframes x-float { 0%,100% { margin-top: 0; } 50% { margin-top: -26px; } }
@@ -180,7 +177,6 @@ html.has-custom-cursor .x-pal li, html.has-custom-cursor .x-fab, html.has-custom
 	.x-grad { animation: none; }
 	.x-wave, .x-ticker-track, .bg-fx .glow { animation: none !important; }
 	.x-ticker { overflow-x: auto; }
-	.x-canvas { display: none; }
 	.x-reveal { opacity: 1; transform: none; transition: none; }
 	.hero-type .x-caret { animation: none; }
 }

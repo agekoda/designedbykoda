@@ -195,6 +195,8 @@
 		const original = logo.textContent;
 		const glyphs = 'abcdefghijklmnopqrstuvwxyz01<>/{}#%';
 		let raf;
+		// SCRAMBLE_SLOWNESS: frames per revealed letter. Bigger = slower (was 2.2).
+		const SCRAMBLE_SLOWNESS = 4.5;
 		// Freeze the logo's box so scrambled glyphs can't resize it and
 		// nudge the centred nav links around.
 		const lockLogo = () => {
@@ -209,7 +211,7 @@
 			cancelAnimationFrame(raf);
 			let frame = 0;
 			(function step() {
-				const reveal = frame / 2.2;
+				const reveal = frame / SCRAMBLE_SLOWNESS;
 				logo.textContent = original.split('').map((ch, i) => (i < reveal ? ch : glyphs[(Math.random() * glyphs.length) | 0])).join('');
 				frame++;
 				if (reveal < original.length) raf = requestAnimationFrame(step);
@@ -244,53 +246,6 @@
 				g.style.translate = `${nx * k}px ${ny * k}px`;
 			});
 		}, { passive: true });
-	}
-
-	// ---------- Particle constellation ----------
-	if (!calm) {
-		const cv = el('canvas', 'x-canvas');
-		cv.setAttribute('aria-hidden', 'true');
-		const bg = $('.bg-fx');
-		(bg ? bg.after(cv) : doc.body.prepend(cv));
-		const ctx = cv.getContext('2d');
-		let W, H, pts = [], mx = -999, my = -999, running = true;
-		const N = () => Math.min(70, Math.round((innerWidth * innerHeight) / 24000));
-		function size() {
-			W = cv.width = innerWidth; H = cv.height = innerHeight;
-			pts = Array.from({ length: N() }, () => ({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - 0.5) * 0.35, vy: (Math.random() - 0.5) * 0.35 }));
-		}
-		size();
-		addEventListener('resize', size);
-		if (fine) addEventListener('pointermove', (e) => { mx = e.clientX; my = e.clientY; }, { passive: true });
-		doc.addEventListener('visibilitychange', () => { running = !doc.hidden; if (running) requestAnimationFrame(frame); });
-		function frame() {
-			if (!running) return;
-			ctx.clearRect(0, 0, W, H);
-			const [r, g, b] = accentRGB;
-			for (let i = 0; i < pts.length; i++) {
-				const p = pts[i];
-				p.x += p.vx; p.y += p.vy;
-				if (p.x < 0 || p.x > W) p.vx *= -1;
-				if (p.y < 0 || p.y > H) p.vy *= -1;
-				ctx.fillStyle = `rgba(${r},${g},${b},0.55)`;
-				ctx.beginPath(); ctx.arc(p.x, p.y, 1.4, 0, 6.283); ctx.fill();
-				for (let j = i + 1; j < pts.length; j++) {
-					const q = pts[j], dx = p.x - q.x, dy = p.y - q.y, d = dx * dx + dy * dy;
-					if (d < 14000) {
-						ctx.strokeStyle = `rgba(${r},${g},${b},${0.16 * (1 - d / 14000)})`;
-						ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
-					}
-				}
-				const mdx = p.x - mx, mdy = p.y - my, md = mdx * mdx + mdy * mdy;
-				if (md < 22000) {
-					ctx.strokeStyle = `rgba(${r},${g},${b},${0.5 * (1 - md / 22000)})`;
-					ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(mx, my); ctx.stroke();
-					p.x += mdx * 0.002; p.y += mdy * 0.002;
-				}
-			}
-			requestAnimationFrame(frame);
-		}
-		requestAnimationFrame(frame);
 	}
 
 	// ---------- Command palette ----------
