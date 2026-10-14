@@ -325,22 +325,8 @@
 
 		// NOTE: no preventDefault() on pointerdown. Cancelling it suppresses the
 		// compatibility mouse events, which froze the circle cursor while dragging.
-		// While dragging, the circle cursor is pinned to the x where the click
-		// began and only follows the mouse up and down. interactions.js drives the
-		// cursor from window mousemove, so we intercept those in the capture phase
-		// and re-emit them with the x fixed.
-		let lockX = 0, relaying = false;
-		const pinCursor = (ev) => {
-			if (relaying || !ev.isTrusted) return;
-			ev.stopImmediatePropagation();
-			relaying = true;
-			window.dispatchEvent(new MouseEvent('mousemove', { clientX: lockX, clientY: ev.clientY }));
-			relaying = false;
-		};
 		thumb.addEventListener('pointerdown', (e) => {
 			dragging = true; startY = e.clientY; startPos = o.getPos();
-			lockX = e.clientX;
-			window.addEventListener('mousemove', pinCursor, true);
 			thumb.setPointerCapture(e.pointerId);
 			sb.classList.add('is-drag', 'is-active');
 			doc.body.style.userSelect = 'none';
@@ -354,7 +340,6 @@
 		const endDrag = () => {
 			if (!dragging) return;
 			dragging = false;
-			window.removeEventListener('mousemove', pinCursor, true);
 			sb.classList.remove('is-drag', 'is-active');
 			doc.body.style.userSelect = '';
 			root.style.scrollBehavior = '';
@@ -393,7 +378,7 @@
 				pageBar.sb.classList.add('is-intro');
 				setTimeout(() => pageBar.sb.classList.remove('is-intro'), 2600);
 			}
-		}, 1200);
+		}, 700);
 	}
 
 	// ---------- Command palette ----------
