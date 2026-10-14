@@ -285,80 +285,98 @@
 		}, { passive: true });
 	}
 
-	// ---------- Custom draggable scroll bar ----------
+	// ---------- Custom draggable scroll bars ----------
 	// The native scrollbar is hidden on circle-cursor devices (it would show
-	// the OS arrow), so this thin rounded bar shows there is more to scroll
-	// and can be dragged or clicked like a normal scrollbar.
-	if (root.classList.contains('has-custom-cursor')) {
-		const sb = el('div', 'x-sb is-pre', '<div class="x-sb-thumb"></div>');
-		// THUMB_MAX: longest the bar can get, in px. Lower = shorter bar.
-		const THUMB_MAX = 72;
-		sb.setAttribute('aria-hidden', 'true');
-		doc.body.appendChild(sb);
-		const thumb = $('.x-sb-thumb', sb);
-		let trackH = 0, thumbH = 0, maxScroll = 0, dragging = false, startY = 0, startScroll = 0, hideT;
+	// the OS arrow), so these thin rounded bars show there is more to scroll
+	// and can be dragged or clicked like a normal scrollbar. One for the page,
+	// one for the command palette's list.
+	// THUMB_MAX: longest the page bar can get, in px. Lower = shorter bar.
+	const THUMB_MAX = 128;
+	const customCursor = root.classList.contains('has-custom-cursor');
 
+	function makeBar(o) {
+		const sb = el('div', 'x-sb ' + (o.cls || ''), '<div class="x-sb-thumb"></div>');
+		sb.setAttribute('aria-hidden', 'true');
+		o.host.appendChild(sb);
+		const thumb = $('.x-sb-thumb', sb);
+		let trackH = 0, thumbH = 0, maxScroll = 0, dragging = false, startY = 0, startPos = 0, hideT;
+
+		function place() {
+			const p = maxScroll ? Math.min(1, Math.max(0, o.getPos() / maxScroll)) : 0;
+			thumb.style.transform = `translateY(${p * (trackH - thumbH)}px)`;
+		}
 		function layout() {
-			maxScroll = Math.max(0, root.scrollHeight - innerHeight);
+			maxScroll = Math.max(0, o.getMax());
 			sb.classList.toggle('is-needed', maxScroll > 4);
 			if (maxScroll <= 4) return;
 			trackH = sb.clientHeight;
-			thumbH = Math.min(THUMB_MAX, Math.max(36, Math.round(trackH * (innerHeight / root.scrollHeight))));
+			thumbH = Math.min(o.thumbMax, Math.max(36, Math.round(trackH * o.ratio())));
 			thumb.style.height = thumbH + 'px';
 			place();
 		}
-		function place() {
-			const p = maxScroll ? Math.min(1, Math.max(0, scrollY / maxScroll)) : 0;
-			thumb.style.transform = `translateY(${p * (trackH - thumbH)}px)`;
-		}
-		addEventListener('scroll', () => {
+		o.scrollTarget.addEventListener('scroll', () => {
 			place();
 			sb.classList.add('is-scrolling');
 			clearTimeout(hideT);
 			hideT = setTimeout(() => sb.classList.remove('is-scrolling'), 900);
 		}, { passive: true });
 		addEventListener('resize', layout);
-		if ('ResizeObserver' in window) new ResizeObserver(layout).observe(doc.body);
-		addEventListener('load', layout);
-		layout();
+		if ('ResizeObserver' in window && o.observe) new ResizeObserver(layout).observe(o.observe);
 
+		// NOTE: no preventDefault() on pointerdown. Cancelling it suppresses the
+		// compatibility mouse events, which froze the circle cursor while dragging.
 		thumb.addEventListener('pointerdown', (e) => {
-			e.preventDefault();
-			dragging = true; startY = e.clientY; startScroll = scrollY;
+			dragging = true; startY = e.clientY; startPos = o.getPos();
 			thumb.setPointerCapture(e.pointerId);
 			sb.classList.add('is-drag', 'is-active');
+			doc.body.style.userSelect = 'none';
 			root.style.scrollBehavior = 'auto';
 		});
 		thumb.addEventListener('pointermove', (e) => {
 			if (!dragging) return;
 			const travel = trackH - thumbH;
-			if (travel > 0) scrollTo(0, startScroll + ((e.clientY - startY) / travel) * maxScroll);
+			if (travel > 0) o.setPos(startPos + ((e.clientY - startY) / travel) * maxScroll, false);
 		});
 		const endDrag = () => {
 			if (!dragging) return;
 			dragging = false;
 			sb.classList.remove('is-drag', 'is-active');
+			doc.body.style.userSelect = '';
 			root.style.scrollBehavior = '';
 		};
 		thumb.addEventListener('pointerup', endDrag);
 		thumb.addEventListener('pointercancel', endDrag);
+		thumb.addEventListener('lostpointercapture', endDrag);
 		// click on the empty track: jump so the thumb centres on the click
 		sb.addEventListener('pointerdown', (e) => {
 			if (e.target === thumb) return;
 			const r = sb.getBoundingClientRect();
 			const travel = trackH - thumbH;
 			const p = travel > 0 ? (e.clientY - r.top - thumbH / 2) / travel : 0;
-			scrollTo({ top: Math.min(1, Math.max(0, p)) * maxScroll, behavior: 'smooth' });
+			o.setPos(Math.min(1, Math.max(0, p)) * maxScroll, true);
 		});
+		layout();
+		return { sb, layout };
+	}
 
+	let pageBar = null;
+	if (customCursor) {
+		pageBar = makeBar({
+			host: doc.body, cls: 'is-pre', thumbMax: THUMB_MAX, scrollTarget: window, observe: doc.body,
+			getMax: () => root.scrollHeight - innerHeight,
+			getPos: () => scrollY,
+			ratio: () => innerHeight / root.scrollHeight,
+			setPos: (v, smooth) => scrollTo({ top: v, behavior: smooth ? 'smooth' : 'auto' }),
+		});
+		addEventListener('load', pageBar.layout);
 		// intro nudge, once per page load, only if there is something to scroll.
 		// The thumb stays fully hidden (is-pre) until it starts.
 		setTimeout(() => {
-			layout();
-			sb.classList.remove('is-pre');
-			if (maxScroll > 4) {
-				sb.classList.add('is-intro');
-				setTimeout(() => sb.classList.remove('is-intro'), 2600);
+			pageBar.layout();
+			pageBar.sb.classList.remove('is-pre');
+			if (pageBar.sb.classList.contains('is-needed')) {
+				pageBar.sb.classList.add('is-intro');
+				setTimeout(() => pageBar.sb.classList.remove('is-intro'), 2600);
 			}
 		}, 1200);
 	}
@@ -384,9 +402,16 @@
 	const pal = el('div', 'x-pal');
 	pal.setAttribute('role', 'dialog');
 	pal.setAttribute('aria-label', 'Command palette');
-	pal.innerHTML = '<div class="x-pal-box"><input type="text" placeholder="Type a command or page..." aria-label="Search commands" autocomplete="off" spellcheck="false"><ul></ul><div class="x-pal-foot"><span>&uarr;&darr; navigate</span><span>&crarr; select</span><span>esc close</span></div></div>';
+	pal.innerHTML = '<div class="x-pal-box"><input type="text" placeholder="Type a command or page..." aria-label="Search commands" autocomplete="off" spellcheck="false"><div class="x-pal-scroll"><ul></ul></div><div class="x-pal-foot"><span>&uarr;&darr; navigate</span><span>&crarr; select</span><span>esc close</span></div></div>';
 	doc.body.appendChild(pal);
 	const inp = $('input', pal), list = $('ul', pal);
+	const listBar = customCursor ? makeBar({
+		host: $('.x-pal-scroll', pal), cls: 'x-sb-list', thumbMax: 80, scrollTarget: list, observe: list,
+		getMax: () => list.scrollHeight - list.clientHeight,
+		getPos: () => list.scrollTop,
+		ratio: () => list.clientHeight / list.scrollHeight,
+		setPos: (v, smooth) => list.scrollTo({ top: v, behavior: smooth ? 'smooth' : 'auto' }),
+	}) : null;
 	let shown = [], sel = 0;
 	function draw() {
 		const q = inp.value.trim().toLowerCase();
@@ -397,6 +422,7 @@
 			: '<div class="x-pal-empty">Nothing matches. Try &ldquo;projects&rdquo;.</div>';
 		const s = $('.is-sel', list);
 		if (s) s.scrollIntoView({ block: 'nearest' });
+		if (listBar) listBar.layout();
 	}
 	function openPal() { pal.classList.add('is-open'); inp.value = ''; sel = 0; draw(); setTimeout(() => inp.focus(), 30); }
 	function closePal() { pal.classList.remove('is-open'); inp.blur(); }

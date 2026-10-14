@@ -222,3 +222,7 @@ html.has-custom-cursor .x-sb, html.has-custom-cursor .x-sb * { cursor: none; }
 	100% { translate: 0 0; opacity: 0.32; }
 }
 .x-sb.is-intro .x-sb-thumb { animation: x-sb-peek 2.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Palette list bar: sits inside the palette box, right of the GO TO / LINK labels. */
+.x-pal-scroll { position: relative; }
+.x-sb.x-sb-list { position: absolute; top: 6px; bottom: 6px; right: 2px; width: 16px; z-index: 2; }
