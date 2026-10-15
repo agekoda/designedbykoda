@@ -2,6 +2,7 @@
 import { getCollection } from 'astro:content';
 import Layout from '../layouts/Layout.astro';
 import ProjectCard from '../components/ProjectCard.astro';
+import ProjectImage from '../components/ProjectImage.astro';
 import { SITE_DESCRIPTION } from '../consts';
 
 // Controls the order projects appear in on the homepage grid specifically.
@@ -28,6 +29,46 @@ const projects = [
 		.filter((p) => p !== undefined),
 	...byOrderField.filter((p) => !homepageOrder.includes(p.id)),
 ];
+
+// "By the numbers" band. These are typed in by hand (the homepage is built
+// ahead of time, so it can't read the live stats). Update them occasionally,
+// the live figures are on /stats. Last updated: 14 Oct 2026.
+const stats = [
+	{ value: 2.1, decimals: 1, suffix: 'M+', label: 'viewers reached' },
+	{ value: 4.3, decimals: 1, suffix: 'M', label: 'total views' },
+	{ value: 13, decimals: 0, suffix: 'K+', label: 'followers' },
+	{ value: projects.length, decimals: 0, suffix: '', label: 'custom projects' },
+];
+
+// The project shown in the big "featured" panel.
+const spotlight = allProjects.find((p) => p.id === 'eink-calendar');
+
+const steps = [
+	{
+		n: '01',
+		title: 'Idea & research',
+		text: 'Start from a problem or a part I want to push. Datasheets, breadboards and a lot of reading.',
+		icon: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z',
+	},
+	{
+		n: '02',
+		title: 'Schematic & PCB',
+		text: 'Schematics, power design and routing in KiCad. Boards get made, then assembled by hand.',
+		icon: 'M4 6h5v5H4zM15 13h5v5h-5zM9 8.5h4a2 2 0 0 1 2 2V13M7 11v4a2 2 0 0 0 2 2h6',
+	},
+	{
+		n: '03',
+		title: 'Firmware',
+		text: 'ESP32 firmware written from scratch: wireless, low-power sleep and a UI that feels finished.',
+		icon: 'M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16',
+	},
+	{
+		n: '04',
+		title: 'Enclosure & test',
+		text: 'Custom enclosures that actually fit, then real-world battery and range testing before it ships.',
+		icon: 'M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM12 12l8-4.5M12 12v9M12 12L4 7.5',
+	},
+];
 ---
 
 <Layout title="designedbykoda" description={SITE_DESCRIPTION}>
@@ -43,6 +84,51 @@ const projects = [
 			<a class="button ghost" data-magnetic href="/about">About me</a>
 		</div>
 	</section>
+
+	<section class="numbers x-reveal" aria-label="By the numbers">
+		<div class="num-grid">
+			{
+				stats.map((st) => (
+					<div class="num">
+						<span
+							class="num-val"
+							data-count={st.value}
+							data-decimals={st.decimals}
+							data-suffix={st.suffix}
+						>
+							{st.value.toFixed(st.decimals)}
+							{st.suffix}
+						</span>
+						<span class="num-label">{st.label}</span>
+					</div>
+				))
+			}
+		</div>
+		<a class="num-link" href="/stats">See the full stats &rarr;</a>
+	</section>
+
+	{
+		spotlight && (
+			<section class="spotlight x-reveal" aria-label="Featured project">
+				<a class="spot-media card" href="/projects/eink-calendar/" aria-label="See the E-Ink Calendar project">
+					<ProjectImage src={spotlight.data.heroImage} alt={spotlight.data.title} ratio="4 / 3" />
+				</a>
+				<div class="spot-body">
+					<span class="eyebrow">Featured &middot; Preorders open soon</span>
+					<h2>{spotlight.data.title}</h2>
+					<p>{spotlight.data.tagline}</p>
+					<ul class="spot-points">
+						<li>Pulls events from any Google Calendar, shared ones included</li>
+						<li>Scan a QR code to set it up, no app needed</li>
+						<li>E-ink screen with 3 to 4 months per charge</li>
+					</ul>
+					<div class="spot-cta">
+						<a class="button" data-magnetic href="/projects/eink-calendar/">See the project</a>
+					</div>
+				</div>
+			</section>
+		)
+	}
 
 	<section class="featured">
 		<div class="featured-heading">
@@ -67,9 +153,278 @@ const projects = [
 			}
 		</div>
 	</section>
+
+	<section class="process x-reveal" aria-labelledby="process-h">
+		<div class="featured-heading">
+			<h2 id="process-h">How I build</h2>
+		</div>
+		<ol class="steps">
+			{
+				steps.map((st) => (
+					<li class="step">
+						<span class="step-n">{st.n}</span>
+						<svg
+							class="step-icon"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.7"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d={st.icon} />
+						</svg>
+						<h3>{st.title}</h3>
+						<p>{st.text}</p>
+					</li>
+				))
+			}
+		</ol>
+	</section>
+
+	<section class="collab x-reveal" aria-labelledby="collab-h">
+		<h2 id="collab-h">Want to work together?</h2>
+		<p>
+			Sponsorships, collabs, or just keen to talk hardware? Have a look at the numbers and get in
+			touch through any of my socials.
+		</p>
+		<div class="hero-links">
+			<a class="button" data-magnetic href="/stats">Sponsorships &amp; stats</a>
+			<a class="button ghost" data-magnetic href="https://youtube.com/@zdhd" target="_blank" rel="noopener">
+				Watch on YouTube
+			</a>
+		</div>
+	</section>
 </Layout>
 
 <style>
+	/* ---------- By the numbers ---------- */
+	.numbers {
+		margin: 0 0 3.5em;
+	}
+	.num-grid {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 1em;
+	}
+	.num {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15em;
+		padding: 1.1em 1.2em;
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		background: color-mix(in srgb, var(--bg-raised) 80%, transparent);
+		transition:
+			border-color 0.25s ease,
+			transform 0.25s ease;
+	}
+	.num:hover {
+		border-color: var(--accent-dark);
+		transform: translateY(-3px);
+	}
+	.num-val {
+		font-size: 2em;
+		font-weight: 700;
+		line-height: 1.1;
+		letter-spacing: -0.02em;
+		color: var(--fg);
+		font-variant-numeric: tabular-nums;
+	}
+	.num-label {
+		font-size: 0.8em;
+		color: var(--muted);
+	}
+	.num-link {
+		display: inline-block;
+		margin-top: 0.9em;
+		font-size: 0.85em;
+		color: var(--muted);
+	}
+	.num-link:hover {
+		color: var(--fg);
+	}
+
+	/* ---------- Featured project ---------- */
+	.spotlight {
+		display: grid;
+		grid-template-columns: 1.05fr 1fr;
+		gap: 2em;
+		align-items: center;
+		margin: 0 0 4em;
+		padding: 1.3em;
+		border: 1px solid var(--border);
+		border-radius: 20px;
+		background:
+			radial-gradient(ellipse at top right, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%),
+			var(--bg-raised);
+	}
+	.spot-media {
+		display: block;
+		border-radius: 14px;
+		overflow: hidden;
+	}
+	.spot-media :global(.img-slot) {
+		border-radius: 14px;
+	}
+	.eyebrow {
+		display: inline-block;
+		font-size: 0.7em;
+		font-weight: 700;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--accent);
+		margin-bottom: 0.7em;
+	}
+	.spot-body h2 {
+		font-size: 1.9em;
+		margin-bottom: 0.3em;
+	}
+	.spot-body p {
+		margin-bottom: 1em;
+	}
+	.spot-points {
+		list-style: none;
+		padding: 0;
+		margin: 0 0 1.4em;
+	}
+	.spot-points li {
+		position: relative;
+		padding-left: 1.4em;
+		font-size: 0.92em;
+		color: var(--muted);
+	}
+	.spot-points li::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: 0.62em;
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--accent);
+	}
+	.spot-cta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.7em;
+	}
+
+	/* ---------- How I build ---------- */
+	.process {
+		margin: 4.5em 0 0;
+	}
+	.steps {
+		position: relative;
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 1.2em;
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+	.steps::before {
+		content: '';
+		position: absolute;
+		top: 24px;
+		left: 6%;
+		right: 6%;
+		height: 1px;
+		background: linear-gradient(90deg, var(--accent), var(--border));
+		transform: scaleX(0);
+		transform-origin: 0 50%;
+		transition: transform 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.2s;
+	}
+	.process.is-visible .steps::before {
+		transform: scaleX(1);
+	}
+	.step {
+		position: relative;
+		margin: 0;
+		padding: 0 0.2em;
+	}
+	.step-n {
+		position: absolute;
+		top: -0.5em;
+		right: 0.2em;
+		font-size: 0.7em;
+		font-weight: 700;
+		letter-spacing: 0.1em;
+		color: var(--muted-dim);
+	}
+	.step-icon {
+		display: block;
+		width: 48px;
+		height: 48px;
+		padding: 12px;
+		margin-bottom: 0.9em;
+		border-radius: 50%;
+		background: var(--bg);
+		border: 1px solid var(--accent-dark);
+		color: var(--accent);
+		transition:
+			transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+			background 0.3s ease;
+	}
+	.step:hover .step-icon {
+		transform: translateY(-3px) scale(1.08);
+		background: color-mix(in srgb, var(--accent) 14%, var(--bg));
+	}
+	.step h3 {
+		font-size: 1.02em;
+		margin-bottom: 0.3em;
+	}
+	.step p {
+		font-size: 0.85em;
+		line-height: 1.55;
+		margin: 0;
+	}
+
+	/* ---------- Collaborate ---------- */
+	.collab {
+		margin: 5em 0 0;
+		padding: 2.4em 1.6em;
+		text-align: center;
+		border: 1px solid var(--border);
+		border-radius: 20px;
+		background:
+			radial-gradient(ellipse at center top, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
+			var(--bg-raised);
+	}
+	.collab h2 {
+		font-size: 1.7em;
+	}
+	.collab p {
+		max-width: 480px;
+		margin: 0.4em auto 1.4em;
+	}
+
+	@media (max-width: 720px) {
+		.num-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+		.spotlight {
+			grid-template-columns: 1fr;
+			gap: 1.2em;
+		}
+		.steps {
+			grid-template-columns: repeat(2, 1fr);
+			row-gap: 1.8em;
+		}
+		.steps::before {
+			display: none;
+		}
+	}
+	@media (max-width: 480px) {
+		.steps {
+			grid-template-columns: 1fr;
+		}
+		.hero-links {
+			flex-wrap: wrap;
+		}
+	}
+
 	.hero {
 		text-align: center;
 		padding: 3em 0 4em 0;
