@@ -2,7 +2,7 @@
 title: "Battery Profiler"
 tagline: "A bench instrument that measures the real capacity of 1S Li-ion and LiPo cells"
 description: "A single-cell bench instrument that measures the real capacity and health of Li-ion and LiPo batteries, built to check whether cheap cells live up to their advertised capacity."
-category: "Test & Measurement"
+category: "Measurement"
 status: "Upcoming"
 order: 13
 heroImage: "/images/projects/battery-profiler/hero.jpg"
