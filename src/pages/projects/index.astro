@@ -5,7 +5,7 @@ import ProjectCard from '../../components/ProjectCard.astro';
 
 const allProjects = (await getCollection('projects')).sort((a, b) => a.data.order - b.data.order);
 
-const categoryOrder = ['RF & Wireless', 'Smart Home', 'Portable & Wearable'] as const;
+const categoryOrder = ['RF & Wireless', 'Smart Home', 'Portable & Wearable', 'Test & Measurement'] as const;
 const grouped = categoryOrder
 	.map((category) => ({
 		category,
