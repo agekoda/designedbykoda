@@ -344,8 +344,8 @@ var css = '' +
 '@keyframes bpfw{to{stroke-dashoffset:-12}}@keyframes bpbw{to{stroke-dashoffset:12}}' +
 '#bp-sim .bp-svg .fade{transition:opacity .3s}' +
 '#bp-sim .bp-svg #heat-waves{opacity:0;transition:opacity .6s}' +
-'#bp-sim .bp-svg .hw{fill:none;stroke:#ff9a4a;stroke-width:2;stroke-linecap:round;opacity:0;animation:bphw 2.6s ease-in-out infinite}' +
-'@keyframes bphw{0%{opacity:0;transform:translateY(8px)}30%{opacity:.95}100%{opacity:0;transform:translateY(-30px)}}' +
+'#bp-sim .bp-svg .hw{fill:none;stroke:#ff9a4a;stroke-width:2;stroke-linecap:round;opacity:0;animation:bphw 9s ease-in-out infinite}' +
+'@keyframes bphw{0%{opacity:0;transform:translateY(8px)}9%{opacity:.95}29%,100%{opacity:0;transform:translateY(-30px)}}' +
 '@media(prefers-reduced-motion:reduce){#bp-sim .bp-svg .hw{animation:none;opacity:.75}}' +
 '#bp-sim .bp-svg [id^=btn-]{transition:transform .08s;transform-box:fill-box;transform-origin:center}' +
 '#bp-sim .bp-svg [id^=btn-].pr{transform:scale(.88)}' +
@@ -553,11 +553,11 @@ function routeWires() {
     var x = rnd(-74, -4), amp = rnd(5, 10), seg = rnd(20, 30), n = Math.random() < 0.5 ? 2 : 3;
     var d = 'M' + x.toFixed(1) + ' ' + rnd(592, 604).toFixed(1) + ' q' + amp.toFixed(1) + ' ' + (-seg / 2).toFixed(1) + ' 0 ' + (-seg).toFixed(1);
     for (var i = 1; i < n; i++) d += ' t0 ' + (-seg).toFixed(1);
-    p.setAttribute('d', d); p.style.animationDuration = rnd(2.0, 3.6).toFixed(2) + 's';
+    p.setAttribute('d', d);
   }
-  for (var i = 0; i < 6; i++) {
+  for (var i = 0; i < 3; i++) {
     var p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('class', 'hw');
-    reroll(p); p.style.animationDelay = (-rnd(0, 3)).toFixed(2) + 's';
+    reroll(p); p.style.animationDelay = (-rnd(0, 9)).toFixed(2) + 's';
     p.addEventListener('animationiteration', function (e) { reroll(e.target); });
     g.appendChild(p);
   }
