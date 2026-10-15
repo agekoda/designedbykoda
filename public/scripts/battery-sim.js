@@ -555,7 +555,7 @@ function routeWires() {
     for (var i = 1; i < n; i++) d += ' t0 ' + (-seg).toFixed(1);
     p.setAttribute('d', d);
   }
-  for (var i = 0; i < 6; i++) {
+  for (var i = 0; i < 5; i++) {
     var p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('class', 'hw');
     reroll(p); p.style.animationDelay = (-rnd(0, 4)).toFixed(2) + 's';
     p.addEventListener('animationiteration', function (e) { reroll(e.target); });
