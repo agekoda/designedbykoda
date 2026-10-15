@@ -11,6 +11,13 @@ gallery: []
 
 A single-cell bench instrument that measures the real capacity of 1S Li-ion and LiPo batteries, built to check whether cheap cells live up to their advertised capacity. One board tests one cell, and two boards can run side by side. Currently in development.
 
+## Try it
+
+A working simulation of the board. Connect a cell and a power source, press START, and watch the real firmware screens run the full test. Some of the cells are not what they claim to be.
+
+<div id="bp-sim"></div>
+<script src="/scripts/battery-sim.js" defer></script>
+
 ## How a test works
 
 Set the charge current, discharge current and cutoff voltage on the board, then the test runs:
