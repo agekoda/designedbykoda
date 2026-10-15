@@ -3,6 +3,7 @@ import Layout from './Layout.astro';
 import ProjectImage from '../components/ProjectImage.astro';
 import ProjectModel from '../components/ProjectModel.astro';
 import WaitlistForm from '../components/WaitlistForm.astro';
+import { getCollection } from 'astro:content';
 
 interface Props {
 	slug: string;
@@ -47,6 +48,12 @@ const {
 	waitlist = false,
 	waitlistLabel,
 } = Astro.props;
+
+// Previous / next project (wraps around) for the footer navigation.
+const ordered = (await getCollection('projects')).sort((a, b) => a.data.order - b.data.order);
+const at = ordered.findIndex((p) => p.id === slug);
+const prev = at >= 0 ? ordered[(at - 1 + ordered.length) % ordered.length] : null;
+const next = at >= 0 ? ordered[(at + 1) % ordered.length] : null;
 ---
 
 <Layout title={`${title} — designedbykoda`} description={description} image={heroImage}>
@@ -115,9 +122,73 @@ const {
 			</div>
 		)
 	}
+
+	{
+		prev && next && prev.id !== slug && (
+			<nav class="pn" aria-label="More projects">
+				<a class="pn-a card" href={`/projects/${prev.id}/`}>
+					<span class="pn-dir">&larr; Previous project</span>
+					<strong>{prev.data.title}</strong>
+					<span class="pn-tag">{prev.data.tagline}</span>
+				</a>
+				<a class="pn-a pn-next card" href={`/projects/${next.id}/`}>
+					<span class="pn-dir">Next project &rarr;</span>
+					<strong>{next.data.title}</strong>
+					<span class="pn-tag">{next.data.tagline}</span>
+				</a>
+			</nav>
+		)
+	}
 </Layout>
 
 <style>
+	.pn {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1em;
+		margin-top: 3.5em;
+		padding-top: 2em;
+		border-top: 1px solid var(--border);
+	}
+	.pn-a {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25em;
+		padding: 1.1em 1.3em;
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		background: var(--bg-raised);
+		transition: border-color 0.2s ease;
+	}
+	.pn-a:hover {
+		border-color: var(--accent-dark);
+	}
+	.pn-next {
+		text-align: right;
+	}
+	.pn-dir {
+		font-size: 0.75em;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--muted-dim);
+	}
+	.pn-a strong {
+		color: var(--fg);
+		font-size: 1.1em;
+	}
+	.pn-tag {
+		color: var(--muted);
+		font-size: 0.85em;
+		line-height: 1.4;
+	}
+	@media (max-width: 560px) {
+		.pn {
+			grid-template-columns: 1fr;
+		}
+		.pn-next {
+			text-align: left;
+		}
+	}
 	.back {
 		display: inline-block;
 		color: var(--muted);
