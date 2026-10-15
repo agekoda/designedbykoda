@@ -3,7 +3,7 @@ title: "Power Puck"
 tagline: "A magnetically mounted energy monitor, targeting ~6 months per charge"
 description: "A low-power, magnetically mounted energy monitoring device, currently in development."
 category: "Smart Home"
-status: "Upcoming"
+status: "Complete"
 order: 12
 heroImage: "/images/projects/smart-energy-meter-puck/hero.jpg"
 gallery: []
