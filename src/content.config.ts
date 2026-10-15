@@ -23,7 +23,7 @@ const projects = defineCollection({
 		title: z.string(),
 		tagline: z.string(),
 		description: z.string(),
-		category: z.enum(["RF & Wireless", "Smart Home", "Portable & Wearable"]),
+		category: z.enum(["RF & Wireless", "Smart Home", "Portable & Wearable", "Test & Measurement"]),
 		status: z.enum(["Complete", "Upcoming"]).default("Complete"),
 		// Lower numbers show first.
 		order: z.number().default(99),
