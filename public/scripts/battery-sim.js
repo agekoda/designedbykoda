@@ -167,7 +167,7 @@ function step(dt) {
     if (ph === 'D2') F.dischOut += mAh;
   }
   // power / boot handling
-  var on = present || (c && !c.p.dead && ocv(c.soc) > 2.7);
+  var on = present; // the 3.3 V LDO is fed from the input rail only; the battery never powers the board
   if (on && !powered) { F = newF(); bootT = T; }
   if (!on && powered) { F = newF(); }
   powered = !!on;
@@ -404,8 +404,8 @@ root.innerHTML = '' +
 '</div>' +
 '<div class="bp-side">' +
 ' <div class="bp-hint" id="bp-hint" aria-live="polite"></div>' +
-' <div class="bp-card" id="bp-c1"><h4><i>1</i>Battery</h4><div class="bp-chips" id="bp-cells" role="radiogroup" aria-label="Battery"></div><p class="bp-note" id="bp-cell-note"></p></div>' +
-' <div class="bp-card" id="bp-c2"><h4><i>2</i>Power</h4><div class="bp-chips" id="bp-power" role="radiogroup" aria-label="Power source"></div><div class="bp-row" id="bp-psu-row" hidden><label for="bp-v">Voltage</label><input id="bp-v" type="range" min="0" max="12" step="0.1" value="5"><b id="bp-vv" style="min-width:48px;text-align:right"></b></div></div>' +
+' <div class="bp-card" id="bp-c2"><h4><i>1</i>Power</h4><div class="bp-chips" id="bp-power" role="radiogroup" aria-label="Power source"></div><div class="bp-row" id="bp-psu-row" hidden><label for="bp-v">Voltage</label><input id="bp-v" type="range" min="0" max="12" step="0.1" value="5"><b id="bp-vv" style="min-width:48px;text-align:right"></b></div></div>' +
+' <div class="bp-card" id="bp-c1"><h4><i>2</i>Battery</h4><div class="bp-chips" id="bp-cells" role="radiogroup" aria-label="Battery"></div><p class="bp-note" id="bp-cell-note"></p></div>' +
 ' <div class="bp-card" id="bp-c3"><h4><i>3</i>Run the test</h4><p class="bp-note" style="margin:0 0 12px">Press the buttons on the board: <b>START</b> to begin, <b>SELECT</b> to change currents, <b>STOP</b> to abort. Keyboard: <kbd>S</kbd> <kbd>X</kbd> <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>Enter</kbd>.</p><div class="bp-row" style="margin-top:0"><span>Speed</span><span class="bp-seg" id="bp-speed" role="group" aria-label="Simulation speed"></span></div></div>' +
 ' <div class="bp-card"><div class="bp-res" id="bp-res"></div><canvas class="bp-chart" id="bp-chart" width="640" height="300"></canvas><p class="bp-verdict" id="bp-verdict" aria-live="polite"></p><pre class="bp-csv" id="bp-csv" hidden></pre></div>' +
 '</div></div>' +
@@ -430,7 +430,7 @@ PRESETS.forEach(function (p) { chip(cellsEl, p.id, p.name + '<small>' + p.tag + 
   b.onclick = function () { speed = x[0]; updateUI(); }; speedEl.appendChild(b);
 });
 function connectCell(id) { batt = id ? cells[id] : null; step(0); drawScreen(); updateUI(); }
-var pwSel = 'usb', pwTimer = 0;
+var pwSel = 'none', pwTimer = 0;
 function setPower(t) {
   clearTimeout(pwTimer); pwSel = t;
   var delay = t === 'usb' && pw.type !== 'usb' && !RM ? 450 : 0;
@@ -440,8 +440,8 @@ function setPower(t) {
 }
 q('#bp-v').oninput = function () { pw.v = parseFloat(this.value); step(0); drawScreen(); updateUI(); };
 q('#bp-reset').onclick = function () {
-  resetCells(); batt = cells.genuine; pw = { type: 'usb', v: 5 }; q('#bp-v').value = 5; th = 24; csvRows = []; chart = []; results = null;
-  pwSel = 'usb'; clearTimeout(pwTimer);
+  resetCells(); batt = null; pw = { type: 'none', v: 5 }; q('#bp-v').value = 5; th = 24; csvRows = []; chart = []; results = null;
+  pwSel = 'none'; clearTimeout(pwTimer);
   F = newF(); powered = false; step(0); drawScreen(); updateUI();
 };
 
@@ -668,9 +668,8 @@ widget.addEventListener('keydown', function (e) {
 function setOp(el, o) { if (el) el.style.opacity = o; }
 function fmtDur(s) { var m = Math.floor(s / 60); return Math.floor(m / 60) + 'h ' + p2(m % 60) + 'm'; }
 function hintText() {
-  if (!powered) return ['Board is off. Plug in a power source or a charged battery.', ''];
-  if (!batt) return ['Step 1: pick a battery to plug into the board.', ''];
-  if (!sens.present) return ['Step 2: connect a power source (USB-C or the bench PSU).', ''];
+  if (!powered) return ['Step 1: connect a power source (USB-C or the bench PSU). The board stays off without one, because the battery never powers it.', ''];
+  if (!batt) return ['Board is on. Step 2: pick a battery to plug in.', ''];
   var m = F.mode;
   if (m === 'HOME') return ['Ready. Press START on the board to begin the test, or SELECT to change the currents first.', ''];
   if (m === 'MENU') return [F.editing ? 'Editing. UP / DOWN change the value, SELECT confirms.' : 'Setup menu. UP / DOWN move, SELECT edits a value, START begins the test.', ''];
@@ -795,7 +794,7 @@ function halt() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
 if (window.IntersectionObserver) new IntersectionObserver(function (e) { visible = e[0].isIntersecting; (visible || isFull) ? run() : halt(); }, { rootMargin: '120px' }).observe(root);
 document.addEventListener('visibilitychange', function () { document.hidden ? halt() : run(); });
 
-batt = cells.genuine; pw.type = 'usb'; pwSel = 'usb'; speed = 600;
+speed = 600;
 setTimeout(function () { layout(); step(0); drawScreen(); updateUI(); drawChart(); run(); }, 0);
 root.__bp = { est: estimate, open: openFull, close: closeFull, press: press, connect: connectCell, power: setPower, setV: function (v) { pw.v = v; step(0); }, speed: function (s) { speed = s; }, F: function () { return F; }, sens: function () { return sens; }, results: function () { return results; }, csv: function () { return csvRows; }, T: function () { return T; }, th: function () { return th; } };
 })();
