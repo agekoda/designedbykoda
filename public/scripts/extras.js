@@ -25,7 +25,7 @@
 	// misses (layout shifts while loading, restored scroll, back/forward cache),
 	// make sure anything on screen still fades in rather than staying hidden.
 	function rescueReveals() {
-		$$('.reveal:not(.is-visible)').forEach((e) => {
+		$$('.reveal:not(.is-visible), .x-reveal:not(.is-visible)').forEach((e) => {
 			const r = e.getBoundingClientRect();
 			if (r.top < innerHeight && r.bottom > 0) e.classList.add('is-visible');
 		});
@@ -381,16 +381,142 @@
 		}, 700);
 	}
 
+	// ---------- Reveal for sections written into the page markup ----------
+	const xr = $$('.x-reveal:not(.is-visible)').filter((e) => !e.dataset.xr);
+	if (xr.length) {
+		const io = new IntersectionObserver((ents) => {
+			ents.forEach((en) => { if (en.isIntersecting) { en.target.classList.add('is-visible'); io.unobserve(en.target); } });
+		}, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+		xr.forEach((t) => { t.dataset.xr = '1'; io.observe(t); });
+	}
+	$$('.featured-heading').forEach((h) => {
+		if (h.classList.contains('is-lit')) return;
+		const io = new IntersectionObserver((ents) => {
+			if (ents[0].isIntersecting) { h.classList.add('is-lit'); io.disconnect(); }
+		}, { threshold: 0.6 });
+		io.observe(h);
+	});
+
+	// ---------- Count-up numbers ([data-count]) ----------
+	$$('[data-count]').forEach((n) => {
+		const target = parseFloat(n.dataset.count);
+		const dec = parseInt(n.dataset.decimals || '0', 10);
+		const suffix = n.dataset.suffix || '';
+		const show = (v) => (n.textContent = v.toFixed(dec) + suffix);
+		show(target);
+		if (calm) return;
+		show(0);
+		const io = new IntersectionObserver((ents) => {
+			if (!ents[0].isIntersecting) return;
+			io.disconnect();
+			const t0 = performance.now(), dur = 1800;
+			(function step(t) {
+				const p = Math.min(1, (t - t0) / dur);
+				show(target * (1 - Math.pow(1 - p, 4)));
+				if (p < 1) requestAnimationFrame(step);
+			})(t0);
+		}, { threshold: 0.8 });
+		io.observe(n);
+	});
+
+	// ---------- Project filter chips (homepage grid) ----------
+	const grid = $('.featured .grid');
+	if (grid) {
+		const items = $$(':scope > *', grid).map((w) => {
+			const card = $('.card', w);
+			const tags = card ? $$('.tag', card).map((t) => t.textContent.trim()) : [];
+			return { w, cat: tags[0] || '', upcoming: tags.some((t) => /upcoming/i.test(t)) };
+		});
+		const cats = [...new Set(items.map((i) => i.cat).filter(Boolean))];
+		const hasUp = items.some((i) => i.upcoming);
+		const filters = ['All', ...cats, ...(hasUp ? ['Upcoming'] : [])];
+		const bar = el('div', 'x-chips');
+		bar.setAttribute('role', 'group');
+		bar.setAttribute('aria-label', 'Filter projects');
+		const fhead = $('.featured-heading');
+		const badge = fhead && $('.x-count', fhead);
+		const matches = (it, f) => f === 'All' || (f === 'Upcoming' ? it.upcoming : it.cat === f);
+		filters.forEach((f, i) => {
+			const n = items.filter((it) => matches(it, f)).length;
+			const b = el('button', 'x-chip' + (i === 0 ? ' is-on' : ''), `${f}<span>${n}</span>`);
+			b.type = 'button';
+			b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
+			b.addEventListener('click', () => {
+				$$('.x-chip', bar).forEach((c) => { c.classList.toggle('is-on', c === b); c.setAttribute('aria-pressed', String(c === b)); });
+				let k = 0;
+				items.forEach((it) => {
+					const show = matches(it, f);
+					it.w.classList.toggle('x-gone', !show);
+					if (show) {
+						it.w.classList.add('is-visible');
+						if (!calm && it.w.animate) {
+							it.w.animate(
+								[{ opacity: 0, transform: 'translateY(14px) scale(0.97)' }, { opacity: 1, transform: 'none' }],
+								{ duration: 450, delay: k * 45, easing: 'cubic-bezier(0.16,1,0.3,1)', fill: 'backwards' }
+							);
+						}
+						k++;
+					}
+				});
+				if (badge) badge.textContent = String(k);
+			});
+			bar.appendChild(b);
+		});
+		grid.before(bar);
+	}
+
+	// ---------- Project page: sticky "On this page" bar ----------
+	const prose = $('article.prose');
+	if (prose && !hero) {
+		const hs = $$('h2', prose);
+		if (hs.length >= 3) {
+			const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+			hs.forEach((h) => { if (!h.id) h.id = slug(h.textContent); });
+			const nav = el('nav', 'x-toc');
+			nav.setAttribute('aria-label', 'On this page');
+			const track = el('div', 'x-toc-track');
+			const links = hs.map((h) => {
+				const a = el('a', 'x-toc-a');
+				a.href = '#' + h.id;
+				a.textContent = h.textContent;
+				track.appendChild(a);
+				return a;
+			});
+			nav.appendChild(track);
+			prose.before(nav);
+			const spy = () => {
+				let cur = 0;
+				hs.forEach((h, i) => { if (h.getBoundingClientRect().top < 140) cur = i; });
+				const atTop = hs[0].getBoundingClientRect().top > 140;
+				links.forEach((a, i) => a.classList.toggle('is-on', !atTop && i === cur));
+				const on = links[cur];
+				if (!atTop && on) {
+					const l = on.offsetLeft - track.clientWidth / 2 + on.clientWidth / 2;
+					track.scrollTo({ left: l, behavior: calm ? 'auto' : 'smooth' });
+				}
+			};
+			let tk = false;
+			addEventListener('scroll', () => { if (!tk) { tk = true; requestAnimationFrame(() => { spy(); tk = false; }); } }, { passive: true });
+			spy();
+		}
+	}
+
 	// ---------- Command palette ----------
 	const go = (href) => () => { location.href = href; };
 	const ext = (href) => () => window.open(href, '_blank', 'noopener');
 	const socials = $$('header .social-links a').map((a) => [a.textContent.trim(), a.href]);
+	let projectEntries = [];
+	try {
+		const raw = $('#x-projects');
+		if (raw) projectEntries = JSON.parse(raw.textContent).map(([t, u]) => [t, 'Project', go(u)]);
+	} catch (e) {}
 	const cmds = [
 		['Home', 'Go to', go('/')],
 		['Projects', 'Go to', go('/projects')],
 		['About', 'Go to', go('/about')],
 		['Sponsorships & stats', 'Go to', go('/stats')],
 		['E-Ink Calendar preorder', 'Go to', go('/preorder/eink-calendar')],
+		...projectEntries,
 		['E-Ink Calendar setup', 'Go to', go('/setup')],
 		['Privacy policy', 'Go to', go('/privacy')],
 		...socials.map(([n, h]) => [n.replace(/^(Follow on|Subscribe on|View source on)\s*/, 'Open '), 'Link', ext(h)]),
