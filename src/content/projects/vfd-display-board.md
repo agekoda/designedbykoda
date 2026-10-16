@@ -17,6 +17,13 @@ cameraOrbit: "90deg 40deg 120%"
 
 A custom two-VFD-tube desk display combining retro VFD aesthetics with modern smart-home connectivity. Full custom PCB and assembly — black resin back, 8001 transparent front, with a USB-C port lined up on the back with more precision than I can really explain.
 
+## Try it
+
+Pick a mode, tap the button, and change the room light. The display brightness follows the light sensor the same way the real clock does.
+
+<div id="vfd-sim"></div>
+<script src="/scripts/vfd-sim.js" defer></script>
+
 ## Hardware
 
 - ESP32-S3
@@ -35,10 +42,3 @@ A custom two-VFD-tube desk display combining retro VFD aesthetics with modern sm
 - Fetches live weather data
 - Fetches live crypto prices
 - Additional data modes
-
-## Try it
-
-Pick a mode, tap the button, and change the room light. The display brightness follows the light sensor the same way the real clock does.
-
-<div id="vfd-sim"></div>
-<script src="/scripts/vfd-sim.js" defer></script>
