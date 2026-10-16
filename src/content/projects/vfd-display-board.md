@@ -35,3 +35,10 @@ A custom two-VFD-tube desk display combining retro VFD aesthetics with modern sm
 - Fetches live weather data
 - Fetches live crypto prices
 - Additional data modes
+
+## Try it
+
+Pick a mode, tap the button, and change the room light. The display brightness follows the light sensor the same way the real clock does.
+
+<div id="vfd-sim"></div>
+<script src="/scripts/vfd-sim.js" defer></script>
