@@ -1,0 +1,552 @@
+---
+export const prerender = false;
+import Layout from '../layouts/Layout.astro';
+import { loadStatus, demoStatus } from '../lib/status';
+
+const env = Astro.locals.runtime?.env ?? {};
+const demo = Astro.url.searchParams.get('demo');
+const data = demo ? demoStatus(demo) : await loadStatus(env);
+Astro.response.headers.set('Cache-Control', demo ? 'no-store' : 'public, max-age=30');
+
+const banner = {
+	operational: { tone: 'ok', title: 'All systems operational', sub: 'Everything is responding normally.' },
+	degraded: { tone: 'warn', title: 'Some services are slow', sub: 'Things still work, but a little slower than usual.' },
+	partial: {
+		tone: 'bad',
+		title: 'Partial outage',
+		sub: 'Part of the service is down. Your calendar keeps showing its last update and catches up when it is back.',
+	},
+	major: {
+		tone: 'bad',
+		title: 'Major outage',
+		sub: 'Most of the service is down. Your calendar keeps showing its last update and catches up when it is back.',
+	},
+	maintenance: { tone: 'warn', title: 'Scheduled maintenance', sub: 'Updates may arrive a little late.' },
+	unknown: { tone: 'idle', title: 'Waiting for the first check', sub: 'Checks run every 5 minutes.' },
+}[data.overall];
+
+const stateText = { operational: 'Operational', slow: 'Slow', outage: 'Outage', unknown: 'No data' } as const;
+
+function dayLabel(day: string) {
+	return new Date(day + 'T00:00:00Z').toLocaleDateString('en-AU', {
+		day: 'numeric',
+		month: 'short',
+		timeZone: 'UTC',
+	});
+}
+function barClass(pct: number | null) {
+	if (pct === null) return 'none';
+	if (pct >= 99.5) return 'ok';
+	if (pct >= 95) return 'warn';
+	return 'bad';
+}
+function barTitle(d: { day: string; pct: number | null }) {
+	if (d.pct === null) return `${dayLabel(d.day)}: no data`;
+	return `${dayLabel(d.day)}: ${d.pct >= 99.995 ? '100' : d.pct.toFixed(2)}% uptime`;
+}
+function pct(n: number | null) {
+	if (n === null) return '—';
+	return n >= 99.995 ? '100%' : `${n.toFixed(2)}%`;
+}
+function duration(sec: number) {
+	const m = Math.max(1, Math.round(sec / 60));
+	if (m < 60) return `${m} min`;
+	const h = Math.floor(m / 60);
+	const r = m % 60;
+	if (h < 48) return r ? `${h} h ${r} min` : `${h} h`;
+	return `${Math.round(h / 24)} days`;
+}
+
+const ongoing = data.incidents.filter((i) => i.resolved === null);
+const past = data.incidents.filter((i) => i.resolved !== null);
+const hasData = data.lastCheck !== null;
+---
+
+<Layout
+	title="Status — designedbykoda"
+	description="Live status of the E-Ink Calendar service: website, device API and database."
+>
+	<div class="status-page">
+		<h1>Status</h1>
+		<p class="lede">Live health of the services behind the E-Ink Calendar.</p>
+
+		<div id="status-root" data-demo={demo ?? ''}>
+			<section class={`banner ${banner.tone}`} aria-live="polite">
+				<span class="dot" aria-hidden="true"></span>
+				<div>
+					<h2>{banner.title}</h2>
+					<p>{banner.sub}</p>
+				</div>
+			</section>
+
+			<p class="meta">
+				{
+					hasData ? (
+						<>
+							Last checked <time data-ts={data.lastCheck} data-rel>just now</time>. Checks run every 5
+							minutes.
+						</>
+					) : (
+						<>No checks recorded yet.</>
+					)
+				}
+				{data.demo && <span class="demo-tag">Demo data</span>}
+			</p>
+
+			{
+				ongoing.length > 0 && (
+					<section class="ongoing" aria-label="Ongoing incidents">
+						{ongoing.map((i) => (
+							<article class={`incident ${i.severity}`}>
+								<div class="inc-head">
+									<h3>{i.title}</h3>
+									<span class="inc-badge">{i.severity === 'maintenance' ? 'Maintenance' : i.severity === 'degraded' ? 'Degraded' : i.severity === 'info' ? 'Notice' : 'Ongoing'}</span>
+								</div>
+								{i.body && i.source === 'manual' && <p>{i.body}</p>}
+								<p class="inc-time">
+									Started <time data-ts={i.started} data-abs>{new Date(i.started * 1000).toUTCString()}</time>
+									{' · '}
+									<time data-ts={i.started} data-since>{duration(Math.floor(Date.now() / 1000) - i.started)}</time> so far
+								</p>
+							</article>
+						))}
+					</section>
+				)
+			}
+
+			<section class="components" aria-label="Services">
+				{
+					data.components.map((c) => (
+						<article class="comp">
+							<div class="comp-head">
+								<div>
+									<h3>{c.label}</h3>
+									<p class="blurb">{c.blurb}</p>
+								</div>
+								<span class={`pill ${c.state}`}>
+									<span class="pdot" aria-hidden="true" />
+									{stateText[c.state]}
+								</span>
+							</div>
+							<div class="bars" role="img" aria-label={`${c.label}: ${pct(c.uptime)} uptime over the last 90 days`}>
+								{c.days.map((d) => (
+									<span class={`bar ${barClass(d.pct)}`} title={barTitle(d)} />
+								))}
+							</div>
+							<div class="bar-foot">
+								<span>90 days ago</span>
+								<span class="uptime">{pct(c.uptime)} uptime</span>
+								<span>Today</span>
+							</div>
+							{c.avgMs !== null && <p class="resp">Average response, last 24 h: {c.avgMs} ms</p>}
+						</article>
+					))
+				}
+			</section>
+
+			{
+				data.devicesActive24h !== null && hasData && (
+					<section class="devices">
+						<div>
+							<strong>{data.devicesActive24h}</strong>
+							<span>calendars checked in over the last 24 hours</span>
+						</div>
+						{data.lastDeviceSeen && (
+							<div>
+								<strong>
+									<time data-ts={data.lastDeviceSeen} data-rel>recently</time>
+								</strong>
+								<span>most recent calendar check-in</span>
+							</div>
+						)}
+					</section>
+				)
+			}
+
+			<section class="history">
+				<h2>Past incidents</h2>
+				{
+					past.length === 0 ? (
+						<p class="empty">
+							{hasData ? 'No incidents in the last 90 days.' : 'Nothing to show yet.'}
+						</p>
+					) : (
+						past.map((i) => (
+							<article class={`incident past ${i.severity}`}>
+								<div class="inc-head">
+									<h3>{i.title}</h3>
+									<span class="inc-badge">Resolved</span>
+								</div>
+								{i.body && i.source === 'manual' && <p>{i.body}</p>}
+								<p class="inc-time">
+									<time data-ts={i.started} data-abs>{new Date(i.started * 1000).toUTCString()}</time>
+									{' · '}
+									lasted {duration((i.resolved as number) - i.started)}
+								</p>
+							</article>
+						))
+					)
+				}
+			</section>
+		</div>
+
+		<p class="foot">
+			Times are shown in your local time. Outages are logged automatically when a service fails two
+			checks in a row. <a href="/api/status.json">JSON</a>
+		</p>
+	</div>
+</Layout>
+
+<script>
+	const fmtAbs = (ts: number) =>
+		new Date(ts * 1000).toLocaleString(undefined, {
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit',
+		});
+	const rel = (ts: number) => {
+		const s = Math.max(0, Math.floor(Date.now() / 1000) - ts);
+		if (s < 90) return 'just now';
+		const m = Math.round(s / 60);
+		if (m < 60) return `${m} min ago`;
+		const h = Math.round(m / 60);
+		if (h < 36) return `${h} h ago`;
+		return `${Math.round(h / 24)} days ago`;
+	};
+	function format() {
+		document.querySelectorAll<HTMLElement>('time[data-ts]').forEach((el) => {
+			const ts = Number(el.dataset.ts);
+			if (!ts) return;
+			if (el.hasAttribute('data-abs')) el.textContent = fmtAbs(ts);
+			else if (el.hasAttribute('data-rel')) el.textContent = rel(ts);
+		});
+	}
+	format();
+	setInterval(format, 30000);
+
+	// Refresh the page contents every minute without a reload.
+	setInterval(async () => {
+		if (document.hidden) return;
+		try {
+			const res = await fetch(location.pathname + location.search, { cache: 'no-store' });
+			if (!res.ok) return;
+			const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+			const next = doc.getElementById('status-root');
+			const cur = document.getElementById('status-root');
+			if (next && cur) {
+				cur.innerHTML = next.innerHTML;
+				format();
+			}
+		} catch {
+			/* offline: keep what's on screen */
+		}
+	}, 60000);
+</script>
+
+<style>
+	.status-page {
+		max-width: 820px;
+		margin: 0 auto;
+		--ok: #3ecf8e;
+		--warn: #f5a524;
+		--bad: #ef5350;
+		--idle: #707070;
+	}
+	h1 {
+		margin-bottom: 0.2em;
+	}
+	.lede {
+		color: var(--muted);
+		margin-bottom: 1.6em;
+	}
+
+	/* Overall banner */
+	.banner {
+		display: flex;
+		align-items: center;
+		gap: 1em;
+		padding: 1.2em 1.4em;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+		background: var(--bg-raised);
+	}
+	.banner h2 {
+		font-size: 1.35em;
+		margin: 0;
+	}
+	.banner p {
+		margin: 0.2em 0 0 0;
+		color: var(--muted);
+		font-size: 0.95em;
+	}
+	.banner .dot {
+		flex: none;
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: var(--idle);
+	}
+	.banner.ok {
+		border-color: color-mix(in srgb, var(--ok) 45%, var(--border));
+		background: color-mix(in srgb, var(--ok) 8%, var(--bg-raised));
+	}
+	.banner.ok .dot {
+		background: var(--ok);
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent);
+		animation: pulse 2.4s ease-out infinite;
+	}
+	.banner.warn {
+		border-color: color-mix(in srgb, var(--warn) 50%, var(--border));
+		background: color-mix(in srgb, var(--warn) 8%, var(--bg-raised));
+	}
+	.banner.warn .dot {
+		background: var(--warn);
+	}
+	.banner.bad {
+		border-color: color-mix(in srgb, var(--bad) 55%, var(--border));
+		background: color-mix(in srgb, var(--bad) 9%, var(--bg-raised));
+	}
+	.banner.bad .dot {
+		background: var(--bad);
+		animation: pulse-bad 1.6s ease-out infinite;
+	}
+	@keyframes pulse {
+		0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); }
+		70%, 100% { box-shadow: 0 0 0 12px transparent; }
+	}
+	@keyframes pulse-bad {
+		0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--bad) 60%, transparent); }
+		70%, 100% { box-shadow: 0 0 0 12px transparent; }
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.banner .dot {
+			animation: none !important;
+		}
+	}
+
+	.meta {
+		color: var(--muted-dim);
+		font-size: 0.85em;
+		margin: 0.8em 0 1.6em 0.2em;
+	}
+	.demo-tag {
+		margin-left: 0.7em;
+		padding: 0.1em 0.6em;
+		border-radius: 999px;
+		border: 1px solid var(--accent-dark);
+		color: var(--accent);
+		font-size: 0.9em;
+	}
+
+	/* Incidents */
+	.ongoing {
+		margin-bottom: 1.6em;
+	}
+	.incident {
+		padding: 1em 1.2em;
+		border-radius: 12px;
+		border: 1px solid var(--border);
+		background: var(--bg-raised);
+		margin-bottom: 0.8em;
+	}
+	.incident.outage:not(.past) {
+		border-color: color-mix(in srgb, var(--bad) 55%, var(--border));
+	}
+	.incident.degraded:not(.past),
+	.incident.maintenance:not(.past) {
+		border-color: color-mix(in srgb, var(--warn) 55%, var(--border));
+	}
+	.inc-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 1em;
+	}
+	.incident h3 {
+		font-size: 1.02em;
+		margin: 0;
+	}
+	.incident p {
+		margin: 0.4em 0 0 0;
+		color: var(--muted);
+		font-size: 0.92em;
+	}
+	.inc-time {
+		color: var(--muted-dim) !important;
+		font-size: 0.85em !important;
+	}
+	.inc-badge {
+		flex: none;
+		font-size: 0.72em;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--bad);
+	}
+	.incident.degraded .inc-badge,
+	.incident.maintenance .inc-badge {
+		color: var(--warn);
+	}
+	.incident.past .inc-badge {
+		color: var(--ok);
+	}
+
+	/* Components */
+	.components {
+		display: grid;
+		gap: 0.9em;
+	}
+	.comp {
+		padding: 1.1em 1.3em 1em 1.3em;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+		background: var(--bg-raised);
+	}
+	.comp-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		gap: 1em;
+		margin-bottom: 0.9em;
+	}
+	.comp h3 {
+		font-size: 1.05em;
+		margin: 0;
+	}
+	.blurb {
+		margin: 0.15em 0 0 0;
+		color: var(--muted-dim);
+		font-size: 0.85em;
+	}
+	.pill {
+		flex: none;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45em;
+		padding: 0.3em 0.8em;
+		border-radius: 999px;
+		border: 1px solid var(--border);
+		font-size: 0.8em;
+		font-weight: 700;
+		color: var(--muted);
+	}
+	.pdot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--idle);
+	}
+	.pill.operational {
+		color: var(--ok);
+		border-color: color-mix(in srgb, var(--ok) 40%, var(--border));
+	}
+	.pill.operational .pdot {
+		background: var(--ok);
+	}
+	.pill.slow {
+		color: var(--warn);
+		border-color: color-mix(in srgb, var(--warn) 45%, var(--border));
+	}
+	.pill.slow .pdot {
+		background: var(--warn);
+	}
+	.pill.outage {
+		color: var(--bad);
+		border-color: color-mix(in srgb, var(--bad) 50%, var(--border));
+	}
+	.pill.outage .pdot {
+		background: var(--bad);
+	}
+
+	.bars {
+		display: flex;
+		gap: 2px;
+		height: 34px;
+	}
+	.bar {
+		flex: 1;
+		min-width: 0;
+		border-radius: 2px;
+		background: #2a2a2a;
+	}
+	.bar.ok {
+		background: var(--ok);
+	}
+	.bar.warn {
+		background: var(--warn);
+	}
+	.bar.bad {
+		background: var(--bad);
+	}
+	.bar:hover {
+		filter: brightness(1.25);
+	}
+	.bar-foot {
+		display: flex;
+		justify-content: space-between;
+		margin-top: 0.5em;
+		font-size: 0.78em;
+		color: var(--muted-dim);
+	}
+	.uptime {
+		color: var(--muted);
+		font-weight: 700;
+	}
+	.resp {
+		margin: 0.5em 0 0 0;
+		font-size: 0.8em;
+		color: var(--muted-dim);
+	}
+
+	/* Devices */
+	.devices {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 2.5em;
+		margin: 1.8em 0 0.4em 0.2em;
+	}
+	.devices div {
+		display: flex;
+		flex-direction: column;
+	}
+	.devices strong {
+		font-size: 1.5em;
+	}
+	.devices span {
+		color: var(--muted-dim);
+		font-size: 0.85em;
+	}
+
+	.history {
+		margin-top: 2.4em;
+	}
+	.history h2 {
+		font-size: 1.2em;
+		margin-bottom: 0.8em;
+	}
+	.empty {
+		color: var(--muted);
+		padding: 1em 1.2em;
+		border-radius: 12px;
+		border: 1px dashed var(--border);
+	}
+	.foot {
+		margin-top: 2.6em;
+		color: var(--muted-dim);
+		font-size: 0.82em;
+	}
+	.foot a {
+		color: var(--muted);
+		text-decoration: underline;
+	}
+	@media (max-width: 560px) {
+		.comp-head {
+			flex-direction: column;
+		}
+		.bars {
+			height: 28px;
+		}
+	}
+</style>

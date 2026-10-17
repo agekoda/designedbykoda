@@ -19,6 +19,8 @@ export default defineConfig({
 	},
 	integrations: [mdx(), sitemap()],
 	adapter: cloudflare({
+		// Custom entry so the Worker can also run the status checks on a cron.
+		workerEntryPoint: { path: "src/worker.ts" },
 		platformProxy: {
 			enabled: true,
 		},

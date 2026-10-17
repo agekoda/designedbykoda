@@ -56,8 +56,23 @@ const prev = at >= 0 ? ordered[(at - 1 + ordered.length) % ordered.length] : nul
 const next = at >= 0 ? ordered[(at + 1) % ordered.length] : null;
 ---
 
-<Layout title={`${title} — designedbykoda`} description={description} image={heroImage}>
-	<a class="back" href="/projects">&larr; All projects</a>
+<Layout title={`${title} — designedbykoda`} description={description} image={`/og/${slug}.png`}>
+	<div class="top-row">
+		<a class="back" href="/projects">&larr; All projects</a>
+		<button
+			type="button"
+			class="share-btn"
+			data-title={`${title} — designedbykoda`}
+			data-text={tagline}
+		>
+			<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+				<path d="M16 6l-4-4-4 4" />
+				<path d="M12 2v13" />
+			</svg>
+			<span class="share-label">Share</span>
+		</button>
+	</div>
 
 	<div class="project-header">
 		<div class="tags">
@@ -141,7 +156,79 @@ const next = at >= 0 ? ordered[(at + 1) % ordered.length] : null;
 	}
 </Layout>
 
+<script>
+	// Share: use the phone/OS share sheet where there is one, otherwise copy
+	// the link and say so on the button.
+	document.querySelectorAll<HTMLButtonElement>('.share-btn').forEach((btn) => {
+		const label = btn.querySelector<HTMLElement>('.share-label')!;
+		let timer: number | undefined;
+		const flash = (text: string) => {
+			label.textContent = text;
+			btn.classList.add('done');
+			clearTimeout(timer);
+			timer = window.setTimeout(() => {
+				label.textContent = 'Share';
+				btn.classList.remove('done');
+			}, 2000);
+		};
+		btn.addEventListener('click', async () => {
+			const url = window.location.href.split('#')[0];
+			if (navigator.share) {
+				try {
+					await navigator.share({ title: btn.dataset.title, text: btn.dataset.text, url });
+					return;
+				} catch (err) {
+					if ((err as Error).name === 'AbortError') return;
+				}
+			}
+			try {
+				await navigator.clipboard.writeText(url);
+				flash('Link copied');
+			} catch {
+				window.prompt('Copy this link:', url);
+			}
+		});
+	});
+</script>
+
 <style>
+	.top-row {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 1em;
+	}
+	.share-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45em;
+		padding: 0.4em 0.9em;
+		border-radius: 999px;
+		border: 1px solid var(--border);
+		background: var(--bg-raised);
+		color: var(--muted);
+		font: inherit;
+		font-size: 0.85em;
+		font-weight: 600;
+		cursor: pointer;
+		transition:
+			color 0.15s ease,
+			border-color 0.15s ease;
+	}
+	.share-btn svg {
+		width: 1.1em;
+		height: 1.1em;
+	}
+	.share-btn:hover,
+	.share-btn:focus-visible {
+		color: var(--fg);
+		border-color: var(--accent-dark);
+	}
+	.share-btn.done {
+		color: var(--accent);
+		border-color: var(--accent);
+	}
+
 	.pn {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
