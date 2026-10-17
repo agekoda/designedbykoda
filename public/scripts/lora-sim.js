@@ -92,13 +92,16 @@ function tone(f, ms, delay) {
   } catch (e) { }
   buzzUntil = Math.max(buzzUntil, now() + (delay || 0) + ms);
 }
-function sndRecv() { tone(1800, 90, 0); tone(2100, 90, 140); }
-function sndSent() { tone(2600, 60, 0); }
-function sndLow() { tone(1200, 80, 0); tone(1000, 80, 120); tone(800, 80, 240); }
+var led = { c: null, until: 0, blink: false };
+function setLed(c, ms, blink) { led.c = c; led.until = now() + ms; led.blink = !!blink; }
+var LED_MSG = [40, 60, 120], LED_SENT = [30, 100, 40], LED_EMERG = [255, 0, 0], LED_LOW = [200, 120, 0];
+function sndRecv() { setLed(LED_MSG, 1500); tone(1800, 90, 0); tone(2100, 90, 140); }
+function sndSent() { setLed(LED_SENT, 1000); tone(2600, 60, 0); }
+function sndLow() { setLed(LED_LOW, 3000); tone(1200, 80, 0); tone(1000, 80, 120); tone(800, 80, 240); }
 var alarmOsc = null, alarmIv = 0;
 /* Emergency alarm: one continuous two-tone oscillator (1400 / 900 Hz, 160 ms each) that keeps going until CENTER is pressed or the device loses power. */
 function startAlarm() {
-  if (alarm.on) return; alarm.on = true; clearTimeout(alarm.t); alarm.t = setTimeout(stopAlarm, 3000);
+  if (alarm.on) return; alarm.on = true; setLed(LED_EMERG, 3000, true); clearTimeout(alarm.t); alarm.t = setTimeout(stopAlarm, 3000);
   if (!settings.buzzOn || !dev.sound) return;
   try {
     if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
@@ -339,7 +342,7 @@ function drawSetSub() {
   else if (s === 'S_SF') { bigVal('Spreading Factor', 'SF' + settings.sf, ['LEFT/RIGHT: -/+ 1 (live)', 'higher = longer range, slower'], (settings.sf - 7) / 5); hint('CENTER: back'); }
   else if (s === 'S_ENC') { bigVal('Encryption', settings.encOn ? 'ON' : 'OFF', [settings.encKey ? 'Key: ' + settings.encKey.length + ' chars set' : 'Key: not set', 'UP/DOWN: toggle'], null); hint('CENTER: enter key   LEFT: back'); }
   else if (s === 'S_BUZ') { bigVal('Buzzer', onOff(settings.buzzOn), null, null); hint('UP/DOWN: toggle   CENTER: back'); }
-  else if (s === 'S_LED') { bigVal('Status LED', onOff(settings.ledOn), ['(currently has no visible effect --', 'LED hardware issue still open)'], null); hint('UP/DOWN: toggle   CENTER: back'); }
+  else if (s === 'S_LED') { bigVal('Status LED', onOff(settings.ledOn), ['Lights the RGB LED on events', '(real board: LED hardware issue still open)'], null); hint('UP/DOWN: toggle   CENTER: back'); }
   else if (s === 'S_GPSP') { bigVal('GPS Privacy', onOff(settings.gpsInMsg), ['Include GPS time in messages'], null); hint('UP/DOWN: toggle   CENTER: back'); }
   else if (s === 'S_BATT') { bigVal('Battery Alert', settings.battAlertOn ? settings.battThresh + '%' : 'Off', ['UP: toggle   LEFT/RIGHT: threshold -/+ 5'], null); hint('CENTER: back'); }
   else if (s === 'S_SHUT') { rowsList('Auto Shutdown', SHUTV.map(function (v) { return v ? v.toFixed(1) + ' V' : 'Off'; }), null, ui.listSel, ui.setTop, 22, 1 + 1 - 1); hint('UP/DOWN: select   CENTER: apply'); }
@@ -691,6 +694,7 @@ function rp(pts, r) {
   '<rect x="22" y="-76" width="73" height="16" rx="3" fill="rgba(5,8,12,.9)"/>' +
   '<path d="M12 -76 V-118 Q12 -154 58.7 -154 Q105.4 -154 105.4 -118 V-76 Z" fill="rgba(255,255,255,.04)"/>' + ribs + '</g>' +
   '<g class="ls-fx" id="ls-fx" style="color:#3ff2d6"><circle class="ls-arc" cx="58.7" cy="-130" r="26"/><circle class="ls-arc a2" cx="58.7" cy="-130" r="40"/><circle class="ls-arc a3" cx="58.7" cy="-130" r="54"/></g>' +
+  '<defs><radialGradient id="ls-ledg"><stop id="ls-leds1" offset="0" stop-color="#fff" stop-opacity="0.8"/><stop id="ls-leds2" offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><circle id="ls-ledglow" cx="527" cy="606" r="30" fill="url(#ls-ledg)" opacity="0" style="transition:opacity .18s"/><rect id="ls-ledfill" x="518" y="597" width="18" height="18" rx="1" fill="#fff" opacity="0" style="transition:opacity .18s"/>' +
   '<circle class="ls-buzz" id="ls-bz1" cx="307" cy="618" r="26"/><circle class="ls-buzz" id="ls-bz2" cx="307" cy="618" r="40" style="animation-delay:.12s"/>' +
   '<text id="ls-pwrtxt" x="573.6" y="224" text-anchor="middle" font-size="12" font-weight="600" fill="#3ddc84" stroke="none" font-family="Inter,Arial,sans-serif">ON</text>' +
   '<g ' + s + '><rect id="ls-sw2" x="564" y="140" width="19" height="26" rx="3" fill="rgba(63,242,214,.25)" stroke-opacity=".6"/></g>' +
@@ -898,6 +902,13 @@ function frame() {
   var lvl = backlightLevel(); var o = lvl.toFixed(2); if (cache.op !== o) { cache.op = o; cv.style.opacity = o; bigc.style.opacity = o; }
   if (ui.dirty || t - lastDraw > periodFor(ui.scr)) { lastDraw = t; ui.dirty = false; renderTft(); bigDraw(); }
   var fx = q('#ls-fx'), on = t < onAir.until; fx.setAttribute('class', 'ls-fx' + (on ? ' on' : '')); fx.style.color = onAir.kind === 'tx' ? '#ff9a5a' : '#3ff2d6';
+  var lon = settings.ledOn && dev.on && !dev.asleep && led.c && t < led.until && (!led.blink || Math.floor(t / 250) % 2 === 0);
+  var lk = lon ? led.c.join(',') : '';
+  if (cache.led !== lk) {
+    cache.led = lk; var gl = gid('ls-ledglow'), lf = gid('ls-ledfill');
+    if (lon) { var rg = 'rgb(' + Math.min(255, Math.round(led.c[0] * 1.7)) + ',' + Math.min(255, Math.round(led.c[1] * 1.7)) + ',' + Math.min(255, Math.round(led.c[2] * 1.7)) + ')'; gid('ls-leds1').setAttribute('stop-color', rg); gid('ls-leds2').setAttribute('stop-color', rg); lf.setAttribute('fill', rg); gl.setAttribute('opacity', 0.55); lf.setAttribute('opacity', 0.55); }
+    else { gl.setAttribute('opacity', 0); lf.setAttribute('opacity', 0); }
+  }
   var bz = t < buzzUntil || alarm.on; q('#ls-bz1').setAttribute('class', 'ls-buzz' + (bz ? ' on' : '')); q('#ls-bz2').setAttribute('class', 'ls-buzz' + (bz ? ' on' : ''));
   var air = q('#ls-air'), ai = air.firstChild;
   if (on) { var tot = onAir.until - (onAir.start || (onAir.start = onAir.until - 1)); }
