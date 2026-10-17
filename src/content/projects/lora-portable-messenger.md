@@ -29,6 +29,8 @@ Open the simulator, use the joystick to browse the menus and send a message, the
 <div id="lora-sim"></div>
 <script src="/scripts/lora-sim.js" defer></script>
 
+Want to know how far it actually reaches? [Plan a real link in the range planner](/tools/lora-range/): pick the terrain, spreading factor and power, and see range, airtime and battery life.
+
 ## Hardware
 
 - ESP32-S3
