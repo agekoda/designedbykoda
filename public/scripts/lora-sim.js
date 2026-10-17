@@ -38,9 +38,9 @@ var BASE_LAT = -31.9505, BASE_LON = 115.8605;   /* generic Perth CBD point, not 
 var CAP_MAH = 3000;
 
 /* ---------- state ---------- */
-var settings = { bl: 80, blTimeout: 30000, theme: 0, menuStyle: 0, joy: 0, callsign: 'OPERATOR', freq: 0, pwr: 22, sf: 10, encOn: false, encKey: '', buzzOn: true, ledOn: true, gpsInMsg: true, battAlertOn: true, battThresh: 15, shutdownV: 0, compOff: null };
-try { var sv = JSON.parse(localStorage.getItem('koda-lora-settings') || 'null'); if (sv) for (var k0 in sv) if (k0 in settings) settings[k0] = sv[k0]; } catch (e) { }
-function saveSettings() { try { localStorage.setItem('koda-lora-settings', JSON.stringify(settings)); } catch (e) { } }
+var settings = { bl: 100, blTimeout: 30000, theme: 0, menuStyle: 0, joy: 0, callsign: 'OPERATOR', freq: 0, pwr: 22, sf: 10, encOn: false, encKey: '', buzzOn: true, ledOn: true, gpsInMsg: true, battAlertOn: true, battThresh: 15, shutdownV: 0, compOff: null };
+try { var sv = JSON.parse(localStorage.getItem('koda-lora-settings-v2') || 'null'); if (sv) for (var k0 in sv) if (k0 in settings) settings[k0] = sv[k0]; } catch (e) { }
+function saveSettings() { try { localStorage.setItem('koda-lora-settings-v2', JSON.stringify(settings)); } catch (e) { } }
 
 var dev = { on: true, asleep: false, usb: false, pct: 82, sky: true, heading: 40, spin: false, sound: true, tempC: 24.6, hum: 48, bootAt: 0, lastInput: 0, lastRssi: null, lastSnr: null, txUntil: 0, rxUntil: 0, lowFired: false, shutAt: 0, rate: -3.6, lastBattDraw: 0 };
 var gps = { fix: false, sats: 0, since: 0, lat: BASE_LAT, lon: BASE_LON, alt: 12.4, nmea: [] };
@@ -48,7 +48,7 @@ var msgs = [];
 var ui = { scr: 'BOOT', sel: 0, msel: 0, scroll: 0, viewEnd: 0, back: 'MENU', setSel: 0, setTop: 0, sub: 0, lora: 0, listSel: 0, emerg: false, calUntil: 0, calMsg: '', calMsgUntil: 0, calX: [9, -9], calY: [9, -9], dirty: true, penc: null };
 var kb = { mode: 'compose', set: 0, row: 0, col: 0, text: '', max: 179 * 2, ret: 'MSGS' };
 var alarm = { on: false, t: 0 };
-var remote = { follow: true, sf: 10, freq: 0, env: 1, dist: 1.0, auto: true, enc: false, key: 'koda' };
+var remote = { follow: true, sf: 10, freq: 0, env: 1, dist: 1.0, auto: false, enc: false, key: 'koda' };
 
 /* ---------- canvas TFT (320x240, Adafruit GFX 5x7 font) ---------- */
 var cv = null, g = null, SC = 3;
@@ -652,7 +652,7 @@ root.innerHTML = '' +
 '    <div class="ls-row"><span>Area</span><span class="ls-seg" id="ls-env" role="group" aria-label="Surroundings"></span></div>' +
 '    <div class="ls-row"><span>Its settings</span><span class="ls-step"><button type="button" id="ls-sfm" aria-label="Lower spreading factor">&minus;</button><b id="ls-sfv"></b><button type="button" id="ls-sfp" aria-label="Raise spreading factor">+</button></span><select id="ls-rfq" aria-label="Its frequency"></select><button id="ls-match" class="ls-pill" type="button" style="background:none;cursor:pointer" title="Make its settings match yours"></button></div>' +
 '    <div class="ls-row"><input id="ls-rtxt" type="text" maxlength="170" placeholder="Type a message" aria-label="Message from the other radio"><button class="ls-btn pri" id="ls-rsend" type="button">Send</button></div>' +
-'    <div class="ls-row" style="margin-top:8px"><button class="ls-btn alert" id="ls-remerg" type="button" aria-pressed="false">Emergency</button><button class="ls-btn" id="ls-renc" type="button" aria-pressed="false" title="Key: koda">Encrypted</button><button class="ls-btn on" id="ls-rauto" type="button" aria-pressed="true">Auto-reply</button></div>' +
+'    <div class="ls-row" style="margin-top:8px"><button class="ls-btn alert" id="ls-remerg" type="button" aria-pressed="false">Emergency</button><button class="ls-btn" id="ls-renc" type="button" aria-pressed="false" title="Key: koda">Encrypted</button><button class="ls-btn" id="ls-rauto" type="button" aria-pressed="false">Auto-reply</button></div>' +
 '    <div class="ls-air" id="ls-air"><i></i></div><div class="ls-airl" id="ls-airl">Idle</div>' +
 '    <ul class="ls-log" id="ls-log" aria-live="polite"></ul>' +
 '   </div>' +
@@ -700,8 +700,9 @@ function rp(pts, r) {
   '<path d="M628 782 H674 M628 928 H674" stroke-opacity=".35"/>' +
   '<text transform="rotate(-90 648 858)" x="648" y="858" text-anchor="middle" font-size="16" font-weight="600" fill="#e8eef4" stroke="none" font-family="Inter,Arial,sans-serif">18650</text><text transform="rotate(-90 664 858)" x="664" y="858" text-anchor="middle" font-size="9" fill="#e8eef4" fill-opacity=".6" stroke="none" font-family="Inter,Arial,sans-serif">3.7 V Li-ion</text>' +
   '<text x="676" y="750" font-size="13" fill="#ff6b6b" stroke="none" font-family="Inter,Arial,sans-serif">+</text><text x="676" y="972" font-size="15" fill="#9aa7b4" stroke="none" font-family="Inter,Arial,sans-serif">\u2212</text></g>' +
-  /* usb plug */
-  '<g id="ls-plug" style="transform:translateY(60px)"><g ' + s + '><rect x="262" y="906" width="76" height="26" rx="6" fill="rgba(5,8,12,.92)"/><rect x="274" y="914" width="52" height="10" rx="3" stroke-opacity=".35"/><rect x="250" y="932" width="100" height="46" rx="10" fill="rgba(5,8,12,.92)"/><path d="M300 978 V1000"/></g></g>' +
+  /* usb plug: slides in from below and disappears into the receptacle mouth (clipped at the board edge) */
+  '<clipPath id="ls-plugclip"><rect x="200" y="923" width="200" height="200"/></clipPath>' +
+  '<g clip-path="url(#ls-plugclip)"><g id="ls-plug" style="transform:translateY(50px)"><g ' + s + '><rect x="265" y="880" width="70" height="62" fill="rgba(5,8,12,.95)"/><path d="M279 880 V942 M321 880 V942" stroke-opacity=".3"/><rect x="252" y="942" width="96" height="46" rx="10" fill="rgba(5,8,12,.95)"/><path d="M300 988 V1000"/></g></g></g>' +
   '<rect id="ls-plughit" x="240" y="930" width="120" height="70" fill="transparent" style="cursor:pointer"/>';
   var bz = gid('tft-bezel'); if (bz) { var bb = bz.getBBox(); var r = el('rect', { id: 'ls-alring', x: bb.x - 8, y: bb.y - 8, width: bb.width + 16, height: bb.height + 16, rx: 6 }, ext); }
   var kn = gid('power-switch'); if (kn) { var rs = kn.querySelectorAll('rect'); if (rs[1]) rs[1].setAttribute('id', 'ls-sw1'); }
@@ -719,7 +720,10 @@ function place(elm, target, pad) {
 function layout() {
   var t = gid('tft-display'), j = gid('btn-1'), p = gid('power-switch'); if (!t || !stage.offsetWidth) return;
   var sc = stage.getBoundingClientRect().width / 720;
-  place(cv, t, 0); place(q('#ls-joy'), j, 38 * sc); place(q('#ls-pwr'), p, 6);
+  var bz = gid('tft-bezel') || t, sr0 = stage.getBoundingClientRect(), br = bz.getBoundingClientRect();
+  var sh = br.height * 0.96, sw = sh * 4 / 3; if (sw > br.width * 0.95) { sw = br.width * 0.95; sh = sw * 3 / 4; }
+  cv.style.left = (br.left - sr0.left + (br.width - sw) / 2) + 'px'; cv.style.top = (br.top - sr0.top + (br.height - sh) / 2) + 'px'; cv.style.width = sw + 'px'; cv.style.height = sh + 'px';
+  place(q('#ls-joy'), j, 38 * sc); place(q('#ls-pwr'), p, 6);
 }
 if (window.ResizeObserver) new ResizeObserver(layout).observe(stage);
 window.addEventListener('load', layout); window.addEventListener('resize', layout);
@@ -772,7 +776,7 @@ q('#ls-pwr').addEventListener('click', togglePower);
 q('#ls-bpwr').addEventListener('click', togglePower);
 q('#ls-busb').addEventListener('click', toggleUsb);
 q('#ls-plughit').addEventListener('click', toggleUsb);
-q('#ls-bsnd').addEventListener('click', function () { dev.sound = !dev.sound; if (!dev.sound) stopAlarmSound(); else try { actx && actx.resume(); } catch (e) { } updateUi(); });
+q('#ls-bsnd').addEventListener('click', function () { settings.buzzOn = !settings.buzzOn; saveSettings(); if (!settings.buzzOn) stopAlarmSound(); else try { actx && actx.resume(); } catch (e) { } ui.dirty = true; updateUi(); });
 function stopAlarmSound() { if (alarmOsc) { try { alarmOsc.stop(); } catch (e) { } alarmOsc = null; clearInterval(alarmIv); } }
 
 /* ---------- side panel ---------- */
@@ -815,7 +819,7 @@ function updateUi() {
   var pw = dev.on && !dev.asleep;
   q('#ls-bpwr').classList.toggle('on', pw); setT('ls-bpwr', pw ? 'Power on' : 'Power off');
   q('#ls-busb').classList.toggle('on', dev.usb); setT('ls-busb', dev.usb ? 'USB-C plugged in' : 'USB-C unplugged');
-  q('#ls-bsnd').classList.toggle('on', dev.sound); setT('ls-bsnd', dev.sound ? 'Sound on' : 'Sound off');
+  q('#ls-bsnd').classList.toggle('on', settings.buzzOn); setT('ls-bsnd', settings.buzzOn ? 'Sound on' : 'Sound off'); if (!settings.buzzOn && alarmOsc) stopAlarmSound();
   q('#ls-spin').classList.toggle('on', dev.spin); q('#ls-spin').setAttribute('aria-pressed', dev.spin);
   setT('ls-pwrtxt', pw ? 'ON' : 'OFF'); var pt = q('#ls-pwrtxt'); if (pt) pt.setAttribute('fill', pw ? '#3ddc84' : '#8da0b3');
   var tr = 'translateY(' + (pw ? -20 : 20) + 'px)'; if (sw1) sw1.style.transform = tr; if (sw2) sw2.style.transform = tr;
