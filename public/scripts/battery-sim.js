@@ -21,7 +21,7 @@ function text(x, y, s, size, c) {
     var ch = s.charCodeAt(k) & 255;
     for (var i = 0; i < 5; i++) {
       var b = FONT[ch * 5 + i];
-      for (var j = 0; j < 7; j++) if ((b >> j) & 1) tctx.fillRect(x + (k * 6 + i) * size, y + j * size, size, size);
+      for (var j = 0; j < 8; j++) if ((b >> j) & 1) tctx.fillRect(x + (k * 6 + i) * size, y + j * size, size, size);
     }
   }
 }
@@ -344,7 +344,7 @@ var css = '' +
 '@keyframes bpfw{to{stroke-dashoffset:-12}}@keyframes bpbw{to{stroke-dashoffset:12}}' +
 '#bp-sim .bp-svg .fade{transition:opacity .3s}' +
 '#bp-sim .bp-svg #heat-waves{opacity:0;transition:opacity .6s}' +
-'#bp-sim .bp-svg .hw{fill:none;stroke:#ff9a4a;stroke-width:2;stroke-linecap:round;opacity:0;animation:bphw 4s ease-in-out infinite}' +
+'#bp-sim .bp-svg .hw{fill:none;stroke:#ff9a4a;stroke-width:2;stroke-linecap:round;opacity:0;animation:bphw 9s ease-in-out infinite}' +
 '@keyframes bphw{0%{opacity:0;transform:translateY(8px)}9%{opacity:.95}29%,100%{opacity:0;transform:translateY(-30px)}}' +
 '@media(prefers-reduced-motion:reduce){#bp-sim .bp-svg .hw{animation:none;opacity:.75}}' +
 '#bp-sim .bp-svg [id^=btn-]{transition:transform .08s;transform-box:fill-box;transform-origin:center}' +
@@ -555,9 +555,9 @@ function routeWires() {
     for (var i = 1; i < n; i++) d += ' t0 ' + (-seg).toFixed(1);
     p.setAttribute('d', d);
   }
-  for (var i = 0; i < 5; i++) {
+  for (var i = 0; i < 3; i++) {
     var p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('class', 'hw');
-    reroll(p); p.style.animationDelay = (-rnd(0, 4)).toFixed(2) + 's';
+    reroll(p); p.style.animationDelay = (-rnd(0, 9)).toFixed(2) + 's';
     p.addEventListener('animationiteration', function (e) { reroll(e.target); });
     g.appendChild(p);
   }
