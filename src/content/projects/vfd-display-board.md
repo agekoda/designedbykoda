@@ -13,9 +13,10 @@ gallery:
 model: "/models/projects/vfd-display-board/model.glb"
 modelCaption: "VFD Display Board"
 cameraOrbit: "90deg 40deg 120%"
+simulator: true
 ---
 
-A custom two-VFD-tube desk display combining retro VFD aesthetics with modern smart-home connectivity. Full custom PCB and assembly — black resin back, 8001 transparent front, with a USB-C port lined up on the back with more precision than I can really explain.
+A custom two-VFD-tube desk display combining retro VFD aesthetics with modern smart-home connectivity. Full custom PCB and assembly — black resin back, 8001 transparent front, with a USB-C port on the back.
 
 ## Try it
 

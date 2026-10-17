@@ -55,6 +55,9 @@ const projects = defineCollection({
 		// Optional small CTA banner shown at the bottom of this project's
 		// card on the homepage/projects grid, e.g. "Join the waitlist".
 		cardBanner: z.string().optional(),
+		// Set to true when the project page has an interactive simulator
+		// (under a "## Try it" heading). Shows a "Try it live" pill on the card.
+		simulator: z.boolean().default(false),
 		// Aspect ratio (CSS aspect-ratio value) for the gallery images on this
 		// project's page. Defaults to landscape; set to "3 / 4" for portrait
 		// photos instead.

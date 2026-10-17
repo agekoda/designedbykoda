@@ -7,6 +7,7 @@ status: "Upcoming"
 order: 13
 heroImage: "/images/projects/battery-profiler/hero.jpg"
 gallery: []
+simulator: true
 ---
 
 A single-cell bench instrument that measures the real capacity of 1S Li-ion and LiPo batteries, built to check whether cheap cells live up to their advertised capacity. One board tests one cell, and two boards can run side by side. Currently in development.
