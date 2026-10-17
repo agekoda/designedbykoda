@@ -27,10 +27,8 @@ const { slug, title, tagline, category, status, heroImage, cardBanner, simulator
 				aria-label={`Try the ${title} simulator`}
 			>
 				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor" /></svg>
-				<span class="sim-text">
-					<span class="sim-label">Try it live</span>
-					<span class="sim-more">Jump to simulator ↓</span>
-				</span>
+				<span class="sim-label">Try it live</span>
+				<span class="sim-more">Jump to simulator ↓</span>
 			</span>
 		)}
 	</div>
@@ -118,48 +116,40 @@ const { slug, title, tagline, category, status, heroImage, cardBanner, simulator
 		color: var(--accent);
 		flex: none;
 	}
-	.sim-text {
-		display: inline-grid;
-		text-align: center;
-	}
-	/* Both labels sit in the same cell, so the pill never changes size.
-	   The swap only animates opacity + transform (compositor only, no
-	   layout), which keeps it smooth. */
-	.sim-label,
-	.sim-more {
-		grid-area: 1 / 1;
-	}
 	.sim-more {
 		display: none;
 	}
 	@media (hover: hover) and (pointer: fine) {
 		.sim-more {
-			display: block;
-		}
-		.sim-label,
-		.sim-more {
-			will-change: opacity, transform;
-			transition:
-				opacity 0.18s ease-out,
-				transform 0.18s ease-out;
-		}
-		.sim-more {
+			display: inline-block;
+			max-width: 0;
+			overflow: hidden;
 			opacity: 0;
-			transform: translateY(5px);
+			transition:
+				max-width 0.25s ease,
+				opacity 0.2s ease;
 		}
 		.sim-pill:hover,
 		.sim-pill:focus-visible {
 			border-color: var(--accent);
 		}
-		.sim-pill:hover .sim-label,
-		.sim-pill:focus-visible .sim-label {
-			opacity: 0;
-			transform: translateY(-5px);
-		}
 		.sim-pill:hover .sim-more,
 		.sim-pill:focus-visible .sim-more {
+			max-width: 12em;
 			opacity: 1;
-			transform: none;
+		}
+		.sim-label {
+			display: inline-block;
+			max-width: 8em;
+			overflow: hidden;
+			transition:
+				max-width 0.25s ease,
+				opacity 0.2s ease;
+		}
+		.sim-pill:hover .sim-label,
+		.sim-pill:focus-visible .sim-label {
+			max-width: 0;
+			opacity: 0;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
