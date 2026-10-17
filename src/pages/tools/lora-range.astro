@@ -1,0 +1,62 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout
+	title="LoRa range planner — designedbykoda"
+	description="Drag a second radio across a top-down landscape and see LoRa range, signal margin, airtime and battery life change for each spreading factor, power level and terrain."
+>
+	<h1 class="sr-only">LoRa range planner</h1>
+	<div id="lora-range"></div>
+	<noscript><p class="lr-how">This planner needs JavaScript to draw the map.</p></noscript>
+	<script src="/scripts/lora-range.js" defer is:inline></script>
+
+	<section class="lr-how">
+		<h2>How this works</h2>
+		<p>
+			Drag the other radio, or use the distance slider. The map zooms out as the radios move apart,
+			and the green and amber rings show how far a message should reach with your settings. The
+			numbers use the same radio model as the
+			<a href="/projects/lora-portable-messenger/">LoRa Portable Messenger</a> simulator.
+		</p>
+		<ul>
+			<li><strong>Spreading factor</strong> trades speed for range. Each step up roughly doubles the airtime and adds about 2.5 dB of sensitivity.</li>
+			<li><strong>Signal margin</strong> is how many dB the signal arrives above the weakest one the radio can still decode. Above 10 dB is a solid link, 0 to 10 dB is marginal, below 0 is no link.</li>
+			<li><strong>Delivery chance</strong> allows for 2 dB of random fading on every packet, so a link with a small margin loses some messages.</li>
+			<li><strong>Battery life</strong> assumes a 3000 mAh cell, the simulator's screen and radio draw, and the transmit current of the LoRa module at each power setting.</li>
+		</ul>
+		<p class="lr-small">
+			This is a simplified model, not a field measurement. Real range depends on antennas, terrain,
+			weather and interference. The forest loss and transmit current figures are my own estimates.
+		</p>
+	</section>
+</Layout>
+
+<style is:global>
+	/* This page uses the full width instead of the usual centred column. */
+	body main#main {
+		width: 100%;
+		max-width: none;
+		padding: 0 0 4em 0;
+	}
+	.lr-how {
+		max-width: 860px;
+		margin: 3em auto 0 auto;
+		padding: 0 1.25em;
+		color: var(--muted);
+	}
+	.lr-how h2 {
+		color: var(--fg);
+		margin-bottom: 0.5em;
+	}
+	.lr-how li {
+		margin-bottom: 0.5em;
+	}
+	.lr-how li strong {
+		color: var(--fg);
+	}
+	.lr-small {
+		font-size: 0.9em;
+		color: var(--muted-dim);
+	}
+</style>
