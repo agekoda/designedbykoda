@@ -95,7 +95,7 @@ const { slug, title, tagline, category, status, heroImage, cardBanner, simulator
 		z-index: 2;
 		display: inline-flex;
 		align-items: center;
-		gap: 0.4em;
+		gap: 0;
 		padding: 0.4em 0.75em 0.4em 0.6em;
 		border-radius: 999px;
 		background: rgba(10, 14, 20, 0.78);
@@ -115,6 +115,7 @@ const { slug, title, tagline, category, status, heroImage, cardBanner, simulator
 		height: 1.15em;
 		color: var(--accent);
 		flex: none;
+		margin-right: 0.4em;
 	}
 	.sim-more {
 		display: none;
@@ -135,12 +136,12 @@ const { slug, title, tagline, category, status, heroImage, cardBanner, simulator
 		}
 		.sim-pill:hover .sim-more,
 		.sim-pill:focus-visible .sim-more {
-			max-width: 12em;
+			max-width: 10em;
 			opacity: 1;
 		}
 		.sim-label {
 			display: inline-block;
-			max-width: 8em;
+			max-width: 4.5em;
 			overflow: hidden;
 			transition:
 				max-width 0.25s ease,
