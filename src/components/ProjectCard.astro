@@ -27,8 +27,10 @@ const { slug, title, tagline, category, status, heroImage, cardBanner, simulator
 				aria-label={`Try the ${title} simulator`}
 			>
 				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor" /></svg>
-				<span class="sim-label">Try it live</span>
-				<span class="sim-more">Jump to simulator ↓</span>
+				<span class="sim-text">
+					<span class="sim-label">Try it live</span>
+					<span class="sim-more">Jump to simulator ↓</span>
+				</span>
 			</span>
 		)}
 	</div>
@@ -117,43 +119,52 @@ const { slug, title, tagline, category, status, heroImage, cardBanner, simulator
 		flex: none;
 		margin-right: 0.4em;
 	}
+	.sim-text {
+		display: grid;
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+	}
+	.sim-label,
+	.sim-more {
+		grid-area: 1 / 1;
+	}
 	.sim-more {
 		display: none;
 	}
 	@media (hover: hover) and (pointer: fine) {
-		.sim-more {
-			display: inline-block;
-			max-width: 0;
+		/* The pill's width is animated directly between two fixed sizes,
+		   so it grows straight to its final width and stops. */
+		.sim-pill {
+			box-sizing: border-box;
+			width: 7.53em;
 			overflow: hidden;
-			opacity: 0;
-			transition:
-				max-width 0.25s ease,
-				opacity 0.2s ease;
+			transition: width 0.25s ease-out;
 		}
 		.sim-pill:hover,
 		.sim-pill:focus-visible {
+			width: 12.77em;
 			border-color: var(--accent);
+		}
+		.sim-more {
+			display: block;
+			opacity: 0;
+			transition: opacity 0.2s ease;
+		}
+		.sim-label {
+			transition: opacity 0.2s ease;
 		}
 		.sim-pill:hover .sim-more,
 		.sim-pill:focus-visible .sim-more {
-			max-width: 10em;
 			opacity: 1;
-		}
-		.sim-label {
-			display: inline-block;
-			max-width: 4.5em;
-			overflow: hidden;
-			transition:
-				max-width 0.25s ease,
-				opacity 0.2s ease;
 		}
 		.sim-pill:hover .sim-label,
 		.sim-pill:focus-visible .sim-label {
-			max-width: 0;
 			opacity: 0;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
+		.sim-pill,
 		.sim-more,
 		.sim-label {
 			transition: none !important;
