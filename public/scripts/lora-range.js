@@ -135,6 +135,8 @@ var CSS = '' +
 '#lora-range .lr-dist .lr-dv{min-width:92px;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}' +
 '#lora-range .lr-dist input{flex:1}' +
 '#lora-range .lr-ends{display:flex;justify-content:space-between;font-size:11px;color:#8d99a6;margin-top:2px}' +
+'html.has-custom-cursor #lora-range *{cursor:none!important}' +
+'#lora-range canvas{-webkit-user-select:none;user-select:none}' +
 '#lora-range canvas.day{filter:invert(1) hue-rotate(180deg) brightness(.98) saturate(1.15)}' +
 '#lora-range .lr-note{font-size:11.5px;color:#8d99a6;line-height:1.4;margin-top:10px}' +
 '#lora-range details summary{cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8d99a6;margin:12px 0 4px;list-style:none}' +
@@ -428,7 +430,7 @@ function massLayers(envIdx, s, aEnv) {
   }
   if (envIdx === 0) {
     gridBuildS(gB, L, 17);
-    fieldPaint(gB, L, function (v) { fo[0] = 165; fo[1] = 195; fo[2] = 130; fo[3] = 0.05 + band(v, 0.3, 0.55) * 0.08; });
+    fieldPaint(gB, L, function (v) { fo[0] = 165; fo[1] = 195; fo[2] = 130; fo[3] = (0.05 + band(v, 0.3, 0.55) * 0.08) * (S.day ? 2.2 : 1); });
   } else if (envIdx === 1) {
     gridBuildS(gB, L, 5);
     fieldPaint(gB, L, function (v) { var t1 = band(v, 0.3, 0.55), t2 = band(v, 0.55, 0.75); fo[0] = 56 + 10 * t2; fo[1] = 140 + 12 * t2; fo[2] = 100 + 8 * t2; fo[3] = 0.07 + t1 * 0.16 + t2 * 0.08; });
@@ -902,14 +904,15 @@ function local(e) { var r = cv.getBoundingClientRect(); return [e.clientX - r.le
 cv.addEventListener('pointerdown', function (e) {
   if (e.pointerType === 'touch') return;
   var p = local(e); if (!hitRemote(p[0], p[1])) return;
-  drag = true; dragHint = false; lastPtr = p; leaveFit(); cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; e.preventDefault();
+  drag = true; dragHint = false; lastPtr = p; leaveFit(); cv.setPointerCapture(e.pointerId);   /* no preventDefault here: it would stop the site's circle cursor from receiving mouse events */
 });
 cv.addEventListener('pointermove', function (e) {
   if (e.pointerType === 'touch') return;
   var p = local(e);
-  if (drag) { lastPtr = p; moveTo(p[0], p[1]); } else cv.style.cursor = hitRemote(p[0], p[1]) ? 'grab' : '';
+  if (drag) { lastPtr = p; moveTo(p[0], p[1]); }
 });
-function endDrag(e) { if (!drag) return; drag = false; cv.style.cursor = ''; try { cv.releasePointerCapture(e.pointerId); } catch (x) {} }
+document.addEventListener('selectstart', function (e) { if (drag) e.preventDefault(); });
+function endDrag(e) { if (!drag) return; drag = false; try { cv.releasePointerCapture(e.pointerId); } catch (x) {} }
 cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
 /* touch: only take over the gesture when it starts on the radio, so the page still scrolls */
 cv.addEventListener('touchstart', function (e) {
