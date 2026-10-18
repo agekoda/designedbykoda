@@ -261,29 +261,71 @@ function vnoise(x, y, k) {
 var C0 = 0.0015, LV = 12;          /* smallest cell 1.5 m, each level 3x bigger */
 function layerAlpha(px) { return sstep(22, 40, px) * (1 - sstep(66, 120, px)); }
 
-function drawTerrain(envIdx, aEnv) {
-  var s = sc(), x0 = WX(0), x1 = WX(W), y0 = WY(0), y1 = WY(H);
-  for (var k = 0; k < LV; k++) {
-    var c = C0 * Math.pow(3, k), px = c * s, a = layerAlpha(px) * aEnv;
-    if (a < 0.012) continue;
-    var i0 = Math.floor(x0 / c) - 1, i1 = Math.ceil(x1 / c) + 1, j0 = Math.floor(y0 / c) - 1, j1 = Math.ceil(y1 / c) + 1;
-    ctx.globalAlpha = a;
-    if (envIdx === 0) terrainOpen(i0, i1, j0, j1, c, k, s);
-    else if (envIdx === 1) terrainForest(i0, i1, j0, j1, c, k, s);
-    else if (envIdx === 2) terrainSuburb(i0, i1, j0, j1, c, k, s);
-    else terrainUrban(i0, i1, j0, j1, c, k, s);
-  }
-  ctx.globalAlpha = 1;
-  if (envIdx <= 1) drawStream(aEnv, envIdx, s);
+/* Everything below is drawn in real-world sizes. A tree is ~6 m wide, a house ~12 m, a block ~80 m, so as you zoom
+   out the individual things shrink and fade away and bigger structure (woods, lakes, built-up areas, main roads) takes over. */
+var RI0 = 0, RI1 = 0, RJ0 = 0, RJ1 = 0;
+function cellRange(c) { RI0 = Math.floor(WX(0) / c) - 1; RI1 = Math.ceil(WX(W) / c) + 1; RJ0 = Math.floor(WY(0) / c) - 1; RJ1 = Math.ceil(WY(H) / c) + 1; return (RI1 - RI0) * (RJ1 - RJ0) < 16000; }
+
+/* multi-scale density field: real feature sizes from 50 m to ~1000 km; coarse levels use only the big octaves, so the same
+   woods / towns / lakes stay in the same place while the small detail fades in or out */
+var OCT = [0.05, 0.15, 0.45, 1.35, 4, 12, 36, 108, 324, 972];
+var OCS = [], OSN = [];
+for (var oj = 0; oj < 10; oj++) { OCS.push(Math.cos(oj * 0.9 + 0.4)); OSN.push(Math.sin(oj * 0.9 + 0.4)); }
+function oct(wx, wy, j, salt) {          /* each octave is rotated differently so the value noise never lines up with the axes */
+  var sc0 = OCT[j], x = (wx * OCS[j] - wy * OSN[j]) / sc0, y = (wx * OSN[j] + wy * OCS[j]) / sc0;
+  return vnoise(x, y, salt * 16 + j) - 0.5;
 }
-/* ---- shared helpers for the terrains ---- */
+var OFF = { 5: [201.3, -885.4], 17: [781.3, -216.9], 31: [-57.7, 174], 300: [325.5, 692.5], 400: [804.6, 372.9] };   /* shifts picked so the start point sits in a pleasant spot */
+function dens(wx, wy, cmin, salt) {
+  var sum = 0, n = 0, j, of = OFF[salt]; if (of) { wx += of[0]; wy += of[1]; }
+  for (j = 0; j < 10; j++) { var sc0 = OCT[j]; if (sc0 < 2.2 * cmin) continue; sum += oct(wx, wy, j, salt); n++; }
+  var v = n ? 0.5 + sum / Math.sqrt(n) * 1.35 : 0.5;
+  return v;
+}
+/* same field, but octaves fade in and out smoothly as the zoom changes (L = spacing of the sample lattice in km) */
+function densS(wx, wy, L, salt) {
+  var sum = 0, w2 = 0, j, of = OFF[salt]; if (of) { wx += of[0]; wy += of[1]; }
+  for (j = 0; j < 10; j++) { var sc0 = OCT[j], w = sstep(1.8, 3.2, sc0 / L); if (w <= 0) continue; sum += w * oct(wx, wy, j, salt); w2 += w * w; }
+  var v = w2 > 1e-6 ? 0.5 + sum / Math.sqrt(w2) * 1.35 * Math.min(1, Math.sqrt(w2)) : 0.5;
+  return v;
+}
+function mkGrid() { return { buf: new Float32Array(1), nx: 0, ny: 0, gi0: 0, gj0: 0, st: 1 }; }
+function gridBuild(g, i0, i1, j0, j1, c, st, cmin, salt) {
+  g.st = st; g.gi0 = Math.floor(i0 / st); g.gj0 = Math.floor(j0 / st);
+  g.nx = Math.ceil(i1 / st) - g.gi0 + 2; g.ny = Math.ceil(j1 / st) - g.gj0 + 2;
+  if (g.buf.length < g.nx * g.ny) g.buf = new Float32Array(g.nx * g.ny);
+  for (var a = 0; a < g.nx; a++) for (var b = 0; b < g.ny; b++) g.buf[a * g.ny + b] = dens((g.gi0 + a) * st * c, (g.gj0 + b) * st * c, cmin, salt);
+}
+function gridBuildS(g, L, salt) {
+  g.st = 1; g.gi0 = Math.floor(WX(0) / L) - 1; g.gj0 = Math.floor(WY(0) / L) - 1;
+  g.nx = Math.ceil(WX(W) / L) - g.gi0 + 2; g.ny = Math.ceil(WY(H) / L) - g.gj0 + 2;
+  if (g.buf.length < g.nx * g.ny) g.buf = new Float32Array(g.nx * g.ny);
+  for (var a = 0; a < g.nx; a++) for (var b = 0; b < g.ny; b++) g.buf[a * g.ny + b] = densS((g.gi0 + a) * L, (g.gj0 + b) * L, L, salt);
+}
+function gridAt(g, i, j) {
+  var fx = i / g.st - g.gi0, fy = j / g.st - g.gj0, a = Math.floor(fx), b = Math.floor(fy); fx -= a; fy -= b; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+  var o = a * g.ny + b, v00 = g.buf[o], v10 = g.buf[o + g.ny], v01 = g.buf[o + 1], v11 = g.buf[o + g.ny + 1];
+  return v00 + (v10 - v00) * fx + (v01 - v00) * fy + (v00 - v10 - v01 + v11) * fx * fy;
+}
+var gA = mkGrid(), gB = mkGrid();
+
+function blobs(path, g, i0, i1, j0, j1, c, s, thr, rad, wide) {   /* union of circles where the field is above thr */
+  for (var i = i0; i <= i1; i++) for (var j = j0; j <= j1; j++) {
+    if (gridAt(g, i + 0.5, j + 0.5) <= thr) continue;
+    var x = X((i + 0.5) * c), y = Y((j + 0.5) * c), r = c * s * rad * (0.85 + 0.3 * hash(i, j, 3, 5));
+    path.moveTo(x + r, y); path.arc(x, y, r, 0, 6.2832);
+  }
+}
+
+/* ---- shared helpers for rotated neighbourhoods ---- */
 var FX = 0, FY = 0, FC = 1, FS = 0, SS = 1, PX = 0, PY = 0, QX = 0, QY = 0;
 function setFrame(cx, cy, th, s) { FX = cx; FY = cy; FC = Math.cos(th); FS = Math.sin(th); SS = s; }
-function loc(u, v) {                 /* local (rotated) coords -> world QX,QY and screen PX,PY */
+function loc(u, v) {
   QX = FX + u * FC - v * FS; QY = FY + u * FS + v * FC;
   PX = area.cx + (QX - cam.cx) * SS; PY = area.cy + (QY - cam.cy) * SS;
 }
-function quad(p, u, v, hu, hv, a) {  /* rotated rectangle in the local frame */
+function quad(p, u, v, hu, hv, a) {
+  if (hu * SS < 3.4) { loc(u, v); p.rect(PX - hu * SS, PY - hv * SS, 2 * hu * SS, 2 * hv * SS); return; }   /* tiny: skip the rotation */
   var ca = Math.cos(a), sa = Math.sin(a);
   loc(u + (-hu) * ca - (-hv) * sa, v + (-hu) * sa + (-hv) * ca); p.moveTo(PX, PY);
   loc(u + hu * ca - (-hv) * sa, v + hu * sa + (-hv) * ca); p.lineTo(PX, PY);
@@ -294,48 +336,115 @@ function quad(p, u, v, hu, hv, a) {  /* rotated rectangle in the local frame */
 function dotAt(p, u, v, r) { loc(u, v); p.moveTo(PX + r, PY); p.arc(PX, PY, r, 0, 6.2832); }
 function line(p, u0, v0, u1, v1) { loc(u0, v0); p.moveTo(PX, PY); loc(u1, v1); p.lineTo(PX, PY); }
 
-/* a meandering stream (open land + forest) */
+/* ---- streams (open land + forest) ---- */
 var SW = 1;
-function streamX(wy, env) { var p = env ? 2.1 : 0.4; return 0.42 * Math.sin(wy / 0.95 + p) + 0.16 * Math.sin(wy / 0.31 + p * 2.3) * SW; }
+function streamX(wy, env) { var p = env ? 2.1 : 0.4; return 0.42 * Math.sin(wy / 0.95 + p) + 0.16 * Math.sin(wy / 0.31 + p * 2.3) * SW + 2.4 * Math.sin(wy / 7 + p) + 0.9 * Math.sin(wy / 2.3 + p * 1.7); }
 function drawStream(aEnv, env, s) {
   var y0 = WY(0) - 0.05, y1 = WY(H) + 0.05, n = Math.min(400, Math.ceil(H / 5) + 2), st = (y1 - y0) / n, i;
   SW = sstep(40, 160, s);
   var bank = new Path2D();
   for (i = 0; i <= n; i++) { var y = y0 + i * st, x = X(streamX(y, env)), yy = Y(y); if (i) bank.lineTo(x, yy); else bank.moveTo(x, yy); }
-  var w = clamp(0.012 * s, 2, 14);
+  var w = clamp(0.012 * s, 1.6, 12);
   ctx.globalAlpha = aEnv; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(120,170,140,0.10)'; ctx.lineWidth = w + 6; ctx.stroke(bank);
+  ctx.strokeStyle = 'rgba(120,170,140,0.10)'; ctx.lineWidth = w + 5; ctx.stroke(bank);
   ctx.strokeStyle = 'rgba(110,175,225,0.30)'; ctx.lineWidth = w; ctx.stroke(bank);
   ctx.globalAlpha = 1;
 }
-/* straight-ish avenues through built-up areas */
-var AC = 1, AS = 0, AD = 1, AW = 0, AL = 1;
-function avSetup(phi, D, wig, len) { AC = Math.cos(phi); AS = Math.sin(phi); AD = D; AW = wig; AL = len; }
-function avDist(wx, wy) { var a = wx * AC + wy * AS, b = -wx * AS + wy * AC + AW * Math.sin(a / AL), t = b / AD; return Math.abs(t - Math.round(t)) * AD; }
-function drawAvenues(c, s, rgba) {
-  var xs = [WX(0), WX(W)], ys = [WY(0), WY(H)], amin = 1e9, amax = -1e9, bmin = 1e9, bmax = -1e9, i, j;
+
+/* ---- roads: irregular spacing, some lines missing, gently wavy ---- */
+var AC = 1, AS = 0, AD = 1, AW = 0, AL = 1, AK = 0;
+function avSetup(phi, D, wig, len, key) { AC = Math.cos(phi); AS = Math.sin(phi); AD = D; AW = wig; AL = len; AK = key; }
+function avOn(n) { return hash(n, 7, AK, 4) > 0.3; }
+function avOff(n) { return n * AD + (hash(n, 7, AK, 3) - 0.5) * 0.55 * AD; }
+function avDist(wx, wy) {
+  var a = wx * AC + wy * AS, b = -wx * AS + wy * AC + AW * Math.sin(a / AL), n0 = Math.round(b / AD), best = 1e9;
+  for (var n = n0 - 1; n <= n0 + 1; n++) { if (!avOn(n)) continue; var d = Math.abs(b - avOff(n)); if (d < best) best = d; }
+  return best;
+}
+function drawAvenues(widthPx, rgba) {
+  var xs = [WX(0), WX(W)], ys = [WY(0), WY(H)], amin = 1e9, amax = -1e9, bmin = 1e9, bmax = -1e9, i, j, s = sc();
   for (i = 0; i < 2; i++) for (j = 0; j < 2; j++) {
     var a = xs[i] * AC + ys[j] * AS, b = -xs[i] * AS + ys[j] * AC;
     if (a < amin) amin = a; if (a > amax) amax = a; if (b < bmin) bmin = b; if (b > bmax) bmax = b;
   }
-  var n0 = Math.floor((bmin - AW) / AD), n1 = Math.ceil((bmax + AW) / AD), steps = Math.min(220, Math.ceil((amax - amin) * s / 24) + 2), p = new Path2D();
+  var n0 = Math.floor((bmin - AW) / AD) - 1, n1 = Math.ceil((bmax + AW) / AD) + 1, steps = Math.min(220, Math.ceil((amax - amin) * s / 24) + 2), p = new Path2D();
   if (n1 - n0 > 40) return;
-  for (var n = n0; n <= n1; n++) for (i = 0; i <= steps; i++) {
-    var aa = amin + (amax - amin) * i / steps, bb = n * AD - AW * Math.sin(aa / AL);
-    var px = X(aa * AC - bb * AS), py = Y(aa * AS + bb * AC);
-    if (i) p.lineTo(px, py); else p.moveTo(px, py);
+  for (var n = n0; n <= n1; n++) {
+    if (!avOn(n)) continue;
+    for (i = 0; i <= steps; i++) {
+      var aa = amin + (amax - amin) * i / steps, bb = avOff(n) - AW * Math.sin(aa / AL);
+      var px = X(aa * AC - bb * AS), py = Y(aa * AS + bb * AC);
+      if (i) p.lineTo(px, py); else p.moveTo(px, py);
+    }
   }
-  ctx.lineJoin = 'round'; ctx.strokeStyle = rgba; ctx.lineWidth = Math.max(1.5, c * s * 0.13); ctx.stroke(p);
+  ctx.lineJoin = 'round'; ctx.strokeStyle = rgba; ctx.lineWidth = widthPx; ctx.stroke(p);
 }
 
-/* ---- Open: rolling ground with contour lines, a few shrubs and lone trees, and a stream ---- */
+/* ---------- drawing ---------- */
+function drawTerrain(envIdx, aEnv) {
+  var s = sc(), k, c, px, a;
+  massLayers(envIdx, s, aEnv);
+  for (k = 0; k < LV; k++) {
+    c = C0 * Math.pow(3, k); px = c * s; a = layerAlpha(px) * aEnv;
+    if (envIdx === 0 && a >= 0.012 && cellRange(c)) { ctx.globalAlpha = a; contours(k, c, s); }
+    if (envIdx >= 2) {                                 /* road hierarchy: only roads whose spacing makes sense at this zoom */
+      var D = (envIdx === 2 ? 14 : 12) * c, ra = sstep(260, 420, D * s) * (1 - sstep(1500, 2600, D * s)) * aEnv;
+      if (ra > 0.012) { ctx.globalAlpha = ra; avSetup(envIdx === 2 ? 0.5 : 0.62, D, 0.9 * c, 4 * c, 20 + k); drawAvenues(Math.max(1.3, c * s * 0.13), envIdx === 2 ? 'rgba(210,220,235,0.11)' : 'rgba(190,205,235,0.13)'); }
+    }
+  }
+  ctx.globalAlpha = 1;
+  if (envIdx === 0) openObjects(s, aEnv);
+  else if (envIdx === 1) forestObjects(s, aEnv);
+  else if (envIdx === 2) { speckle(2, s, aEnv); suburbObjects(s, aEnv); }
+  else { speckle(3, s, aEnv); urbanObjects(s, aEnv); }
+  if (envIdx <= 1) drawStream(aEnv, envIdx, s);
+}
+
+/* ---- soft density maps: rendered small and scaled up, so woods / towns / lakes get smooth natural edges ---- */
+var FRES = 8, fcan = null, fctx = null, fimg = null, fw = 0, fh = 0, fo = [0, 0, 0, 0];
+function fieldPaint(g, L, fn) {
+  var w = Math.ceil(W / FRES), h = Math.ceil(H / FRES);
+  if (!fcan) { fcan = document.createElement('canvas'); fctx = fcan.getContext('2d'); }
+  if (fw !== w || fh !== h) { fcan.width = fw = w; fcan.height = fh = h; fimg = fctx.createImageData(w, h); }
+  var d = fimg.data, x, y, o = 0, ic = 1 / L, wx0 = WX(0), wy0 = WY(0), stp = FRES / sc();
+  for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
+    fn(gridAt(g, (wx0 + x * stp) * ic, (wy0 + y * stp) * ic));
+    d[o++] = fo[0]; d[o++] = fo[1]; d[o++] = fo[2]; d[o++] = fo[3] * 255;
+  }
+  fctx.putImageData(fimg, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(fcan, 0, 0, w * FRES, h * FRES);
+}
+function band(v, t0, t1) { var t = clamp((v - t0) / (t1 - t0), 0, 1); return t * t * (3 - 2 * t); }
+function massLayers(envIdx, s, aEnv) {
+  var L = 36 / s;
+  ctx.globalAlpha = aEnv;
+  if (envIdx <= 1) {
+    gridBuildS(gA, L, 31);
+    fieldPaint(gA, L, function (v) { fo[0] = 90; fo[1] = 150; fo[2] = 215; fo[3] = band(v, 0.76, 0.8) * 0.2; });
+  }
+  if (envIdx === 0) {
+    gridBuildS(gB, L, 17);
+    fieldPaint(gB, L, function (v) { fo[0] = 150; fo[1] = 180; fo[2] = 110; fo[3] = band(v, 0.5, 0.64) * 0.08; });
+  } else if (envIdx === 1) {
+    gridBuildS(gB, L, 5);
+    fieldPaint(gB, L, function (v) { var t1 = band(v, 0.44, 0.6), t2 = band(v, 0.6, 0.72); fo[0] = 46 - 16 * t2; fo[1] = 130 - 20 * t2; fo[2] = 90 - 12 * t2; fo[3] = t1 * 0.2 + t2 * 0.1; });
+  } else if (envIdx === 2) {
+    gridBuildS(gB, L, 300);
+    fieldPaint(gB, L, function (v) { fo[0] = 150; fo[1] = 170; fo[2] = 200; fo[3] = band(v, 0.47, 0.6) * 0.12; });
+  } else {
+    gridBuildS(gB, L, 400);
+    fieldPaint(gB, L, function (v) { var t1 = band(v, 0.43, 0.56), t2 = band(v, 0.6, 0.72); fo[0] = 120 + 30 * t2; fo[1] = 150 + 35 * t2; fo[2] = 205 + 30 * t2; fo[3] = t1 * 0.09 + t2 * 0.1; });
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---- Open: contour lines at every scale ---- */
 var cornerBuf = new Float32Array(1);
-function terrainOpen(i0, i1, j0, j1, c, k, s) {
-  var i, j, nx = i1 - i0 + 2, ny = j1 - j0 + 2;
+function contours(k, c, s) {
+  var i0 = RI0, i1 = RI1, j0 = RJ0, j1 = RJ1, i, j, nx = i1 - i0 + 2, ny = j1 - j0 + 2;
   if (cornerBuf.length < nx * ny) cornerBuf = new Float32Array(nx * ny);
   for (i = 0; i < nx; i++) for (j = 0; j < ny; j++) cornerBuf[i * ny + j] = vnoise((i0 + i) / 5, (j0 + j) / 5, k) * 0.7 + vnoise((i0 + i) / 2.2 + 40, (j0 + j) / 2.2, k) * 0.3;
-  var lines = new Path2D(), major = new Path2D(), shrubs = new Path2D(), trees = new Path2D(), cores = new Path2D();
-  var levels = [0.36, 0.46, 0.56, 0.66];
+  var lines = new Path2D(), major = new Path2D(), levels = [0.36, 0.46, 0.56, 0.66];
   for (i = 0; i < nx - 1; i++) for (j = 0; j < ny - 1; j++) {
     var a = cornerBuf[i * ny + j], b = cornerBuf[(i + 1) * ny + j], cc = cornerBuf[(i + 1) * ny + j + 1], d = cornerBuf[i * ny + j + 1];
     var mn = Math.min(a, b, cc, d), mx = Math.max(a, b, cc, d), ci = i0 + i, cj = j0 + j;
@@ -358,100 +467,182 @@ function terrainOpen(i0, i1, j0, j1, c, k, s) {
       p.moveTo(X(e1x * c), Y(e1y * c)); p.lineTo(X(e2x * c), Y(e2y * c));
       if (two) { p.moveTo(X(f1x * c), Y(f1y * c)); p.lineTo(X(f2x * c), Y(f2y * c)); }
     }
-    var h = hash(ci, cj, k, 1), wx = (ci + hash(ci, cj, k, 2)) * c, wy = (cj + hash(ci, cj, k, 3)) * c;
-    if (h < 0.075 || (h > 0.985)) {
-      if (Math.abs(wx - streamX(wy, 0)) < Math.max(0.01, 14 / s)) continue;
-      var x = X(wx), y = Y(wy);
-      if (h > 0.985) { var rt = c * s * 0.2; trees.moveTo(x + rt, y); trees.arc(x, y, rt, 0, 6.2832); cores.moveTo(x + 1.2, y); cores.arc(x, y, 1.2, 0, 6.2832); }
-      else { var rs = c * s * (0.05 + 0.07 * hash(ci, cj, k, 4)); shrubs.moveTo(x + rs, y); shrubs.arc(x, y, rs, 0, 6.2832); }
-    }
   }
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = 'rgba(165,190,130,0.10)'; ctx.lineWidth = 1; ctx.stroke(lines);
+  ctx.lineJoin = 'round'; ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(165,190,130,0.10)'; ctx.stroke(lines);
   ctx.strokeStyle = 'rgba(170,200,140,0.20)'; ctx.stroke(major);
-  ctx.fillStyle = 'rgba(150,190,130,0.20)'; ctx.fill(shrubs);
-  ctx.fillStyle = 'rgba(80,150,105,0.14)'; ctx.fill(trees);
-  ctx.strokeStyle = 'rgba(130,205,160,0.30)'; ctx.stroke(trees);
-  ctx.fillStyle = 'rgba(190,225,200,0.30)'; ctx.fill(cores);
 }
 
-/* ---- Forest: groves and clearings, trees that never touch within a layer, and a stream ---- */
-function terrainForest(i0, i1, j0, j1, c, k, s) {
-  var i, j, p0 = new Path2D(), p1 = new Path2D(), p2 = new Path2D(), cores = new Path2D(), halfw = Math.max(0.009, 12 / s);
-  for (i = i0; i <= i1; i++) for (j = j0; j <= j1; j++) {
-    var g = vnoise(i / 5.5, j / 5.5, k) * 0.75 + vnoise(i / 2.1 + 17, j / 2.1, k) * 0.25;      /* grove density */
-    var keep = sstep(0.36, 0.6, g) * 0.9;
-    if (hash(i, j, k, 6) > keep) continue;
-    var h3 = hash(i, j, k, 3), wx = (i + 0.5 + (hash(i, j, k, 1) - 0.5) * 0.36) * c, wy = (j + 0.5 + (hash(i, j, k, 2) - 0.5) * 0.36) * c;
-    if (Math.abs(wx - streamX(wy, 1)) < halfw) continue;
-    var r = c * s * (0.17 + 0.11 * h3), x = X(wx), y = Y(wy);
-    var p = h3 < 0.33 ? p0 : h3 < 0.66 ? p1 : p2;
-    p.moveTo(x + r, y); p.arc(x, y, r, 0, 6.2832);
-    if (r > 6) { cores.moveTo(x + r * 0.22, y); cores.arc(x, y, r * 0.22, 0, 6.2832); }
+/* ---- Open: real-size things (lone trees ~10 m, shrubs ~3 m, grass tufts) that vanish as you zoom out ---- */
+function openObjects(s, aEnv) {
+  var c, px, a, i, j, x, y, wx, wy, h, r;
+  c = 0.09; px = c * s; a = sstep(30, 48, px) * (1 - sstep(3000, 6000, px)) * aEnv;                  /* lone trees */
+  if (a > 0.01 && cellRange(c)) {
+    var trees = new Path2D(), cores = new Path2D(), halfw = Math.max(0.01, 14 / s);
+    for (i = RI0; i <= RI1; i++) for (j = RJ0; j <= RJ1; j++) {
+      if (hash(i, j, 1, 1) > 0.3) continue;
+      wx = (i + hash(i, j, 1, 2)) * c; wy = (j + hash(i, j, 1, 3)) * c;
+      if (Math.abs(wx - streamX(wy, 0)) < halfw) continue;
+      x = X(wx); y = Y(wy); r = c * s * (0.05 + 0.025 * hash(i, j, 1, 4));
+      trees.moveTo(x + r, y); trees.arc(x, y, r, 0, 6.2832);
+      if (r > 5) { cores.moveTo(x + 1.3, y); cores.arc(x, y, 1.3, 0, 6.2832); }
+    }
+    ctx.globalAlpha = a; ctx.lineWidth = 1;
+    ctx.fillStyle = 'rgba(80,150,105,0.16)'; ctx.fill(trees); ctx.strokeStyle = 'rgba(130,205,160,0.32)'; ctx.stroke(trees);
+    ctx.fillStyle = 'rgba(190,225,200,0.30)'; ctx.fill(cores);
   }
-  ctx.fillStyle = 'rgba(54,130,96,0.20)'; ctx.fill(p0);
-  ctx.fillStyle = 'rgba(70,150,108,0.16)'; ctx.fill(p1);
-  ctx.fillStyle = 'rgba(46,112,92,0.24)'; ctx.fill(p2);
-  ctx.strokeStyle = 'rgba(140,215,170,0.28)'; ctx.lineWidth = 1; ctx.stroke(p0); ctx.stroke(p1); ctx.stroke(p2);
-  ctx.fillStyle = 'rgba(190,235,205,0.22)'; ctx.fill(cores);
+  c = 0.025; px = c * s; a = sstep(24, 40, px) * (1 - sstep(1500, 3000, px)) * aEnv;                  /* shrubs */
+  if (a > 0.01 && cellRange(c)) {
+    var sh = new Path2D();
+    for (i = RI0; i <= RI1; i++) for (j = RJ0; j <= RJ1; j++) {
+      if (hash(i, j, 2, 1) > 0.26) continue;
+      wx = (i + hash(i, j, 2, 2)) * c; wy = (j + hash(i, j, 2, 3)) * c;
+      if (Math.abs(wx - streamX(wy, 0)) < Math.max(0.006, 8 / s)) continue;
+      x = X(wx); y = Y(wy); r = c * s * (0.05 + 0.07 * hash(i, j, 2, 4));
+      sh.moveTo(x + r, y); sh.arc(x, y, r, 0, 6.2832);
+    }
+    ctx.globalAlpha = a; ctx.fillStyle = 'rgba(150,190,130,0.22)'; ctx.fill(sh);
+  }
+  c = 0.006; px = c * s; a = sstep(40, 70, px) * (1 - sstep(1200, 2400, px)) * aEnv;                  /* grass tufts */
+  if (a > 0.01 && cellRange(c)) {
+    var tf = new Path2D(), u = c * s * 0.09;
+    for (i = RI0; i <= RI1; i++) for (j = RJ0; j <= RJ1; j++) {
+      if (hash(i, j, 3, 1) > 0.3) continue;
+      x = X((i + hash(i, j, 3, 2)) * c); y = Y((j + hash(i, j, 3, 3)) * c);
+      tf.moveTo(x, y); tf.lineTo(x - u * 0.7, y - u * 1.6); tf.moveTo(x, y); tf.lineTo(x + u * 0.1, y - u * 2); tf.moveTo(x, y); tf.lineTo(x + u * 0.8, y - u * 1.5);
+    }
+    ctx.globalAlpha = a; ctx.strokeStyle = 'rgba(170,205,140,0.35)'; ctx.lineWidth = 1; ctx.stroke(tf);
+  }
+  ctx.globalAlpha = 1;
 }
 
-/* ---- Suburban: separate neighbourhoods, each facing its own way, with curving streets, cul-de-sacs and green gaps ---- */
-function terrainSuburb(i0, i1, j0, j1, c, k, s) {
-  var B = 8 * c, bi, bj, n, m, houses = new Path2D(), houses2 = new Path2D(), road = new Path2D(), bulbs = new Path2D(), green = new Path2D(), greenFill = new Path2D();
-  var bi0 = Math.floor(i0 * c / B) - 1, bi1 = Math.floor(i1 * c / B) + 1, bj0 = Math.floor(j0 * c / B) - 1, bj1 = Math.floor(j1 * c / B) + 1;
-  var cullPx = B * s * 0.75;
-  avSetup(0.5, 15 * c, 1.3 * c, 5 * c);
+/* ---- Forest: individual trees (~6 m crowns, never touching) appear only when close; undergrowth even closer ---- */
+function forestObjects(s, aEnv) {
+  var c = 0.022, px = c * s, a = sstep(10, 16, px) * (1 - sstep(2500, 5000, px)) * aEnv, i, j;
+  if (a > 0.01 && cellRange(c)) {
+    gridBuild(gA, RI0, RI1, RJ0, RJ1, c, 4, 0.04, 5); gridBuild(gB, RI0, RI1, RJ0, RJ1, c, 4, 0.04, 31);
+    var p0 = new Path2D(), p1 = new Path2D(), p2 = new Path2D(), cores = new Path2D(), rings = new Path2D(), halfw = Math.max(0.009, 12 / s);
+    for (i = RI0; i <= RI1; i++) for (j = RJ0; j <= RJ1; j++) {
+      var d = gridAt(gA, i + 0.5, j + 0.5);
+      if (hash(i, j, 0, 6) > sstep(0.42, 0.62, d) * 0.92) continue;
+      if (gridAt(gB, i + 0.5, j + 0.5) > 0.78) continue;                        /* lake */
+      var h3 = hash(i, j, 0, 3), wx = (i + 0.5 + (hash(i, j, 0, 1) - 0.5) * 0.36) * c, wy = (j + 0.5 + (hash(i, j, 0, 2) - 0.5) * 0.36) * c;
+      if (Math.abs(wx - streamX(wy, 1)) < halfw) continue;
+      var r = c * s * (0.2 + 0.12 * h3), x = X(wx), y = Y(wy), p = h3 < 0.33 ? p0 : h3 < 0.66 ? p1 : p2;
+      if (r < 2.6) { p.rect(x - r, y - r, 2 * r, 2 * r); continue; }
+      p.moveTo(x + r, y); p.arc(x, y, r, 0, 6.2832);
+      if (r > 6) { cores.moveTo(x + r * 0.2, y); cores.arc(x, y, r * 0.2, 0, 6.2832); }
+      if (r > 22) { rings.moveTo(x + r * 0.62, y); rings.arc(x, y, r * 0.62, 0, 6.2832); }
+    }
+    ctx.globalAlpha = a; ctx.lineWidth = 1;
+    ctx.fillStyle = 'rgba(54,130,96,0.22)'; ctx.fill(p0);
+    ctx.fillStyle = 'rgba(70,150,108,0.18)'; ctx.fill(p1);
+    ctx.fillStyle = 'rgba(46,112,92,0.26)'; ctx.fill(p2);
+    ctx.strokeStyle = 'rgba(140,215,170,0.28)'; ctx.stroke(p0); ctx.stroke(p1); ctx.stroke(p2);
+    ctx.fillStyle = 'rgba(190,235,205,0.22)'; ctx.fill(cores);
+    ctx.strokeStyle = 'rgba(140,215,170,0.14)'; ctx.stroke(rings);
+  }
+  c = 0.08; px = c * s; a = sstep(7, 12, px) * (1 - sstep(34, 60, px)) * aEnv;                       /* canopy speckle: stand-ins for groups of trees seen from far away */
+  if (a > 0.01 && cellRange(c)) {
+    gridBuild(gA, RI0, RI1, RJ0, RJ1, c, 2, 0.08, 5); gridBuild(gB, RI0, RI1, RJ0, RJ1, c, 2, 0.08, 31);
+    var sp = new Path2D(), halfs = Math.max(0.03, 10 / s);
+    for (i = RI0; i <= RI1; i++) for (j = RJ0; j <= RJ1; j++) {
+      if (hash(i, j, 7, 6) > sstep(0.42, 0.62, gridAt(gA, i + 0.5, j + 0.5)) * 0.8) continue;
+      if (gridAt(gB, i + 0.5, j + 0.5) > 0.78) continue;
+      var swx = (i + hash(i, j, 7, 1)) * c, swy = (j + hash(i, j, 7, 2)) * c;
+      if (Math.abs(swx - streamX(swy, 1)) < halfs) continue;
+      var sr = c * s * (0.09 + 0.07 * hash(i, j, 7, 3)), sx = X(swx), sy = Y(swy);
+      if (sr < 2.4) sp.rect(sx - sr, sy - sr, 2 * sr, 2 * sr); else { sp.moveTo(sx + sr, sy); sp.arc(sx, sy, sr, 0, 6.2832); }
+    }
+    ctx.globalAlpha = a; ctx.fillStyle = 'rgba(80,160,115,0.34)'; ctx.fill(sp);
+  }
+  c = 0.008; px = c * s; a = sstep(14, 22, px) * (1 - sstep(700, 1400, px)) * aEnv;                   /* undergrowth */
+  if (a > 0.01 && cellRange(c)) {
+    gridBuild(gA, RI0, RI1, RJ0, RJ1, c, 4, 0.04, 5);
+    var u = new Path2D();
+    for (i = RI0; i <= RI1; i++) for (j = RJ0; j <= RJ1; j++) {
+      if (hash(i, j, 4, 1) > sstep(0.4, 0.6, gridAt(gA, i + 0.5, j + 0.5)) * 0.4) continue;
+      var xx = X((i + hash(i, j, 4, 2)) * c), yy = Y((j + hash(i, j, 4, 3)) * c), rr = c * s * (0.1 + 0.12 * hash(i, j, 4, 5));
+      u.moveTo(xx + rr, yy); u.arc(xx, yy, rr, 0, 6.2832);
+    }
+    ctx.globalAlpha = a; ctx.fillStyle = 'rgba(100,170,115,0.25)'; ctx.fill(u);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* far-away stand-in for houses / buildings: small marks that thin out and vanish as the real ones take over */
+function speckle(envIdx, s, aEnv) {
+  var urban = envIdx === 3, c = 0.06, px = c * s, a = sstep(6, 10, px) * (1 - sstep(26, 48, px)) * aEnv, i, j;
+  if (a < 0.01 || !cellRange(c)) return;
+  gridBuild(gA, RI0, RI1, RJ0, RJ1, c, 2, 0.1, urban ? 400 : 300);
+  var p = new Path2D(), thr = urban ? 0.48 : 0.52;
+  for (i = RI0; i <= RI1; i++) for (j = RJ0; j <= RJ1; j++) {
+    var d = gridAt(gA, i + 0.5, j + 0.5);
+    if (d < thr || hash(i, j, 8, 1) > (urban ? 0.8 : 0.5)) continue;
+    var r = c * s * (urban ? 0.16 + 0.12 * hash(i, j, 8, 2) : 0.1 + 0.08 * hash(i, j, 8, 2));
+    p.rect(X((i + hash(i, j, 8, 3)) * c) - r, Y((j + hash(i, j, 8, 4)) * c) - r, 2 * r, 2 * r);
+  }
+  ctx.globalAlpha = a; ctx.fillStyle = urban ? 'rgba(160,190,235,0.42)' : 'rgba(175,190,215,0.36)'; ctx.fill(p); ctx.globalAlpha = 1;
+}
+
+/* ---- Suburban: ~12 m houses on curving streets, grouped in neighbourhoods that each face their own way ---- */
+function suburbObjects(s, aEnv) {
+  var c = 0.04, px = c * s, a = sstep(14, 22, px) * (1 - sstep(2200, 4400, px)) * aEnv;
+  if (a < 0.01) return;
+  var B = 8 * c, bi, bj, n, m, houses = new Path2D(), houses2 = new Path2D(), ridges = new Path2D(), road = new Path2D(), bulbs = new Path2D(), green = new Path2D(), greenFill = new Path2D();
+  var bi0 = Math.floor(WX(0) / B) - 1, bi1 = Math.floor(WX(W) / B) + 1, bj0 = Math.floor(WY(0) / B) - 1, bj1 = Math.floor(WY(H) / B) + 1, cullPx = B * s * 0.75;
+  if ((bi1 - bi0) * (bj1 - bj0) > 900) return;
+  avSetup(0.5, 0.55, 0.05, 0.3, 61);
   for (bj = bj0; bj <= bj1; bj++) for (bi = bi0; bi <= bi1; bi++) {
-    var cx = (bi + 0.5 + 0.5 * (bj & 1) + (hash(bi, bj, k, 10) - 0.5) * 0.2) * B, cy = (bj + 0.5 + (hash(bi, bj, k, 9) - 0.5) * 0.2) * B;
+    var cx = (bi + 0.5 * (bj & 1) + (hash(bi, bj, 0, 10) - 0.5) * 0.2) * B, cy = (bj + (hash(bi, bj, 0, 9) - 0.5) * 0.2) * B;
     var sx = X(cx), sy = Y(cy);
     if (sx < -cullPx || sx > W + cullPx || sy < -cullPx || sy > H + cullPx) continue;
-    var h0 = hash(bi, bj, k, 11), th = (hash(bi, bj, k, 12) - 0.5) * 0.7;
+    if (dens(cx, cy, 0.15, 300) < 0.5) continue;                                        /* outside the built-up area */
+    var h0 = hash(bi, bj, 0, 11), th = (hash(bi, bj, 0, 12) - 0.5) * 0.7;
     setFrame(cx, cy, th, s);
-    var Hc = B * 0.39 * (0.8 + 0.2 * hash(bi, bj, k, 13));
-    if (h0 < 0.16) {                                      /* park / field instead of houses */
+    var Hc = B * 0.39 * (0.8 + 0.2 * hash(bi, bj, 0, 13));
+    if (h0 < 0.14) {
       var pr = Hc * 0.75;
-      for (n = 0; n < 14; n++) { var ang = hash(bi, bj, k, 30 + n) * 6.2832, rr = Math.sqrt(hash(bi, bj, k, 50 + n)) * pr; dotAt(green, Math.cos(ang) * rr, Math.sin(ang) * rr * 0.8, c * s * 0.1); }
-      loc(0, 0); var px0 = PX, py0 = PY; greenFill.moveTo(px0 + pr * s, py0); greenFill.ellipse(px0, py0, pr * s, pr * s * 0.8, th, 0, 6.2832);
+      for (n = 0; n < 14; n++) { var ang = hash(bi, bj, 0, 30 + n) * 6.2832, rr = Math.sqrt(hash(bi, bj, 0, 50 + n)) * pr; dotAt(green, Math.cos(ang) * rr, Math.sin(ang) * rr * 0.8, c * s * 0.1); }
+      loc(0, 0); greenFill.moveTo(PX + pr * s, PY); greenFill.ellipse(PX, PY, pr * s, pr * s * 0.8, th, 0, 6.2832);
       continue;
     }
     var pitch = 2.1 * c, nS = Math.max(1, Math.floor(2 * Hc / pitch)), v0 = -(nS - 1) * pitch / 2;
-    var bend = (hash(bi, bj, k, 14) - 0.5) * 1.1 * c, ph = hash(bi, bj, k, 15) * 6.2832, sgn = hash(bi, bj, k, 16) < 0.5 ? 1 : -1, uc = -sgn * Hc;
-    var f = Math.PI * 0.9 / Hc;
-    line(road, uc, v0 - 0.9 * c, uc, -v0 + 0.9 * c);                                  /* collector street */
+    var bend = (hash(bi, bj, 0, 14) - 0.5) * 1.1 * c, ph = hash(bi, bj, 0, 15) * 6.2832, sgn = hash(bi, bj, 0, 16) < 0.5 ? 1 : -1, uc = -sgn * Hc, f = Math.PI * 0.9 / Hc;
+    line(road, uc, v0 - 0.9 * c, uc, -v0 + 0.9 * c);
     for (n = 0; n < nS; n++) {
-      var vs = v0 + n * pitch, len = 2 * Hc * (0.45 + 0.5 * hash(bi * 7 + n, bj, k, 17)), ue = uc + sgn * len;
-      var ua = Math.min(uc, ue), ub = Math.max(uc, ue), seg = 9;
-      for (m = 0; m <= seg; m++) { var uu = uc + sgn * len * m / seg; loc(uu, vs + bend * Math.sin(uu * f + ph)); if (m) road.lineTo(PX, PY); else road.moveTo(PX, PY); }
-      var ubulb = ue; dotAt(bulbs, ubulb, vs + bend * Math.sin(ubulb * f + ph), c * s * 0.36);
-      var lotw = 0.5 * c;
-      for (var u = ua + 0.6 * c; u < ub - 0.5 * c; u += lotw) {
-        if (sgn > 0 ? u > ub - 0.9 * c : u < ua + 0.9 * c) { if (Math.abs(u - ue) < 0.9 * c) continue; }
+      var vs = v0 + n * pitch, len = 2 * Hc * (0.45 + 0.5 * hash(bi * 7 + n, bj, 0, 17)), ue = uc + sgn * len, ua = Math.min(uc, ue), ub = Math.max(uc, ue);
+      for (m = 0; m <= 9; m++) { var uu = uc + sgn * len * m / 9; loc(uu, vs + bend * Math.sin(uu * f + ph)); if (m) road.lineTo(PX, PY); else road.moveTo(PX, PY); }
+      dotAt(bulbs, ue, vs + bend * Math.sin(ue * f + ph), c * s * 0.36);
+      for (var u = ua + 0.6 * c; u < ub - 0.5 * c; u += 0.5 * c) {
+        if (Math.abs(u - ue) < 0.9 * c) continue;
         var slope = Math.atan(bend * f * Math.cos(u * f + ph)), vb = vs + bend * Math.sin(u * f + ph);
         for (var side = -1; side <= 1; side += 2) {
-          var hh = hash(Math.floor(u / c * 8) + n * 131 + side * 7, bi * 13 + bj, k, 18);
+          var hh = hash(Math.floor(u / c * 8) + n * 131 + side * 7, bi * 13 + bj, 0, 18);
           if (hh < 0.1) continue;
-          var hv = c * (0.15 + 0.07 * hash(Math.floor(u / c * 8), n + side * 5 + bi, k, 19)), hu = c * (0.13 + 0.07 * hh);
-          loc(u, vb + side * (0.44 * c + hv));
-          if (avDist(QX, QY) < 0.55 * c) continue;
-          quad(hh < 0.55 ? houses : houses2, u + (hash(Math.floor(u / c * 8), n, k, 20 + side) - 0.5) * 0.05 * c, vb + side * (0.44 * c + hv), hu, hv, slope);
+          var hv = c * (0.15 + 0.07 * hash(Math.floor(u / c * 8), n + side * 5 + bi, 0, 19)), hu = c * (0.13 + 0.07 * hh), vc = vb + side * (0.44 * c + hv);
+          loc(u, vc);
+          if (avDist(QX, QY) < 0.016) continue;
+          quad(hh < 0.55 ? houses : houses2, u, vc, hu, hv, slope);
+          if (hv * s > 18) { loc(u - hu * 0.9, vc); ridges.moveTo(PX, PY); loc(u + hu * 0.9, vc); ridges.lineTo(PX, PY); }
         }
       }
     }
-    loc(0, 0);
   }
-  drawAvenues(c, s, 'rgba(210,220,235,0.10)');
-  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.globalAlpha = a; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  drawAvenues(Math.max(1.3, 0.014 * s), 'rgba(210,220,235,0.11)');
   ctx.strokeStyle = 'rgba(200,215,230,0.12)'; ctx.lineWidth = Math.max(1, c * s * 0.12); ctx.stroke(road);
   ctx.strokeStyle = 'rgba(200,215,230,0.10)'; ctx.lineWidth = 1; ctx.fillStyle = 'rgba(200,215,230,0.06)'; ctx.fill(bulbs); ctx.stroke(bulbs);
-  ctx.fillStyle = 'rgba(150,170,195,0.13)'; ctx.fill(houses);
-  ctx.fillStyle = 'rgba(175,160,150,0.12)'; ctx.fill(houses2);
+  ctx.fillStyle = 'rgba(150,170,195,0.14)'; ctx.fill(houses);
+  ctx.fillStyle = 'rgba(175,160,150,0.13)'; ctx.fill(houses2);
   ctx.strokeStyle = 'rgba(190,205,225,0.28)'; ctx.stroke(houses); ctx.stroke(houses2);
+  ctx.strokeStyle = 'rgba(190,205,225,0.16)'; ctx.stroke(ridges);
   ctx.fillStyle = 'rgba(80,150,105,0.08)'; ctx.fill(greenFill);
   ctx.strokeStyle = 'rgba(120,200,150,0.22)'; ctx.stroke(greenFill); ctx.fillStyle = 'rgba(80,150,105,0.16)'; ctx.fill(green); ctx.stroke(green);
+  ctx.globalAlpha = 1;
 }
 
-/* ---- Urban: districts with uneven street spacing, blocks split into buildings of different sizes, avenues cutting across ---- */
+/* ---- Urban: ~80 m blocks of uneven size split into buildings, taller towards the middle of town ---- */
 var eu = new Float32Array(16), ev = new Float32Array(16);
 function edges(arr, Hc, c, bi, bj, k, salt) {
   var n = 0, p = -Hc; arr[n++] = p;
@@ -462,25 +653,28 @@ function edges(arr, Hc, c, bi, bj, k, salt) {
   }
   arr[n++] = Hc; return n;
 }
-function terrainUrban(i0, i1, j0, j1, c, k, s) {
-  var B = 9 * c, bi, bj, a, b, t, b0 = new Path2D(), b1 = new Path2D(), b2 = new Path2D(), inner = new Path2D(), road = new Path2D(), parks = new Path2D(), parkDots = new Path2D();
-  var bi0 = Math.floor(i0 * c / B) - 1, bi1 = Math.floor(i1 * c / B) + 1, bj0 = Math.floor(j0 * c / B) - 1, bj1 = Math.floor(j1 * c / B) + 1, cullPx = B * s * 0.75;
-  avSetup(0.62, 12 * c, 0.9 * c, 4 * c);
+function urbanObjects(s, aEnv) {
+  var c = 0.03, px = c * s, al = sstep(12, 20, px) * (1 - sstep(2200, 4400, px)) * aEnv;
+  if (al < 0.01) return;
+  var B = 9 * c, bi, bj, a, b, b0 = new Path2D(), b1 = new Path2D(), b2 = new Path2D(), inner = new Path2D(), road = new Path2D(), parks = new Path2D(), parkDots = new Path2D();
+  var bi0 = Math.floor(WX(0) / B) - 1, bi1 = Math.floor(WX(W) / B) + 1, bj0 = Math.floor(WY(0) / B) - 1, bj1 = Math.floor(WY(H) / B) + 1, cullPx = B * s * 0.75, k = 0;
+  if ((bi1 - bi0) * (bj1 - bj0) > 900) return;
+  avSetup(0.62, 0.4, 0.04, 0.25, 62);
   for (bj = bj0; bj <= bj1; bj++) for (bi = bi0; bi <= bi1; bi++) {
-    var cx = (bi + 0.5 + 0.5 * (bj & 1) + (hash(bi, bj, k, 10) - 0.5) * 0.14) * B, cy = (bj + 0.5 + (hash(bi, bj, k, 9) - 0.5) * 0.14) * B;
+    var cx = (bi + 0.5 * (bj & 1) + (hash(bi, bj, k, 10) - 0.5) * 0.14) * B, cy = (bj + (hash(bi, bj, k, 9) - 0.5) * 0.14) * B;
     var sx = X(cx), sy = Y(cy);
     if (sx < -cullPx || sx > W + cullPx || sy < -cullPx || sy > H + cullPx) continue;
+    var dd = dens(cx, cy, 0.15, 400); if (dd < 0.46) continue;
     var th = (hash(bi, bj, k, 12) - 0.5) * 0.42, Hc = B * 0.42;
     setFrame(cx, cy, th, s);
     var nu = edges(eu, Hc, c, bi, bj, k, 100), nv = edges(ev, Hc, c, bi, bj, k, 200);
     for (a = 0; a < nu; a++) line(road, eu[a], -Hc, eu[a], Hc);
     for (b = 0; b < nv; b++) line(road, -Hc, ev[b], Hc, ev[b]);
     for (a = 0; a < nu - 1; a++) for (b = 0; b < nv - 1; b++) {
-      var g = 0.12 * c, u0 = eu[a] + g, u1 = eu[a + 1] - g, v0 = ev[b] + g, v1 = ev[b + 1] - g;
-      var hb = hash(bi * 16 + a, bj * 16 + b, k, 21);
+      var g = 0.12 * c, u0 = eu[a] + g, u1 = eu[a + 1] - g, v0 = ev[b] + g, v1 = ev[b + 1] - g, hb = hash(bi * 16 + a, bj * 16 + b, k, 21);
       loc((u0 + u1) / 2, (v0 + v1) / 2);
-      var dc = Math.sqrt(QX * QX + QY * QY) / (c * 40), tall = clamp(1.1 - dc, 0, 1) * 0.7 + vnoise(QX / (c * 9), QY / (c * 9), k) * 0.5 - 0.1;   /* taller towards the centre of town */
-      if (avDist(QX, QY) < 0.38 * c) continue;
+      if (avDist(QX, QY) < 0.022) continue;
+      var tall = clamp((dd - 0.46) * 2.2, 0, 1) * 0.8 + vnoise(QX / 0.1, QY / 0.1, 9) * 0.35 - 0.1;
       if (hb < 0.1) {
         quad(parks, (u0 + u1) / 2, (v0 + v1) / 2, (u1 - u0) / 2 * 0.94, (v1 - v0) / 2 * 0.94, 0);
         dotAt(parkDots, (u0 + u1) / 2 - (u1 - u0) * 0.2, (v0 + v1) / 2, c * s * 0.12); dotAt(parkDots, (u0 + u1) / 2 + (u1 - u0) * 0.15, (v0 + v1) / 2 + (v1 - v0) * 0.2, c * s * 0.1);
@@ -490,10 +684,8 @@ function terrainUrban(i0, i1, j0, j1, c, k, s) {
       if (hash(bi * 16 + a, bj * 16 + b, k, 22) < 0.3) parts = Math.max(1, parts - 1);
       var cur = along ? u0 : v0;
       for (var q = 0; q < parts; q++) {
-        var share = parts === 1 ? 1 : (q === parts - 1 ? 1 - 0 : 0.35 + 0.3 * hash(bi * 16 + a, bj * 16 + b, k, 40 + q));
-        var seg = q === parts - 1 ? (along ? u1 : v1) - cur : ((along ? u1 : v1) - cur) * Math.min(share, 0.6), cc = cur + seg / 2, gap = 0.035 * c;
-        var ht = clamp(tall + (hash(bi * 16 + a, bj * 16 + b, k, 60 + q) - 0.5) * 0.5, 0, 1), P = ht < 0.33 ? b0 : ht < 0.66 ? b1 : b2;
-        var hu2, hv2, cu, cv;
+        var end = along ? u1 : v1, seg = q === parts - 1 ? end - cur : (end - cur) * Math.min(0.35 + 0.3 * hash(bi * 16 + a, bj * 16 + b, k, 40 + q), 0.6), cc = cur + seg / 2, gap = 0.035 * c;
+        var ht = clamp(tall + (hash(bi * 16 + a, bj * 16 + b, k, 60 + q) - 0.5) * 0.5, 0, 1), P = ht < 0.33 ? b0 : ht < 0.66 ? b1 : b2, hu2, hv2, cu, cv;
         if (along) { hu2 = seg / 2 - gap; hv2 = wV / 2 - gap; cu = cc; cv = (v0 + v1) / 2; } else { hu2 = wU / 2 - gap; hv2 = seg / 2 - gap; cu = (u0 + u1) / 2; cv = cc; }
         quad(P, cu, cv, hu2, hv2, 0);
         if (ht > 0.6) quad(inner, cu, cv, hu2 * 0.55, hv2 * 0.55, 0);
@@ -501,8 +693,8 @@ function terrainUrban(i0, i1, j0, j1, c, k, s) {
       }
     }
   }
-  drawAvenues(c, s, 'rgba(190,205,235,0.12)');
-  ctx.lineJoin = 'round';
+  ctx.globalAlpha = al; ctx.lineJoin = 'round';
+  drawAvenues(Math.max(1.3, 0.016 * s), 'rgba(190,205,235,0.13)');
   ctx.strokeStyle = 'rgba(190,205,235,0.07)'; ctx.lineWidth = Math.max(1, c * s * 0.1); ctx.stroke(road);
   ctx.fillStyle = 'rgba(110,140,185,0.08)'; ctx.fill(b0);
   ctx.fillStyle = 'rgba(120,150,195,0.14)'; ctx.fill(b1);
@@ -511,6 +703,7 @@ function terrainUrban(i0, i1, j0, j1, c, k, s) {
   ctx.strokeStyle = 'rgba(170,195,235,0.18)'; ctx.stroke(inner);
   ctx.fillStyle = 'rgba(80,150,105,0.07)'; ctx.fill(parks); ctx.strokeStyle = 'rgba(120,200,150,0.22)'; ctx.stroke(parks);
   ctx.fillStyle = 'rgba(80,150,105,0.18)'; ctx.fill(parkDots);
+  ctx.globalAlpha = 1;
 }
 
 /* ---------- grid + scale bar ---------- */
