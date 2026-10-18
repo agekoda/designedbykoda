@@ -59,7 +59,7 @@ var rem = { x: 1.2, y: -0.12 };         /* other radio, km from yours (y is down
 var cam = { cx: 0.6, cy: -0.06, ls: Math.log(300), mode: 'follow' };
 var ringR = { good: 1, max: 1, lg: 0, lm: 0 };        /* displayed (animated) radii in km */
 var envA = [1, 0, 0, 0];
-var drag = false, dragHint = true;
+var drag = false, dragHint = true, lastPtr = null;
 var packets = [], hist = [], autoT = 1.2, pulses = [];
 
 function dist() { return Math.max(D_MIN, Math.min(D_MAX, Math.hypot(rem.x, rem.y))); }
@@ -228,6 +228,8 @@ function damp(o, key, target, smooth, dt) {
   o[key] = target + (ch + tmp) * e;
 }
 function stepCam(dt) {
+  /* holding the radio beyond the edge of the fitted view: keep re-reading what is under the pointer so the zoom carries on smoothly */
+  if (drag && lastPtr && (Math.abs(lastPtr[0] - area.cx) > area.w * 0.3 + 4 || Math.abs(lastPtr[1] - area.cy) > area.h * 0.25 + 4)) moveTo(lastPtr[0], lastPtr[1]);
   var t = targetCam();
   if (RM) { cam.ls = t.ls; cam.cx = t.cx; cam.cy = t.cy; ringR.lg = Math.log(rangeFor(10)); ringR.lm = Math.log(rangeFor(0)); }
   else {
@@ -424,16 +426,16 @@ function massLayers(envIdx, s, aEnv) {
   }
   if (envIdx === 0) {
     gridBuildS(gB, L, 17);
-    fieldPaint(gB, L, function (v) { fo[0] = 150; fo[1] = 180; fo[2] = 110; fo[3] = band(v, 0.5, 0.64) * 0.08; });
+    fieldPaint(gB, L, function (v) { fo[0] = 165; fo[1] = 195; fo[2] = 130; fo[3] = 0.05 + band(v, 0.3, 0.55) * 0.08; });
   } else if (envIdx === 1) {
     gridBuildS(gB, L, 5);
-    fieldPaint(gB, L, function (v) { var t1 = band(v, 0.44, 0.6), t2 = band(v, 0.6, 0.72); fo[0] = 46 - 16 * t2; fo[1] = 130 - 20 * t2; fo[2] = 90 - 12 * t2; fo[3] = t1 * 0.2 + t2 * 0.1; });
+    fieldPaint(gB, L, function (v) { var t1 = band(v, 0.3, 0.55), t2 = band(v, 0.55, 0.75); fo[0] = 56 + 10 * t2; fo[1] = 140 + 12 * t2; fo[2] = 100 + 8 * t2; fo[3] = 0.07 + t1 * 0.16 + t2 * 0.08; });
   } else if (envIdx === 2) {
     gridBuildS(gB, L, 300);
-    fieldPaint(gB, L, function (v) { fo[0] = 150; fo[1] = 170; fo[2] = 200; fo[3] = band(v, 0.47, 0.6) * 0.12; });
+    fieldPaint(gB, L, function (v) { fo[0] = 170; fo[1] = 190; fo[2] = 215; fo[3] = band(v, 0.3, 0.55) * 0.17; });
   } else {
     gridBuildS(gB, L, 400);
-    fieldPaint(gB, L, function (v) { var t1 = band(v, 0.43, 0.56), t2 = band(v, 0.6, 0.72); fo[0] = 120 + 30 * t2; fo[1] = 150 + 35 * t2; fo[2] = 205 + 30 * t2; fo[3] = t1 * 0.09 + t2 * 0.1; });
+    fieldPaint(gB, L, function (v) { var t1 = band(v, 0.3, 0.5), t2 = band(v, 0.55, 0.72); fo[0] = 140 + 30 * t2; fo[1] = 170 + 35 * t2; fo[2] = 220 + 25 * t2; fo[3] = t1 * 0.15 + t2 * 0.1; });
   }
   ctx.globalAlpha = 1;
 }
@@ -631,10 +633,10 @@ function suburbObjects(s, aEnv) {
   }
   ctx.globalAlpha = a; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   drawAvenues(Math.max(1.3, 0.014 * s), 'rgba(210,220,235,0.11)');
-  ctx.strokeStyle = 'rgba(200,215,230,0.12)'; ctx.lineWidth = Math.max(1, c * s * 0.12); ctx.stroke(road);
+  ctx.strokeStyle = 'rgba(200,215,230,0.2)'; ctx.lineWidth = Math.max(1, c * s * 0.12); ctx.stroke(road);
   ctx.strokeStyle = 'rgba(200,215,230,0.10)'; ctx.lineWidth = 1; ctx.fillStyle = 'rgba(200,215,230,0.06)'; ctx.fill(bulbs); ctx.stroke(bulbs);
-  ctx.fillStyle = 'rgba(150,170,195,0.14)'; ctx.fill(houses);
-  ctx.fillStyle = 'rgba(175,160,150,0.13)'; ctx.fill(houses2);
+  ctx.fillStyle = 'rgba(165,185,210,0.24)'; ctx.fill(houses);
+  ctx.fillStyle = 'rgba(195,175,160,0.22)'; ctx.fill(houses2);
   ctx.strokeStyle = 'rgba(190,205,225,0.28)'; ctx.stroke(houses); ctx.stroke(houses2);
   ctx.strokeStyle = 'rgba(190,205,225,0.16)'; ctx.stroke(ridges);
   ctx.fillStyle = 'rgba(80,150,105,0.08)'; ctx.fill(greenFill);
@@ -695,10 +697,10 @@ function urbanObjects(s, aEnv) {
   }
   ctx.globalAlpha = al; ctx.lineJoin = 'round';
   drawAvenues(Math.max(1.3, 0.016 * s), 'rgba(190,205,235,0.13)');
-  ctx.strokeStyle = 'rgba(190,205,235,0.07)'; ctx.lineWidth = Math.max(1, c * s * 0.1); ctx.stroke(road);
-  ctx.fillStyle = 'rgba(110,140,185,0.08)'; ctx.fill(b0);
-  ctx.fillStyle = 'rgba(120,150,195,0.14)'; ctx.fill(b1);
-  ctx.fillStyle = 'rgba(135,165,210,0.22)'; ctx.fill(b2);
+  ctx.strokeStyle = 'rgba(190,205,235,0.14)'; ctx.lineWidth = Math.max(1, c * s * 0.1); ctx.stroke(road);
+  ctx.fillStyle = 'rgba(125,155,200,0.15)'; ctx.fill(b0);
+  ctx.fillStyle = 'rgba(135,165,210,0.22)'; ctx.fill(b1);
+  ctx.fillStyle = 'rgba(150,180,225,0.30)'; ctx.fill(b2);
   ctx.strokeStyle = 'rgba(170,195,235,0.30)'; ctx.lineWidth = 1; ctx.stroke(b0); ctx.stroke(b1); ctx.stroke(b2);
   ctx.strokeStyle = 'rgba(170,195,235,0.18)'; ctx.stroke(inner);
   ctx.fillStyle = 'rgba(80,150,105,0.07)'; ctx.fill(parks); ctx.strokeStyle = 'rgba(120,200,150,0.22)'; ctx.stroke(parks);
@@ -897,22 +899,22 @@ function local(e) { var r = cv.getBoundingClientRect(); return [e.clientX - r.le
 cv.addEventListener('pointerdown', function (e) {
   if (e.pointerType === 'touch') return;
   var p = local(e); if (!hitRemote(p[0], p[1])) return;
-  drag = true; dragHint = false; leaveFit(); cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; e.preventDefault();
+  drag = true; dragHint = false; lastPtr = p; leaveFit(); cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; e.preventDefault();
 });
 cv.addEventListener('pointermove', function (e) {
   if (e.pointerType === 'touch') return;
   var p = local(e);
-  if (drag) moveTo(p[0], p[1]); else cv.style.cursor = hitRemote(p[0], p[1]) ? 'grab' : '';
+  if (drag) { lastPtr = p; moveTo(p[0], p[1]); } else cv.style.cursor = hitRemote(p[0], p[1]) ? 'grab' : '';
 });
 function endDrag(e) { if (!drag) return; drag = false; cv.style.cursor = ''; try { cv.releasePointerCapture(e.pointerId); } catch (x) {} }
 cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
 /* touch: only take over the gesture when it starts on the radio, so the page still scrolls */
 cv.addEventListener('touchstart', function (e) {
   var t = e.touches[0], r = cv.getBoundingClientRect();
-  if (hitRemote(t.clientX - r.left, t.clientY - r.top)) { drag = true; dragHint = false; leaveFit(); e.preventDefault(); }
+  if (hitRemote(t.clientX - r.left, t.clientY - r.top)) { drag = true; dragHint = false; lastPtr = [t.clientX - r.left, t.clientY - r.top]; leaveFit(); e.preventDefault(); }
 }, { passive: false });
 cv.addEventListener('touchmove', function (e) {
-  if (!drag) return; var t = e.touches[0], r = cv.getBoundingClientRect(); moveTo(t.clientX - r.left, t.clientY - r.top); e.preventDefault();
+  if (!drag) return; var t = e.touches[0], r = cv.getBoundingClientRect(); lastPtr = [t.clientX - r.left, t.clientY - r.top]; moveTo(lastPtr[0], lastPtr[1]); e.preventDefault();
 }, { passive: false });
 cv.addEventListener('touchend', function () { drag = false; }); cv.addEventListener('touchcancel', function () { drag = false; });
 
