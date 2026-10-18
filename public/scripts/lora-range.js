@@ -54,7 +54,7 @@ function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 function sstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
 
 /* ---------- state ---------- */
-var S = { sf: 10, pwr: 22, env: 0, band: 0, chars: 17, perHr: 12, screen: 2 };
+var S = { day: 0, sf: 10, pwr: 22, env: 0, band: 0, chars: 17, perHr: 12, screen: 2 };
 var rem = { x: 1.2, y: -0.12 };         /* other radio, km from yours (y is down) */
 var cam = { cx: 0.6, cy: -0.06, ls: Math.log(300), mode: 'follow' };
 var ringR = { good: 1, max: 1, lg: 0, lm: 0 };        /* displayed (animated) radii in km */
@@ -135,6 +135,7 @@ var CSS = '' +
 '#lora-range .lr-dist .lr-dv{min-width:92px;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}' +
 '#lora-range .lr-dist input{flex:1}' +
 '#lora-range .lr-ends{display:flex;justify-content:space-between;font-size:11px;color:#8d99a6;margin-top:2px}' +
+'#lora-range canvas.day{filter:invert(1) hue-rotate(180deg) brightness(.98) saturate(1.15)}' +
 '#lora-range .lr-note{font-size:11.5px;color:#8d99a6;line-height:1.4;margin-top:10px}' +
 '#lora-range details summary{cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8d99a6;margin:12px 0 4px;list-style:none}' +
 '#lora-range details summary::-webkit-details-marker{display:none}' +
@@ -183,6 +184,7 @@ root.innerHTML = '' +
 '  <div class="lr-dots" id="lr-dots" aria-label="Recent test packets"></div>' +
 '  <div class="lr-kv"><span>Airtime<small id="lr-pk"></small></span><b id="lr-at"></b></div>' +
 '  <div class="lr-kv"><span>Battery life<small id="lr-bs"></small></span><b id="lr-bt"></b></div>' +
+'  <div class="lr-t" style="margin-top:12px">Map</div>' + segHtml('lr-theme', ['Night', 'Day']) +
 '  <div class="lr-btns"><button type="button" class="lr-btn" id="lr-send">Send test packet</button><button type="button" class="lr-btn" id="lr-fit" aria-pressed="false">Fit range</button></div>' +
 '  <div class="lr-note">Estimates from a simplified model, the same one as the LoRa simulator. Real range depends on antennas, terrain and weather. Forest loss and transmit current are my own estimates.</div>' +
 ' </div>' +
@@ -228,8 +230,8 @@ function damp(o, key, target, smooth, dt) {
   o[key] = target + (ch + tmp) * e;
 }
 function stepCam(dt) {
-  /* holding the radio beyond the edge of the fitted view: keep re-reading what is under the pointer so the zoom carries on smoothly */
-  if (drag && lastPtr && (Math.abs(lastPtr[0] - area.cx) > area.w * 0.3 + 4 || Math.abs(lastPtr[1] - area.cy) > area.h * 0.25 + 4)) moveTo(lastPtr[0], lastPtr[1]);
+  /* while the radio is held, keep re-reading what is under the pointer every frame: held outside the fitted view it zooms out, held inside it zooms in, held on the edge it stays put */
+  if (drag && lastPtr) moveTo(lastPtr[0], lastPtr[1]);
   var t = targetCam();
   if (RM) { cam.ls = t.ls; cam.cx = t.cx; cam.cy = t.cy; ringR.lg = Math.log(rangeFor(10)); ringR.lm = Math.log(rangeFor(0)); }
   else {
@@ -869,12 +871,13 @@ function refresh() {
   $('lr-bs').textContent = S.perHr + ' msgs/hr, screen ' + SCREENS[S.screen].n.toLowerCase() + ', ' + Math.round(b.avg) + ' mA';
   $('lr-dv').textContent = fmtKm(m.d);
   $('lr-pwv').textContent = S.pwr + ' dBm'; $('lr-chv').textContent = S.chars + ' chars'; $('lr-phv').textContent = S.perHr;
-  setSeg('lr-sf', S.sf - 7); setSeg('lr-env', S.env); setSeg('lr-band', S.band); setSeg('lr-scr', S.screen);
+  setSeg('lr-theme', S.day); cv.classList.toggle('day', !!S.day); setSeg('lr-sf', S.sf - 7); setSeg('lr-env', S.env); setSeg('lr-band', S.band); setSeg('lr-scr', S.screen);
   $('lr-pw').value = S.pwr; $('lr-ch').value = S.chars; $('lr-ph').value = S.perHr;
   if (document.activeElement !== $('lr-dist')) $('lr-dist').value = Math.round(Math.log(m.d / D_MIN) / Math.log(D_MAX / D_MIN) * 1000);
 }
 function leaveFit() { if (cam.mode === 'range') { cam.mode = 'follow'; $('lr-fit').setAttribute('aria-pressed', 'false'); $('lr-fit').textContent = 'Fit range'; } }
 function wireSeg(id, fn) { $(id).addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; fn(+b.getAttribute('data-v')); refresh(); }); }
+wireSeg('lr-theme', function (v) { S.day = v; try { localStorage.setItem('lr-day', v); } catch (x) {} });
 wireSeg('lr-sf', function (v) { S.sf = 7 + v; });
 wireSeg('lr-env', function (v) { S.env = v; });
 wireSeg('lr-band', function (v) { S.band = v; });
@@ -917,6 +920,9 @@ cv.addEventListener('touchmove', function (e) {
   if (!drag) return; var t = e.touches[0], r = cv.getBoundingClientRect(); lastPtr = [t.clientX - r.left, t.clientY - r.top]; moveTo(lastPtr[0], lastPtr[1]); e.preventDefault();
 }, { passive: false });
 cv.addEventListener('touchend', function () { drag = false; }); cv.addEventListener('touchcancel', function () { drag = false; });
+
+/* remembered map theme */
+try { if (localStorage.getItem('lr-day') === '1') S.day = 1; } catch (x) {}
 
 /* ---------- start ---------- */
 layout();
