@@ -5,7 +5,7 @@
    ============================================================ */
 
 html { scroll-behavior: smooth; }
-::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); color: #fff; }
+::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); color: var(--fg); }
 
 /* themed scrollbar */
 html { scrollbar-color: var(--accent-dark) var(--bg); scrollbar-width: thin; }
@@ -25,7 +25,7 @@ header { animation: x-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .x-progress {
 	position: fixed; top: 0; left: 0; height: 3px; width: 100%;
 	transform-origin: 0 50%; transform: scaleX(0);
-	background: linear-gradient(90deg, var(--accent-dark), var(--accent), #fff);
+	background: linear-gradient(90deg, var(--accent-dark), var(--accent), var(--fg));
 	box-shadow: 0 0 12px var(--accent);
 	z-index: 10002; pointer-events: none;
 }
@@ -40,7 +40,7 @@ header { animation: x-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 /* ---------- Hero ---------- */
 .x-h { position: relative; display: inline-block; }
-.x-grad { background: linear-gradient(100deg, #fff 30%, var(--accent) 60%, #fff 90%); background-size: 220% 100%;
+.x-grad { background: linear-gradient(100deg, var(--fg) 30%, var(--accent) 60%, var(--fg) 90%); background-size: 220% 100%;
 	-webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
 	animation: x-shimmer 7s linear infinite; }
 @keyframes x-shimmer { to { background-position: -220% 0; } }
@@ -138,10 +138,10 @@ pre:hover .x-copy, .x-copy:focus-visible { opacity: 1; }
 
 /* ---------- Command palette ---------- */
 .x-pal { position: fixed; inset: 0; z-index: 10005; display: flex; align-items: flex-start; justify-content: center; padding: 14vh 1em 1em;
-	background: rgba(5,5,5,0.62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+	background: var(--pal-dim, rgba(5,5,5,0.62)); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity 0.2s; }
 .x-pal.is-open { opacity: 1; pointer-events: auto; }
 .x-pal-box { width: min(560px, 100%); background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px;
-	box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px color-mix(in srgb, var(--accent) 15%, transparent); overflow: hidden;
+	box-shadow: 0 30px 80px var(--pal-shadow, rgba(0,0,0,0.6)), 0 0 0 1px color-mix(in srgb, var(--accent) 15%, transparent); overflow: hidden;
 	transform: translateY(-12px) scale(0.97); transition: transform 0.25s cubic-bezier(0.16,1,0.3,1); }
 .x-pal.is-open .x-pal-box { transform: none; }
 .x-pal input { width: 100%; padding: 1em 1.2em; font-size: 16px; color: var(--fg); background: transparent; border: 0; border-bottom: 1px solid var(--border); outline: none; font-family: inherit; }
@@ -273,3 +273,7 @@ html.has-custom-cursor .x-toc-a { cursor: none; }
 	@keyframes x-vt-out { to { opacity: 0; } }
 	@keyframes x-vt-in { from { opacity: 0; } }
 }
+
+/* ---------- Day mode tweaks ---------- */
+:root[data-mode="light"] { --pal-dim: rgba(30,40,55,0.32); --pal-shadow: rgba(30,50,80,0.28); }
+.x-mode svg { width: 20px; height: 20px; }

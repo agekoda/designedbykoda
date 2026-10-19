@@ -552,7 +552,7 @@ var css = '' +
 'html.has-custom-cursor #lora-sim.is-open *{cursor:auto!important}' +
 'html.has-custom-cursor #lora-sim.is-open button,html.has-custom-cursor #lora-sim.is-open input,html.has-custom-cursor #lora-sim.is-open select{cursor:pointer!important}' +
 '#lora-sim button,#lora-sim input,#lora-sim select{font:inherit;color:inherit}' +
-'#lora-sim .ls{position:relative;outline:none;border:1px solid var(--bd);border-radius:18px;background:radial-gradient(120% 90% at 20% 0,rgba(63,242,214,.07),transparent 60%),rgba(8,12,18,.6)}' +
+'#lora-sim .ls{position:relative;outline:none;border:1px solid var(--bd);border-radius:18px;background:radial-gradient(120% 90% at 20% 0,rgba(63,242,214,.07),transparent 60%),#0b1016}' +
 '#lora-sim .ls:focus-visible{box-shadow:0 0 0 2px var(--ba)}' +
 '#lora-sim .ls-top,#lora-sim .ls-cta{display:none}' +
 /* mini */

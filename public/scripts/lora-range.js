@@ -879,7 +879,8 @@ function refresh() {
 }
 function leaveFit() { if (cam.mode === 'range') { cam.mode = 'follow'; $('lr-fit').setAttribute('aria-pressed', 'false'); $('lr-fit').textContent = 'Fit range'; } }
 function wireSeg(id, fn) { $(id).addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; fn(+b.getAttribute('data-v')); refresh(); }); }
-wireSeg('lr-theme', function (v) { S.day = v; try { localStorage.setItem('lr-day', v); } catch (x) {} });
+wireSeg('lr-theme', function (v) { S.day = v; if (window.siteMode) window.siteMode.set(v ? 'light' : 'dark'); else document.documentElement.toggleAttribute('data-mode-planner', !!v); });
+window.addEventListener('x-mode', function (e) { S.day = e.detail === 'light' ? 1 : 0; refresh(); });
 wireSeg('lr-sf', function (v) { S.sf = 7 + v; });
 wireSeg('lr-env', function (v) { S.env = v; });
 wireSeg('lr-band', function (v) { S.band = v; });
@@ -925,7 +926,7 @@ cv.addEventListener('touchmove', function (e) {
 cv.addEventListener('touchend', function () { drag = false; }); cv.addEventListener('touchcancel', function () { drag = false; });
 
 /* remembered map theme */
-try { if (localStorage.getItem('lr-day') === '1') S.day = 1; } catch (x) {}
+S.day = document.documentElement.getAttribute('data-mode') === 'light' ? 1 : 0;
 
 /* ---------- start ---------- */
 layout();

@@ -206,7 +206,7 @@ var css = '' +
 '#vfd-sim *{box-sizing:border-box}' +
 'html.has-custom-cursor #vfd-sim *{cursor:none!important}' +
 '#vfd-sim button{font:inherit;color:inherit}' +
-'#vfd-sim .vs{outline:none;border:1px solid var(--bd);border-radius:18px;padding:18px;background:radial-gradient(120% 90% at 20% 0,rgba(63,242,214,.06),transparent 60%),rgba(8,12,18,.6)}' +
+'#vfd-sim .vs{outline:none;border:1px solid var(--bd);border-radius:18px;padding:18px;background:radial-gradient(120% 90% at 20% 0,rgba(63,242,214,.06),transparent 60%),#0b1016}' +
 '#vfd-sim .vs:focus-visible{box-shadow:0 0 0 2px var(--ba)}' +
 '#vfd-sim .vs-stage{position:relative;width:100%;user-select:none}' +
 '#vfd-sim .vs-svg{display:block;width:100%;height:auto;overflow:visible;color:#e8eef4}' +

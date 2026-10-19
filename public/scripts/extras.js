@@ -56,18 +56,41 @@
 		amber: ['#f0b45a', '#a87a2a'],
 	};
 	let accentRGB = [90, 160, 220];
-	function setTheme(name, announce) {
-		const t = THEMES[name];
-		if (!t) return;
-		root.style.setProperty('--accent', t[0]);
-		root.style.setProperty('--accent-dark', t[1]);
-		const h = t[0].slice(1);
+	let accentName = store.get('x-theme') || 'blue';
+	const isLight = () => root.getAttribute('data-mode') === 'light';
+	function applyAccent() {
+		const t = THEMES[accentName] || THEMES.blue;
+		if (isLight()) {                         // the lighter accents are hard to read on white, so use the deeper shade
+			root.style.setProperty('--accent', t[1]);
+			root.style.setProperty('--accent-dark', 'color-mix(in srgb, ' + t[1] + ' 70%, #000)');
+		} else if (accentName !== 'blue' || root.style.getPropertyValue('--accent')) {
+			root.style.setProperty('--accent', t[0]);
+			root.style.setProperty('--accent-dark', t[1]);
+		}
+		const h = (isLight() ? t[1] : t[0]).slice(1);
 		accentRGB = [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16));
+	}
+	function setTheme(name, announce) {
+		if (!THEMES[name]) return;
+		accentName = name;
+		applyAccent();
 		store.set('x-theme', name);
 		if (announce) say('Accent: ' + name);
 	}
-	const saved = store.get('x-theme');
-	if (saved) setTheme(saved, false);
+	// Day / night. Other scripts (like the range planner) can call window.siteMode.set('light'|'dark').
+	function setMode(m, announce) {
+		const light = m === 'light';
+		if (light) root.setAttribute('data-mode', 'light'); else root.removeAttribute('data-mode');
+		const meta = $('meta[name="theme-color"]');
+		if (meta) meta.setAttribute('content', light ? '#f4f6f9' : '#0a0a0a');
+		store.set('x-mode', light ? 'light' : 'dark');
+		applyAccent();
+		if (typeof modeBtn !== 'undefined') drawModeBtn();
+		window.dispatchEvent(new CustomEvent('x-mode', { detail: light ? 'light' : 'dark' }));
+		if (announce) say(light ? 'Day mode' : 'Night mode');
+	}
+	window.siteMode = { get: () => (isLight() ? 'light' : 'dark'), set: (m) => setMode(m, false) };
+	applyAccent();
 
 	// ---------- Scroll progress + back to top ----------
 	const bar = el('div', 'x-progress');
@@ -83,7 +106,17 @@
 	const palBtn = el('button', 'x-fab', '<span class="x-kbd">&#8984;K</span>');
 	palBtn.setAttribute('aria-label', 'Open command palette');
 	if (!fine) palBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
-	dock.append(top, palBtn);
+	const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+	const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+	const modeBtn = el('button', 'x-fab x-mode');
+	function drawModeBtn() {
+		modeBtn.innerHTML = isLight() ? MOON : SUN;
+		modeBtn.setAttribute('aria-label', isLight() ? 'Switch to night mode' : 'Switch to day mode');
+		modeBtn.title = isLight() ? 'Night mode' : 'Day mode';
+	}
+	drawModeBtn();
+	modeBtn.addEventListener('click', () => setMode(isLight() ? 'dark' : 'light', true));
+	dock.append(top, modeBtn, palBtn);
 	doc.body.appendChild(dock);
 	top.addEventListener('click', () => scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' }));
 
@@ -520,6 +553,9 @@
 		['E-Ink Calendar setup', 'Go to', go('/setup')],
 		['Privacy policy', 'Go to', go('/privacy')],
 		...socials.map(([n, h]) => [n.replace(/^(Follow on|Subscribe on|View source on)\s*/, 'Open '), 'Link', ext(h)]),
+		['Day mode (light)', 'Appearance', () => setMode('light', true)],
+		['Night mode (dark)', 'Appearance', () => setMode('dark', true)],
+		['Toggle day / night', 'Appearance', () => setMode(isLight() ? 'dark' : 'light', true)],
 		...Object.keys(THEMES).map((t) => ['Accent colour: ' + t, 'Theme', () => setTheme(t, true)]),
 		['Scroll to top', 'Action', () => scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' })],
 		['Copy page link', 'Action', async () => { try { await navigator.clipboard.writeText(location.href); say('Link copied'); } catch (e) { say('Could not copy'); } }],

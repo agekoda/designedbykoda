@@ -305,7 +305,7 @@ var css = '' +
 'html.has-custom-cursor #bp-sim.is-open *{cursor:auto!important}' +
 'html.has-custom-cursor #bp-sim.is-open button,html.has-custom-cursor #bp-sim.is-open input,html.has-custom-cursor #bp-sim.is-open select{cursor:pointer!important}' +
 '#bp-sim button{font:inherit;color:inherit}' +
-'#bp-sim .bp{position:relative;outline:none;border:1px solid var(--bd);border-radius:18px;background:radial-gradient(120% 90% at 20% 0,rgba(34,211,238,.07),transparent 60%),rgba(8,12,18,.6)}' +
+'#bp-sim .bp{position:relative;outline:none;border:1px solid var(--bd);border-radius:18px;background:radial-gradient(120% 90% at 20% 0,rgba(34,211,238,.07),transparent 60%),#0b1016}' +
 '#bp-sim .bp:focus-visible{box-shadow:0 0 0 2px var(--ba)}' +
 '#bp-sim .bp-top,#bp-sim .bp-cta{display:none}' +
 /* mini (on the page) */

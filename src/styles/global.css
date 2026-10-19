@@ -34,6 +34,40 @@
 	--gray-dark: 245, 245, 245;
 	--gray-gradient: rgba(18, 18, 18, 1), var(--bg);
 	--accent-rgb: 90, 160, 220;
+
+	--dot: rgba(80, 160, 220, 0.35);
+	color-scheme: dark;
+}
+
+/* ---------- Day mode ----------
+   Switched by <html data-mode="light"> (set early in <head>, toggled from the
+   dock button or the command palette, remembered in localStorage). */
+:root[data-mode="light"] {
+	--bg: #f4f6f9;
+	--bg-raised: #ffffff;
+	--fg: #14181d;
+	--muted: #4b5662;
+	--muted-dim: #6b7682;
+	--border: #d5dbe2;
+	--accent: #2e6ba8;
+	--accent-dark: #1f4f80;
+
+	--glow-blue: rgba(60, 140, 220, 0.16);
+	--glow-teal: rgba(60, 200, 190, 0.14);
+	--glow-pink: rgba(230, 140, 190, 0.14);
+	--glow-purple: rgba(160, 130, 230, 0.14);
+	--glow-center: rgba(120, 190, 230, 0.14);
+
+	--box-shadow: 0 8px 30px rgba(30, 50, 80, 0.14);
+	--dot: rgba(46, 107, 168, 0.2);
+
+	--black: 20, 24, 29;
+	--gray: 75, 86, 98;
+	--gray-light: 213, 219, 226;
+	--gray-dark: 20, 24, 29;
+	--gray-gradient: rgba(255, 255, 255, 1), var(--bg);
+	--accent-rgb: 46, 107, 168;
+	color-scheme: light;
 }
 
 @font-face {
@@ -237,7 +271,7 @@ hr {
 	z-index: 0;
 	overflow: hidden;
 	pointer-events: none;
-	background-image: radial-gradient(circle, rgba(80, 160, 220, 0.35) 1px, transparent 1px);
+	background-image: radial-gradient(circle, var(--dot) 1px, transparent 1px);
 	background-size: 22px 22px;
 }
 .bg-fx .glow {
@@ -334,6 +368,10 @@ hr {
 .tag.status-upcoming {
 	color: #e0c07a;
 	border-color: #4a3f22;
+}
+:root[data-mode="light"] .tag.status-upcoming {
+	color: #8a6414;
+	border-color: #e3d3a4;
 }
 
 /* ---------- Image lightbox ---------- */
