@@ -89,7 +89,7 @@
 		window.dispatchEvent(new CustomEvent('x-mode', { detail: light ? 'light' : 'dark' }));
 		if (announce) say(light ? 'Day mode' : 'Night mode');
 	}
-	window.siteMode = { get: () => (isLight() ? 'light' : 'dark'), set: (m) => setMode(m, false) };
+	window.siteMode = { get: () => (isLight() ? 'light' : 'dark'), set: (m) => switchMode(m, false) };
 	applyAccent();
 
 	// ---------- Scroll progress + back to top ----------
@@ -108,14 +108,25 @@
 	if (!fine) palBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
 	const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 	const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
-	const modeBtn = el('button', 'x-fab x-mode');
+	const modeBtn = el('button', 'x-fab x-mode', '<span class="x-ico x-sun">' + SUN + '</span><span class="x-ico x-moon">' + MOON + '</span>');
 	function drawModeBtn() {
-		modeBtn.innerHTML = isLight() ? MOON : SUN;
 		modeBtn.setAttribute('aria-label', isLight() ? 'Switch to night mode' : 'Switch to day mode');
 		modeBtn.title = isLight() ? 'Night mode' : 'Day mode';
 	}
 	drawModeBtn();
-	modeBtn.addEventListener('click', () => setMode(isLight() ? 'dark' : 'light', true));
+	// Switch with a circle that grows out from the button (View Transitions); falls back to a plain switch.
+	function switchMode(m, announce, from) {
+		if (calm || !doc.startViewTransition) { setMode(m, announce); return; }
+		const r = (from || modeBtn).getBoundingClientRect();
+		const x = r.left + r.width / 2, y = r.top + r.height / 2;
+		const rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+		const vt = doc.startViewTransition(() => setMode(m, announce));
+		vt.ready.then(() => {
+			root.animate({ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${rad}px at ${x}px ${y}px)`] },
+				{ duration: 650, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', pseudoElement: '::view-transition-new(root)' });
+		}).catch(() => {});
+	}
+	modeBtn.addEventListener('click', () => switchMode(isLight() ? 'dark' : 'light', true));
 	dock.append(top, modeBtn, palBtn);
 	doc.body.appendChild(dock);
 	top.addEventListener('click', () => scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' }));
@@ -553,9 +564,9 @@
 		['E-Ink Calendar setup', 'Go to', go('/setup')],
 		['Privacy policy', 'Go to', go('/privacy')],
 		...socials.map(([n, h]) => [n.replace(/^(Follow on|Subscribe on|View source on)\s*/, 'Open '), 'Link', ext(h)]),
-		['Day mode (light)', 'Appearance', () => setMode('light', true)],
-		['Night mode (dark)', 'Appearance', () => setMode('dark', true)],
-		['Toggle day / night', 'Appearance', () => setMode(isLight() ? 'dark' : 'light', true)],
+		['Day mode (light)', 'Appearance', () => switchMode('light', true, palBtn)],
+		['Night mode (dark)', 'Appearance', () => switchMode('dark', true, palBtn)],
+		['Toggle day / night', 'Appearance', () => switchMode(isLight() ? 'dark' : 'light', true, palBtn)],
 		...Object.keys(THEMES).map((t) => ['Accent colour: ' + t, 'Theme', () => setTheme(t, true)]),
 		['Scroll to top', 'Action', () => scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' })],
 		['Copy page link', 'Action', async () => { try { await navigator.clipboard.writeText(location.href); say('Link copied'); } catch (e) { say('Could not copy'); } }],

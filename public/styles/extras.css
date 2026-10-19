@@ -276,4 +276,19 @@ html.has-custom-cursor .x-toc-a { cursor: none; }
 
 /* ---------- Day mode tweaks ---------- */
 :root[data-mode="light"] { --pal-dim: rgba(30,40,55,0.32); --pal-shadow: rgba(30,50,80,0.28); }
+/* sun <-> moon: both icons sit on top of each other and swap with a spin */
+.x-mode { overflow: hidden; }
+.x-ico { position: absolute; inset: 0; display: grid; place-items: center;
+	transition: transform 0.6s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.35s ease; }
 .x-mode svg { width: 20px; height: 20px; }
+.x-mode .x-moon { opacity: 0; transform: rotate(-120deg) scale(0.3); }
+:root[data-mode="light"] .x-mode .x-sun { opacity: 0; transform: rotate(120deg) scale(0.3); }
+:root[data-mode="light"] .x-mode .x-moon { opacity: 1; transform: none; }
+.x-mode:hover .x-sun svg { animation: x-spin 6s linear infinite; }
+@keyframes x-spin { to { transform: rotate(360deg); } }
+.x-mode:active { transform: scale(0.92); }
+
+/* the circle reveal when switching day / night */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
