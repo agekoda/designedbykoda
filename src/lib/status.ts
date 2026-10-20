@@ -43,6 +43,22 @@ async function timed(
 
 const signal = () => AbortSignal.timeout(TIMEOUT_MS);
 
+// Most recent check per component. One indexed LIMIT 1 lookup each (uses
+// idx_status_checks_comp_ts), so it reads ~5 rows instead of scanning the whole
+// 3-day table, which a GROUP BY MAX(id) subquery does on every call.
+async function latestChecks(db: any): Promise<any[]> {
+	const res = await db.batch(
+		COMPONENTS.map((c) =>
+			db
+				.prepare(
+					'SELECT component, ok, ms, ts FROM status_checks WHERE component = ? ORDER BY ts DESC LIMIT 1',
+				)
+				.bind(c.id),
+		),
+	);
+	return res.flatMap((r: any) => r.results ?? []);
+}
+
 // `appFetch` runs a request through this same Worker in-process, so the
 // checks exercise the real code path without needing to loop back through
 // the public internet.
@@ -91,14 +107,8 @@ export async function runStatusChecks(env: any, appFetch: (req: Request) => Prom
 	const day = new Date(now * 1000).toISOString().slice(0, 10);
 
 	// Previous result per component, read before we insert the new one.
-	const prevRows = await db
-		.prepare(
-			`SELECT component, ok, ts FROM status_checks
-			 WHERE id IN (SELECT MAX(id) FROM status_checks GROUP BY component)`,
-		)
-		.all();
 	const prev = new Map<string, { ok: number; ts: number }>(
-		(prevRows.results ?? []).map((r: any) => [r.component, r]),
+		(await latestChecks(db)).map((r: any) => [r.component, r]),
 	);
 	const openRows = await db
 		.prepare(
@@ -250,12 +260,7 @@ export async function loadStatus(env: any): Promise<StatusData> {
 		const since = days[0];
 		const [daily, latest, avg, incRows, dev] = await Promise.all([
 			db.prepare('SELECT day, component, checks, ok_checks FROM status_daily WHERE day >= ?').bind(since).all(),
-			db
-				.prepare(
-					`SELECT component, ok, ms, ts FROM status_checks
-					 WHERE id IN (SELECT MAX(id) FROM status_checks GROUP BY component)`,
-				)
-				.all(),
+			latestChecks(db).then((results) => ({ results })),
 			db
 				.prepare(
 					`SELECT component, AVG(ms) AS avg_ms FROM status_checks
