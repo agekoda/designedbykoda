@@ -43,8 +43,8 @@ const categories = ['RF & Wireless', 'Smart Home', 'Portable & Wearable', 'Measu
 
 	<div class="grid" id="project-grid">
 		{
-			allProjects.map((project) => (
-				<div class="cell" data-cat={project.data.category}>
+			allProjects.map((project, i) => (
+				<div class="cell reveal" style={`transition-delay: ${(i % 3) * 0.08}s`} data-cat={project.data.category}>
 					<ProjectCard
 						slug={project.id}
 						title={project.data.title}
@@ -75,8 +75,20 @@ const categories = ['RF & Wireless', 'Smart Home', 'Portable & Wearable', 'Measu
 			c.classList.toggle('active', on);
 			c.setAttribute('aria-pressed', String(on));
 		});
+		let n = 0;
 		cells.forEach((el) => {
-			el.hidden = !(f === 'all' || el.dataset.cat === f);
+			const show = f === 'all' || el.dataset.cat === f;
+			el.hidden = !show;
+			if (show && push) {
+				// replay the reveal, staggered like the homepage
+				el.style.transition = 'none';
+				el.classList.remove('is-visible');
+				void el.offsetWidth;
+				el.style.transition = '';
+				el.style.transitionDelay = `${(n % 3) * 0.08}s`;
+				requestAnimationFrame(() => el.classList.add('is-visible'));
+				n++;
+			}
 		});
 		if (push) {
 			const u = new URL(location.href);
@@ -112,7 +124,6 @@ const categories = ['RF & Wireless', 'Smart Home', 'Portable & Wearable', 'Measu
 		border: 1px solid var(--border);
 		border-radius: 999px;
 		padding: 0.45em 1em;
-		cursor: pointer;
 		transition: color 0.15s, border-color 0.15s, background 0.15s;
 	}
 	.chip:hover {
@@ -128,6 +139,16 @@ const categories = ['RF & Wireless', 'Smart Home', 'Portable & Wearable', 'Measu
 		opacity: 0.6;
 		margin-left: 0.3em;
 		font-size: 0.85em;
+	}
+	:global(html.has-custom-cursor) .chip,
+	:global(html.has-custom-cursor) .chip * {
+		cursor: none !important;
+	}
+	.cell {
+		display: flex;
+	}
+	.cell :global(a.card) {
+		flex: 1;
 	}
 	.cell[hidden] {
 		display: none;
