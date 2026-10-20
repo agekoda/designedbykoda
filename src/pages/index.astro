@@ -1,4 +1,5 @@
 ---
+import { homepageOrder } from '../data/projectOrder';
 import { getCollection } from 'astro:content';
 import Layout from '../layouts/Layout.astro';
 import ProjectCard from '../components/ProjectCard.astro';
@@ -8,18 +9,6 @@ import { SITE_DESCRIPTION } from '../consts';
 // Controls the order projects appear in on the homepage grid specifically.
 // Read left-to-right, top-to-bottom. Anything not listed here falls in
 // afterwards, sorted by its `order` field in the content frontmatter.
-const homepageOrder = [
-	'eink-calendar',
-	'vfd-display-board',
-	'battery-profiler',
-	'lora-portable-messenger',
-	'smart-energy-meter-puck',
-	'phantomware',
-	'rf-tool',
-	'nrf-box',
-	'air-quality-monitor',
-	'nrf24-audio-radio',
-];
 
 const allProjects = await getCollection('projects');
 const byOrderField = [...allProjects].sort((a, b) => a.data.order - b.data.order);

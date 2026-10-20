@@ -1,17 +1,19 @@
 ---
 import { getCollection } from 'astro:content';
 import Layout from '../../layouts/Layout.astro';
+import { homepageOrder } from '../../data/projectOrder';
 import ProjectCard from '../../components/ProjectCard.astro';
 
-const allProjects = (await getCollection('projects')).sort((a, b) => a.data.order - b.data.order);
+const all = await getCollection('projects');
+const byOrderField = [...all].sort((a, b) => a.data.order - b.data.order);
+const allProjects = [
+	...homepageOrder.map((slug) => all.find((p) => p.id === slug)).filter((p) => p !== undefined),
+	...byOrderField.filter((p) => !homepageOrder.includes(p.id)),
+];
 
-const categoryOrder = ['RF & Wireless', 'Smart Home', 'Portable & Wearable', 'Measurement'] as const;
-const grouped = categoryOrder
-	.map((category) => ({
-		category,
-		items: allProjects.filter((p) => p.data.category === category),
-	}))
-	.filter((group) => group.items.length > 0);
+const categories = ['RF & Wireless', 'Smart Home', 'Portable & Wearable', 'Measurement'].filter((c) =>
+	allProjects.some((p) => p.data.category === c),
+);
 ---
 
 <Layout
@@ -26,33 +28,67 @@ const grouped = categoryOrder
 		</p>
 	</div>
 
-	{
-		grouped.map((group) => (
-			<section class="group">
-				<h2>{group.category}</h2>
-				<div class="grid">
-					{group.items.map((project) => (
-						<ProjectCard
-							slug={project.id}
-							title={project.data.title}
-							tagline={project.data.tagline}
-							category={project.data.category}
-							status={project.data.status}
-							heroImage={project.data.heroImage}
-							cardBanner={project.data.cardBanner}
-							simulator={project.data.simulator}
-						/>
-					))}
+	<div class="filters" role="group" aria-label="Filter projects by category">
+		<button type="button" class="chip active" data-filter="all" aria-pressed="true">
+			All <span class="count">{allProjects.length}</span>
+		</button>
+		{
+			categories.map((c) => (
+				<button type="button" class="chip" data-filter={c} aria-pressed="false">
+					{c} <span class="count">{allProjects.filter((p) => p.data.category === c).length}</span>
+				</button>
+			))
+		}
+	</div>
+
+	<div class="grid" id="project-grid">
+		{
+			allProjects.map((project) => (
+				<div class="cell" data-cat={project.data.category}>
+					<ProjectCard
+						slug={project.id}
+						title={project.data.title}
+						tagline={project.data.tagline}
+						category={project.data.category}
+						status={project.data.status}
+						heroImage={project.data.heroImage}
+						cardBanner={project.data.cardBanner}
+						simulator={project.data.simulator}
+					/>
 				</div>
-			</section>
-		))
-	}
+			))
+		}
+	</div>
 
 	<section class="upcoming-note">
 		<h2>🔜 Also cooking</h2>
 		<p>Under-shelf smart lighting system, PWM controlled via Home Assistant.</p>
 	</section>
 </Layout>
+
+<script>
+	const chips = document.querySelectorAll<HTMLButtonElement>('.filters .chip');
+	const cells = document.querySelectorAll<HTMLElement>('#project-grid .cell');
+	function apply(f: string, push: boolean) {
+		chips.forEach((c) => {
+			const on = c.dataset.filter === f;
+			c.classList.toggle('active', on);
+			c.setAttribute('aria-pressed', String(on));
+		});
+		cells.forEach((el) => {
+			el.hidden = !(f === 'all' || el.dataset.cat === f);
+		});
+		if (push) {
+			const u = new URL(location.href);
+			if (f === 'all') u.searchParams.delete('category');
+			else u.searchParams.set('category', f);
+			history.replaceState(null, '', u);
+		}
+	}
+	chips.forEach((c) => c.addEventListener('click', () => apply(c.dataset.filter || 'all', true)));
+	const initial = new URL(location.href).searchParams.get('category');
+	if (initial && [...chips].some((c) => c.dataset.filter === initial)) apply(initial, false);
+</script>
 
 <style>
 	.intro {
@@ -62,18 +98,39 @@ const grouped = categoryOrder
 	.intro p {
 		font-size: 1.05em;
 	}
-	.group {
-		margin-bottom: 3em;
+	.filters {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6em;
+		margin-bottom: 1.8em;
 	}
-	.group h2 {
-		font-size: 1.2em;
+	.chip {
+		font: inherit;
+		font-size: 0.9em;
 		color: var(--muted);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		font-weight: 400;
-		border-bottom: 1px solid var(--border);
-		padding-bottom: 0.6em;
-		margin-bottom: 1.3em;
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		padding: 0.45em 1em;
+		cursor: pointer;
+		transition: color 0.15s, border-color 0.15s, background 0.15s;
+	}
+	.chip:hover {
+		color: var(--fg);
+		border-color: var(--accent);
+	}
+	.chip.active {
+		color: var(--fg);
+		border-color: var(--accent);
+		background: color-mix(in srgb, var(--accent) 14%, var(--bg-raised));
+	}
+	.count {
+		opacity: 0.6;
+		margin-left: 0.3em;
+		font-size: 0.85em;
+	}
+	.cell[hidden] {
+		display: none;
 	}
 	.grid {
 		display: grid;
