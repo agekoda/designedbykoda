@@ -258,7 +258,7 @@ export async function loadStatus(env: any): Promise<StatusData> {
 	try {
 		const now = Math.floor(Date.now() / 1000);
 		const since = days[0];
-		const [daily, latest, avg, incRows] = await Promise.all([
+		const [daily, latest, avg, incRows, dev] = await Promise.all([
 			db.prepare('SELECT day, component, checks, ok_checks FROM status_daily WHERE day >= ?').bind(since).all(),
 			latestChecks(db).then((results) => ({ results })),
 			db
@@ -277,6 +277,16 @@ export async function loadStatus(env: any): Promise<StatusData> {
 				)
 				.bind(now - DAYS * 86400)
 				.all(),
+			// Two index-backed lookups (idx_devices_last_seen), so this stays
+			// cheap however many devices exist: MAX reads 1 row, COUNT only
+			// walks the rows seen in the last 24 hours.
+			db
+				.prepare(
+					`SELECT (SELECT MAX(last_seen_at) FROM devices) AS last,
+					        (SELECT COUNT(*) FROM devices WHERE last_seen_at > ?) AS n`,
+				)
+				.bind(now - 86400)
+				.first(),
 		]);
 
 		const dailyBy = new Map<string, { checks: number; ok: number }>();
@@ -326,8 +336,8 @@ export async function loadStatus(env: any): Promise<StatusData> {
 			components,
 			incidents,
 			lastCheck,
-			lastDeviceSeen: null, // intentionally not published
-			devicesActive24h: null, // intentionally not published
+			lastDeviceSeen: (dev as any)?.last ?? null,
+			devicesActive24h: (dev as any)?.n ?? 0,
 			overall: summarise(components, incidents, lastCheck),
 			demo: false,
 		};
@@ -424,8 +434,8 @@ export function demoStatus(kind: string): StatusData {
 		components,
 		incidents,
 		lastCheck: now - 140,
-		lastDeviceSeen: null,
-		devicesActive24h: null,
+		lastDeviceSeen: now - 9 * 60,
+		devicesActive24h: 14,
 		overall: summarise(components, incidents, now),
 		demo: true,
 	};
