@@ -148,16 +148,11 @@ export async function GET({ params, request, locals }) {
 			.run();
 	}
 
-	const timezone = user.timezone || 'UTC';
-	// Still needed for utcOffsetSec in the response (the device uses it for
-	// display + sleep-boundary timing) — but no longer used to restrict the
-	// calendar query itself. That was the actual bug: querying only
-	// midnight-to-midnight "today" meant a calendar with nothing scheduled
-	// for the literal current day returned zero events, even with things
-	// coming up later in the week. Fixed below to fetch the next N
-	// upcoming events from right now onward, same as the original firmware
-	// intended (7 upcoming events, whichever day they fall on).
-	const { offsetSec } = getTodayRangeUTC(timezone, new Date());
+	// The timezone is whatever Google Calendar itself says the account is in
+	// (the `timeZone` field on every events response), so the device always
+	// matches what the person sees in Google Calendar, wherever they are in
+	// the world. The value saved at setup (from the browser) is only the
+	// fallback if Google doesn't report one.
 	const rightNow = new Date();
 
 	let calendarIds: string[];
@@ -169,10 +164,11 @@ export async function GET({ params, request, locals }) {
 	if (calendarIds.length === 0) calendarIds = ['primary'];
 
 	console.log(
-		`Fetching for device ${deviceId}: calendars=${JSON.stringify(calendarIds)} timezone=${timezone} from ${rightNow.toISOString()} onward`
+		`Fetching for device ${deviceId}: calendars=${JSON.stringify(calendarIds)} savedTimezone=${user.timezone} from ${rightNow.toISOString()} onward`
 	);
 
-	const allEvents: { title: string; startUnix: number; allDay: boolean }[] = [];
+	const rawEvents: { title: string; ms: number; allDay: boolean; dateOnly?: string }[] = [];
+	let googleTz: string | null = null;
 
 	for (const calId of calendarIds) {
 		const eventsUrl = new URL(
@@ -199,6 +195,9 @@ export async function GET({ params, request, locals }) {
 		}
 
 		const evData = await evRes.json();
+		// Prefer the primary calendar's timezone; otherwise the first one
+		// Google tells us about.
+		if (evData.timeZone && (calId === 'primary' || !googleTz)) googleTz = evData.timeZone;
 		const itemCount = (evData.items || []).length;
 		console.log(`Calendar "${calId}": Google returned ${itemCount} raw item(s)`);
 		for (const item of evData.items || []) {
@@ -208,13 +207,44 @@ export async function GET({ params, request, locals }) {
 				console.log(`Skipped an item on "${calId}" — missing start or summary: ${JSON.stringify(item.start)} / "${item.summary}"`);
 				continue;
 			}
-			allEvents.push({
+			rawEvents.push({
 				title: item.summary,
-				startUnix: Math.floor(new Date(startValue).getTime() / 1000),
+				ms: new Date(startValue).getTime(),
 				allDay: isAllDay,
+				dateOnly: isAllDay ? startValue : undefined,
 			});
 		}
 	}
+
+	// Settle on a valid timezone: Google's, else the saved one, else UTC.
+	const isValidTz = (tz: unknown): tz is string => {
+		if (typeof tz !== 'string' || !tz) return false;
+		try {
+			new Intl.DateTimeFormat('en-US', { timeZone: tz });
+			return true;
+		} catch {
+			return false;
+		}
+	};
+	const timezone = isValidTz(googleTz) ? googleTz : isValidTz(user.timezone) ? user.timezone : 'UTC';
+	if (isValidTz(googleTz) && googleTz !== user.timezone) {
+		// Keep our copy in sync (e.g. they moved country or changed it in Google).
+		await db.prepare('UPDATE users SET timezone = ? WHERE id = ?').bind(googleTz, device.user_id).run();
+	}
+	const offsetSec = getUtcOffsetSeconds(timezone, rightNow);
+
+	// `startUnix` stays the true UTC instant (older firmware adds utcOffsetSec
+	// itself). `startLocal` is the same moment as local wall-clock time, using
+	// the offset in force AT THAT EVENT, so events after a daylight-saving
+	// change still show the right hour. All-day events are pinned to their
+	// calendar date's midnight so they land on the right day in every zone.
+	const allEvents = rawEvents.map((e) => {
+		const startUnix = Math.floor(e.ms / 1000);
+		const startLocal = e.allDay
+			? Math.floor(Date.parse(`${e.dateOnly}T00:00:00Z`) / 1000)
+			: startUnix + getUtcOffsetSeconds(timezone, new Date(e.ms));
+		return { title: e.title, startUnix, startLocal, allDay: e.allDay };
+	});
 
 	allEvents.sort((a, b) => a.startUnix - b.startUnix);
 	// Merging multiple calendars can exceed 15 combined even though each

@@ -144,25 +144,6 @@ const hasData = data.lastCheck !== null;
 				}
 			</section>
 
-			{
-				data.devicesActive24h !== null && hasData && (
-					<section class="devices">
-						<div>
-							<strong>{data.devicesActive24h}</strong>
-							<span>calendars checked in over the last 24 hours</span>
-						</div>
-						{data.lastDeviceSeen && (
-							<div>
-								<strong>
-									<time data-ts={data.lastDeviceSeen} data-rel>recently</time>
-								</strong>
-								<span>most recent calendar check-in</span>
-							</div>
-						)}
-					</section>
-				)
-			}
-
 			<section class="history">
 				<h2>Past incidents</h2>
 				{
@@ -226,7 +207,7 @@ const hasData = data.lastCheck !== null;
 	format();
 	setInterval(format, 30000);
 
-	// Refresh the page contents every minute without a reload.
+	// Refresh the page contents every 5 minutes (same cadence as the checks) without a reload.
 	setInterval(async () => {
 		if (document.hidden) return;
 		try {
@@ -242,7 +223,7 @@ const hasData = data.lastCheck !== null;
 		} catch {
 			/* offline: keep what's on screen */
 		}
-	}, 60000);
+	}, 300000);
 </script>
 
 <style>
@@ -498,25 +479,6 @@ const hasData = data.lastCheck !== null;
 		margin: 0.5em 0 0 0;
 		font-size: 0.8em;
 		color: var(--muted-dim);
-	}
-
-	/* Devices */
-	.devices {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 2.5em;
-		margin: 1.8em 0 0.4em 0.2em;
-	}
-	.devices div {
-		display: flex;
-		flex-direction: column;
-	}
-	.devices strong {
-		font-size: 1.5em;
-	}
-	.devices span {
-		color: var(--muted-dim);
-		font-size: 0.85em;
 	}
 
 	.history {
