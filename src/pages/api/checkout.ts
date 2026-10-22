@@ -48,6 +48,10 @@ export async function POST({ request, locals }) {
 	params.set('line_items[0][price_data][product_data][name]', 'E-Ink Calendar (Preorder)');
 	params.set('line_items[0][price_data][unit_amount]', String(amountInMinorUnits));
 	params.set('line_items[0][quantity]', '1');
+	// Shows an "Add promotion code" box on Stripe's page. Lets you test a live
+	// payment for $1 with a private 100%-minus-$1 code made in the Stripe
+	// dashboard. Remove this line once testing is done if you don't want the box.
+	params.set('allow_promotion_codes', 'true');
 	params.set('success_url', `${origin}/preorder/success`);
 	params.set('cancel_url', `${origin}/preorder/eink-calendar`);
 
