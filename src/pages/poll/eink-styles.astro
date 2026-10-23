@@ -214,10 +214,15 @@ const poll = POLLS[id];
 </script>
 
 <style>
+	/* Full width of the screen instead of the narrow centered column. */
 	.poll-page {
-		max-width: 920px;
-		margin: 0 auto;
-		padding: 1.5em 0 4em 0;
+		width: 100vw;
+		margin-left: calc(50% - 50vw);
+		padding: 1.5em clamp(1.25em, 3.5vw, 4em) 4em clamp(1.25em, 3.5vw, 4em);
+		box-sizing: border-box;
+	}
+	:global(html:has(.poll-page)) {
+		overflow-x: clip;
 	}
 	/* Circle cursor only: hide the native cursor on everything here. */
 	:global(html.has-custom-cursor) .poll-page,
@@ -238,7 +243,7 @@ const poll = POLLS[id];
 	.intro {
 		color: var(--muted);
 		line-height: 1.65;
-		max-width: 620px;
+		max-width: 680px;
 		margin-bottom: 2em;
 	}
 	.sr-only {
@@ -253,8 +258,20 @@ const poll = POLLS[id];
 	/* ---------- options ---------- */
 	.options {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-		gap: 1.2em;
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		gap: clamp(0.9em, 1.4vw, 1.6em);
+	}
+	/* Laptop-sized screens: three across (3 + 2), so there's never a lone card. */
+	@media (min-width: 900px) and (max-width: 1499px) {
+		.options {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+	}
+	/* Wide screens (about 1500px and up): all five side by side across the whole width. */
+	@media (min-width: 1500px) {
+		.options {
+			grid-template-columns: repeat(5, minmax(0, 1fr));
+		}
 	}
 	.opt {
 		position: relative;
@@ -290,10 +307,10 @@ const poll = POLLS[id];
 	}
 	.rank {
 		position: absolute;
-		top: 10px;
-		left: 10px;
-		min-width: 28px;
-		height: 28px;
+		top: 12px;
+		left: 12px;
+		min-width: 32px;
+		height: 32px;
 		border-radius: 999px;
 		display: flex;
 		align-items: center;
@@ -311,16 +328,17 @@ const poll = POLLS[id];
 	.meta {
 		display: flex;
 		flex-direction: column;
-		gap: 0.2em;
-		padding: 0.8em 1em 0.95em 1em;
+		gap: 0.3em;
+		padding: 1em 1.1em 1.2em 1.1em;
 	}
 	.label {
 		font-weight: 700;
+		font-size: clamp(1.05em, 0.9vw + 0.7em, 1.35em);
 	}
 	.note {
 		color: var(--muted-dim);
-		font-size: 0.85em;
-		line-height: 1.4;
+		font-size: clamp(0.85em, 0.35vw + 0.7em, 1em);
+		line-height: 1.45;
 	}
 
 	/* ---------- actions ---------- */
@@ -407,6 +425,7 @@ const poll = POLLS[id];
 		margin: 0 0 1em 0;
 	}
 	.results {
+		max-width: 1000px;
 		list-style: none;
 		padding: 0;
 		margin: 1.2em 0 0 0;
