@@ -9,6 +9,36 @@ const COOKIE = 'poll_voter';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const COLS = ['r1', 'r2', 'r3'] as const;
 
+// A one-way hash of the visitor's network address + browser type, with a
+// secret salt. It is only used to spot the same person voting again from a
+// fresh cookie (incognito window, cleared cookies), and can't be turned back
+// into an address. Returns null when there's no address (e.g. local dev).
+async function fingerprint(request: Request, env: any): Promise<string | null> {
+	const ip = request.headers.get('CF-Connecting-IP');
+	if (!ip) return null;
+	const ua = request.headers.get('User-Agent') || '';
+	const data = new TextEncoder().encode(`${env?.POLL_SALT || 'poll-v1'}|${ip}|${ua}`);
+	const buf = await crypto.subtle.digest('SHA-256', data);
+	return Array.from(new Uint8Array(buf))
+		.slice(0, 16)
+		.map((b) => b.toString(16).padStart(2, '0'))
+		.join('');
+}
+
+// This visitor's existing vote, found by cookie id or, failing that, by
+// fingerprint. Returns the row (including whose voter id it belongs to).
+async function findVote(db: any, poll: string, voter: string | null, fp: string | null) {
+	if (!voter && !fp) return null;
+	return (await db
+		.prepare(
+			`SELECT voter, first, second, third FROM poll_votes
+			 WHERE poll = ? AND (voter = ? OR (fp IS NOT NULL AND fp = ?))
+			 ORDER BY (voter = ?) DESC LIMIT 1`,
+		)
+		.bind(poll, voter ?? '', fp ?? '', voter ?? '')
+		.first()) as { voter: string; first: string; second: string | null; third: string | null } | null;
+}
+
 function readVoter(request: Request): string | null {
 	const m = (request.headers.get('Cookie') || '').match(new RegExp(`(?:^|;\\s*)${COOKIE}=([^;]+)`));
 	return m && UUID_RE.test(m[1]) ? m[1] : null;
@@ -21,15 +51,10 @@ export async function GET({ request, locals }) {
 	if (!poll) return json({ error: 'Poll not found.' }, 404);
 	if (!db) return json({ error: 'Voting is not available right now.' }, 503);
 
-	const voter = readVoter(request);
+	const env = locals.runtime?.env;
 	const [tallies, mine] = await Promise.all([
 		db.prepare('SELECT style, r1, r2, r3 FROM poll_tallies WHERE poll = ?').bind(id).all(),
-		voter
-			? db
-					.prepare('SELECT first, second, third FROM poll_votes WHERE poll = ? AND voter = ?')
-					.bind(id, voter)
-					.first()
-			: Promise.resolve(null),
+		fingerprint(request, env).then((fp) => findVote(db, id, readVoter(request), fp)),
 	]);
 	return json(summarise(poll, tallies.results ?? [], mine), 200);
 }
@@ -62,13 +87,13 @@ export async function POST({ request, locals }) {
 		return json({ error: 'Please pick between 1 and 3 different options.' }, 400);
 	}
 
-	const newVoter = readVoter(request) ?? crypto.randomUUID();
 	const now = Math.floor(Date.now() / 1000);
+	const fp = await fingerprint(request, locals.runtime?.env);
 
-	const old = (await db
-		.prepare('SELECT first, second, third FROM poll_votes WHERE poll = ? AND voter = ?')
-		.bind(id, newVoter)
-		.first()) as { first: string; second: string | null; third: string | null } | null;
+	// Same cookie, or same network + browser as an earlier vote, counts as the
+	// same person: their vote is replaced, not added to.
+	const old = await findVote(db, id, readVoter(request), fp);
+	const newVoter = old?.voter ?? readVoter(request) ?? crypto.randomUUID();
 
 	const stmts: any[] = [];
 	// Undo this visitor's previous vote in the totals, then add the new one.
@@ -98,13 +123,13 @@ export async function POST({ request, locals }) {
 	stmts.push(
 		db
 			.prepare(
-				`INSERT INTO poll_votes (poll, voter, first, second, third, created_at, updated_at)
-				 VALUES (?, ?, ?, ?, ?, ?, ?)
+				`INSERT INTO poll_votes (poll, voter, first, second, third, fp, created_at, updated_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 				 ON CONFLICT(poll, voter) DO UPDATE SET
 				   first = excluded.first, second = excluded.second, third = excluded.third,
-				   updated_at = excluded.updated_at`,
+				   fp = COALESCE(excluded.fp, poll_votes.fp), updated_at = excluded.updated_at`,
 			)
-			.bind(id, newVoter, picks[0], picks[1] ?? null, picks[2] ?? null, now, now),
+			.bind(id, newVoter, picks[0], picks[1] ?? null, picks[2] ?? null, fp, now, now),
 	);
 	await db.batch(stmts);
 

@@ -26,8 +26,10 @@ import Layout from '../layouts/Layout.astro';
 		</ul>
 		<p>
 			If you vote in a poll on this site, we store your choices together with a random
-			identifier saved in a cookie in your browser. It is not linked to your name, email or
-			IP address, and it only exists so that voting again replaces your earlier vote.
+			identifier saved in a cookie in your browser, and a one-way hash (it cannot be reversed)
+			of your network address and browser type. These are used only so that voting again
+			replaces your earlier vote instead of counting twice. Your name, email and address are
+			not stored with your vote.
 		</p>
 		<p>
 			We do not request or receive access to any other Google service, and we do not
