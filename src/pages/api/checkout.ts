@@ -2,19 +2,9 @@
 // client to redirect to. The price for each currency is looked up here,
 // server-side, never trusted from the client — a client could otherwise
 // submit any amount it wanted for the "AUD" price, for example.
-export const prerender = false;
+import { BASE_PRICE_USD, RATES } from '../../data/preorderPricing';
 
-const BASE_PRICE_USD = 70;
-// Same static rates as the display page — see that file for sourcing
-// notes. Kept in sync manually for now; worth centralizing in one shared
-// file if more currencies get added later.
-const RATES: Record<string, number> = {
-	USD: 1,
-	EUR: 0.86,
-	GBP: 0.74,
-	AUD: 1.386,
-	CAD: 1.38,
-};
+export const prerender = false;
 
 export async function POST({ request, locals }) {
 	const env = locals.runtime?.env ?? {};
