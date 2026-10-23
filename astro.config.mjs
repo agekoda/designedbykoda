@@ -16,6 +16,7 @@ export default defineConfig({
 	redirects: {
 		"/powerpuck": "/projects/smart-energy-meter-puck",
 		"/eink-calendar": "/projects/eink-calendar/",
+		"/vote": "/poll/eink-styles/",
 	},
 	integrations: [mdx(), sitemap()],
 	adapter: cloudflare({
