@@ -1,0 +1,498 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { POLLS } from '../../data/polls';
+
+export function getStaticPaths() {
+	return Object.keys(POLLS).map((id) => ({ params: { id } }));
+}
+
+const { id } = Astro.params;
+const poll = POLLS[id!];
+---
+<Layout title={`${poll.title} - designedbykoda`} description={poll.intro}>
+	<div class="poll-page" data-poll={id} data-max={poll.maxPicks}>
+		<p class="eyebrow">Poll</p>
+		<h1>{poll.title}</h1>
+		<p class="intro">{poll.intro}</p>
+
+		<!-- Voting view -->
+		<section id="vote-view" aria-labelledby="vote-h">
+			<h2 id="vote-h" class="sr-only">Choose your favourites</h2>
+			<div class="options" id="options">
+				{poll.options.map((o) => (
+					<button
+						type="button"
+						class="opt"
+						data-id={o.id}
+						aria-pressed="false"
+						aria-label={`${o.label}: ${o.note}`}
+					>
+						<span class="shot" style={`background-image:url('${o.image}')`}></span>
+						<span class="rank" aria-hidden="true"></span>
+						<span class="meta">
+							<span class="label">{o.label}</span>
+							<span class="note">{o.note}</span>
+						</span>
+					</button>
+				))}
+			</div>
+
+			<div class="actions">
+				<p class="hint" id="hint" aria-live="polite">Tap a layout to choose your favourite.</p>
+				<div class="action-btns">
+					<button type="button" class="ghost" id="clear" hidden>Clear</button>
+					<button type="button" class="submit" id="submit" disabled>Submit vote</button>
+				</div>
+			</div>
+			<p class="peek"><button type="button" class="link" id="peek">Just show me the results</button></p>
+			<p class="error" id="error" role="alert" hidden></p>
+		</section>
+
+		<!-- Results view -->
+		<section id="results-view" aria-labelledby="results-h" hidden>
+			<h2 id="results-h" class="results-title is-visible">Results</h2>
+			<p class="thanks" id="thanks" hidden>Thanks for voting!</p>
+			<ol class="results" id="results"></ol>
+			<p class="foot" id="foot"></p>
+			<p class="peek"><button type="button" class="link" id="change">Change my vote</button></p>
+		</section>
+	</div>
+</Layout>
+
+<script>
+	type Row = { id: string; r1: number; r2: number; r3: number; points: number };
+	type Data = { voters: number; results: Row[]; mine: string[] | null };
+
+	const root = document.querySelector<HTMLElement>('.poll-page')!;
+	const pollId = root.dataset.poll!;
+	const MAX = Number(root.dataset.max || 3);
+	const api = `/api/poll/${pollId}`;
+
+	const optEls = Array.from(document.querySelectorAll<HTMLButtonElement>('.opt'));
+	const hint = document.getElementById('hint')!;
+	const submit = document.getElementById('submit') as HTMLButtonElement;
+	const clearBtn = document.getElementById('clear') as HTMLButtonElement;
+	const errorEl = document.getElementById('error')!;
+	const voteView = document.getElementById('vote-view')!;
+	const resultsView = document.getElementById('results-view')!;
+	const resultsList = document.getElementById('results')!;
+	const foot = document.getElementById('foot')!;
+	const thanks = document.getElementById('thanks')!;
+
+	// optionId -> { label, image }, read from the buttons so there's one source.
+	const info = new Map(
+		optEls.map((b) => [
+			b.dataset.id!,
+			{
+				label: b.querySelector('.label')!.textContent || '',
+				image: (b.querySelector('.shot') as HTMLElement).style.backgroundImage,
+			},
+		]),
+	);
+
+	let picks: string[] = [];
+	const ORD = ['1st', '2nd', '3rd'];
+
+	function paint() {
+		optEls.forEach((b) => {
+			const i = picks.indexOf(b.dataset.id!);
+			b.setAttribute('aria-pressed', String(i >= 0));
+			b.classList.toggle('picked', i >= 0);
+			(b.querySelector('.rank') as HTMLElement).textContent = i >= 0 ? String(i + 1) : '';
+		});
+		submit.disabled = picks.length === 0;
+		clearBtn.hidden = picks.length === 0;
+		if (picks.length === 0) hint.textContent = 'Tap a layout to choose your favourite.';
+		else if (picks.length < MAX)
+			hint.textContent = `${picks.length} chosen. Add a ${ORD[picks.length]} choice if you like, or submit now.`;
+		else hint.textContent = 'You picked your top 3. Tap one to swap it out.';
+	}
+
+	optEls.forEach((b) =>
+		b.addEventListener('click', () => {
+			const id = b.dataset.id!;
+			const i = picks.indexOf(id);
+			if (i >= 0) picks.splice(i, 1); // unpick; the rest move up a place
+			else if (picks.length < MAX) picks.push(id);
+			errorEl.hidden = true;
+			paint();
+		}),
+	);
+	clearBtn.addEventListener('click', () => {
+		picks = [];
+		paint();
+	});
+
+	function showResults(d: Data, justVoted: boolean) {
+		const max = Math.max(1, ...d.results.map((r) => r.points));
+		const sorted = [...d.results].sort((a, b) => b.points - a.points || b.r1 - a.r1);
+		resultsList.innerHTML = '';
+		sorted.forEach((r, n) => {
+			const meta = info.get(r.id)!;
+			const mineRank = d.mine ? d.mine.indexOf(r.id) : -1;
+			const li = document.createElement('li');
+			li.className = 'res' + (mineRank >= 0 ? ' mine' : '');
+			li.innerHTML = `
+				<span class="pos">${n + 1}</span>
+				<span class="thumb"></span>
+				<span class="body">
+					<span class="top"><span class="label"></span><span class="pts"></span></span>
+					<span class="bar"><span class="fill"></span></span>
+					<span class="sub"></span>
+				</span>`;
+			(li.querySelector('.thumb') as HTMLElement).style.backgroundImage = meta.image;
+			li.querySelector('.label')!.textContent =
+				meta.label + (mineRank >= 0 ? `  ·  your ${ORD[mineRank]}` : '');
+			li.querySelector('.pts')!.textContent = `${r.points} pts`;
+			li.querySelector('.sub')!.textContent =
+				`${r.r1} first-place vote${r.r1 === 1 ? '' : 's'}`;
+			(li.querySelector('.fill') as HTMLElement).style.width = `${(r.points / max) * 100}%`;
+			resultsList.appendChild(li);
+		});
+		foot.textContent = `${d.voters} ${d.voters === 1 ? 'person has' : 'people have'} voted. 1st choice = 3 points, 2nd = 2, 3rd = 1.`;
+		thanks.hidden = !justVoted;
+		(document.getElementById('change') as HTMLElement).hidden = !d.mine;
+		voteView.hidden = true;
+		resultsView.hidden = false;
+	}
+
+	async function load(): Promise<Data | null> {
+		try {
+			const res = await fetch(api, { cache: 'no-store' });
+			if (!res.ok) return null;
+			return await res.json();
+		} catch {
+			return null;
+		}
+	}
+
+	submit.addEventListener('click', async () => {
+		submit.disabled = true;
+		submit.textContent = 'Submitting...';
+		errorEl.hidden = true;
+		try {
+			const res = await fetch(api, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ picks }),
+			});
+			const data = await res.json();
+			if (!res.ok) throw new Error(data.error || 'Could not save your vote.');
+			showResults(data, true);
+		} catch (e: any) {
+			errorEl.textContent = e?.message || 'Could not save your vote. Please try again.';
+			errorEl.hidden = false;
+		} finally {
+			submit.textContent = 'Submit vote';
+			submit.disabled = picks.length === 0;
+		}
+	});
+
+	let last: Data | null = null;
+	document.getElementById('peek')!.addEventListener('click', async () => {
+		last = await load();
+		if (last) showResults(last, false);
+		else {
+			errorEl.textContent = 'Results are not available right now.';
+			errorEl.hidden = false;
+		}
+	});
+	document.getElementById('change')!.addEventListener('click', () => {
+		resultsView.hidden = true;
+		voteView.hidden = false;
+		paint();
+		window.scrollTo({ top: 0 });
+	});
+
+	// If this visitor already voted, go straight to results with their picks marked.
+	(async () => {
+		const d = await load();
+		if (d?.mine) {
+			picks = d.mine.slice();
+			paint();
+			showResults(d, false);
+		} else {
+			paint();
+		}
+	})();
+</script>
+
+<style>
+	.poll-page {
+		max-width: 920px;
+		margin: 0 auto;
+		padding: 1.5em 0 4em 0;
+	}
+	/* Circle cursor only: hide the native cursor on everything here. */
+	:global(html.has-custom-cursor) .poll-page,
+	:global(html.has-custom-cursor) .poll-page * {
+		cursor: none !important;
+	}
+	.eyebrow {
+		color: var(--muted-dim);
+		font-size: 0.85em;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		margin: 0 0 0.4em 0;
+	}
+	h1 {
+		margin: 0 0 0.5em 0;
+	}
+	.intro {
+		color: var(--muted);
+		line-height: 1.65;
+		max-width: 620px;
+		margin-bottom: 2em;
+	}
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+	}
+
+	/* ---------- options ---------- */
+	.options {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+		gap: 1.2em;
+	}
+	.opt {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		padding: 0;
+		text-align: left;
+		font: inherit;
+		color: var(--fg);
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		overflow: hidden;
+		transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+	}
+	.opt:hover {
+		border-color: var(--accent);
+	}
+	.opt.picked {
+		border-color: var(--accent);
+		box-shadow: 0 0 0 2px var(--accent);
+	}
+	.opt:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	.shot {
+		display: block;
+		aspect-ratio: 4 / 3;
+		background-size: cover;
+		background-position: center;
+		border-bottom: 1px solid var(--border);
+	}
+	.rank {
+		position: absolute;
+		top: 10px;
+		left: 10px;
+		min-width: 28px;
+		height: 28px;
+		border-radius: 999px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-weight: 800;
+		font-size: 0.9em;
+		color: var(--bg);
+		background: var(--accent);
+		transform: scale(0);
+		transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+	.opt.picked .rank {
+		transform: scale(1);
+	}
+	.meta {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2em;
+		padding: 0.8em 1em 0.95em 1em;
+	}
+	.label {
+		font-weight: 700;
+	}
+	.note {
+		color: var(--muted-dim);
+		font-size: 0.85em;
+		line-height: 1.4;
+	}
+
+	/* ---------- actions ---------- */
+	.actions {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1em;
+		flex-wrap: wrap;
+		margin-top: 1.8em;
+		padding-top: 1.4em;
+		border-top: 1px solid var(--border);
+	}
+	.hint {
+		margin: 0;
+		color: var(--muted);
+		font-size: 0.92em;
+	}
+	.action-btns {
+		display: flex;
+		gap: 0.7em;
+	}
+	.submit {
+		font: inherit;
+		font-weight: 700;
+		padding: 0.75em 1.7em;
+		border: none;
+		border-radius: 999px;
+		color: var(--bg);
+		background: var(--fg);
+		transition: background 0.15s, opacity 0.15s;
+	}
+	.submit:hover:not(:disabled) {
+		background: var(--accent);
+	}
+	.submit:disabled {
+		opacity: 0.35;
+	}
+	.ghost {
+		font: inherit;
+		padding: 0.75em 1.2em;
+		color: var(--muted);
+		background: none;
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		transition: color 0.15s, border-color 0.15s;
+	}
+	.ghost:hover {
+		color: var(--fg);
+		border-color: var(--accent);
+	}
+	.ghost[hidden] {
+		display: none;
+	}
+	.peek {
+		margin: 1.2em 0 0 0;
+	}
+	.link {
+		font: inherit;
+		font-size: 0.88em;
+		padding: 0;
+		color: var(--muted-dim);
+		background: none;
+		border: none;
+		text-decoration: underline;
+		text-underline-offset: 3px;
+	}
+	.link:hover {
+		color: var(--fg);
+	}
+	.error {
+		color: #e5604d;
+		font-size: 0.9em;
+		margin: 1em 0 0 0;
+	}
+
+	/* ---------- results ---------- */
+	.results-title {
+		margin: 0 0 0.4em 0;
+	}
+	.thanks {
+		color: var(--accent);
+		font-weight: 600;
+		margin: 0 0 1em 0;
+	}
+	.results {
+		list-style: none;
+		padding: 0;
+		margin: 1.2em 0 0 0;
+		display: grid;
+		gap: 0.8em;
+	}
+	.results :global(.res) {
+		display: grid;
+		grid-template-columns: 1.6em 110px 1fr;
+		align-items: center;
+		gap: 1em;
+		padding: 0.8em 1em;
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+	}
+	.results :global(.res.mine) {
+		border-color: var(--accent);
+	}
+	.results :global(.pos) {
+		color: var(--muted-dim);
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
+		text-align: center;
+	}
+	.results :global(.thumb) {
+		aspect-ratio: 4 / 3;
+		background-size: cover;
+		background-position: center;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+	}
+	.results :global(.body) {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45em;
+		min-width: 0;
+	}
+	.results :global(.top) {
+		display: flex;
+		justify-content: space-between;
+		gap: 1em;
+		align-items: baseline;
+	}
+	.results :global(.pts) {
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	.results :global(.bar) {
+		display: block;
+		height: 8px;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--fg) 10%, transparent);
+		overflow: hidden;
+	}
+	.results :global(.fill) {
+		display: block;
+		height: 100%;
+		border-radius: 999px;
+		background: var(--accent);
+		transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+	.results :global(.sub) {
+		color: var(--muted-dim);
+		font-size: 0.82em;
+	}
+	.results :global(.foot) {
+		color: var(--muted-dim);
+		font-size: 0.85em;
+		margin: 1.2em 0 0 0;
+	}
+	.results :global(.res .label) {
+		font-weight: 700;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	@media (max-width: 560px) {
+		.results :global(.res) {
+			grid-template-columns: 1.4em 76px 1fr;
+			gap: 0.7em;
+		}
+	}
+</style>
