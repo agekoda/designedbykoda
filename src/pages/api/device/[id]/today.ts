@@ -100,7 +100,24 @@ export async function GET({ params, request, locals }) {
 	if (!device.user_id) {
 		// A specific, distinct error the firmware can check for — this is
 		// the "show the pairing code again" case, not a generic failure.
-		return json({ error: 'not_paired' }, 403);
+		// Also sends the code the device should be showing: after an
+		// unpair, or once the original code has expired, the device's own
+		// stored copy is stale, so it gets a current one here.
+		let pairingCode: string | null = null;
+		try {
+			const nowS = Math.floor(Date.now() / 1000);
+			const row = await db
+				.prepare('SELECT pairing_code, pairing_code_expires_at FROM devices WHERE id = ?')
+				.bind(deviceId)
+				.first();
+			if (row?.pairing_code && row.pairing_code_expires_at > nowS) {
+				pairingCode = row.pairing_code;
+			} else {
+				const { issuePairingCode } = await import('../../../../lib/pairing');
+				pairingCode = await issuePairingCode(db, deviceId, nowS);
+			}
+		} catch {}
+		return json({ error: 'not_paired', pairingCode }, 403);
 	}
 
 	const user = await db
@@ -162,6 +179,19 @@ export async function GET({ params, request, locals }) {
 	} catch {
 		calendarIds = [];
 	}
+	// Per-device settings (set on the device dashboard) win over the
+	// account-level ones. Separate query so a missing column (migration not
+	// run yet) just means "use the account's".
+	let deviceStyle: string | null = null;
+	try {
+		const ds = await db
+			.prepare('SELECT calendar_style, selected_calendar_ids FROM devices WHERE id = ?')
+			.bind(deviceId)
+			.first();
+		deviceStyle = ds?.calendar_style || null;
+		const own = JSON.parse(ds?.selected_calendar_ids || '[]');
+		if (Array.isArray(own) && own.length) calendarIds = own;
+	} catch {}
 	if (calendarIds.length === 0) calendarIds = ['primary'];
 
 	console.log(
@@ -263,6 +293,7 @@ export async function GET({ params, request, locals }) {
 		const row = await db.prepare('SELECT calendar_style FROM users WHERE id = ?').bind(device.user_id).first();
 		if (row?.calendar_style) style = row.calendar_style;
 	} catch {}
+	if (deviceStyle) style = deviceStyle;
 
 	await db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(now, deviceId).run();
 
