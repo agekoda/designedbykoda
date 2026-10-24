@@ -111,6 +111,13 @@ if (!userId) return Astro.redirect('/setup');
 					${styles.map((s) => `<label class="mini"><input type="radio" name="style-${esc(d.id)}" value="${s.id}" ${s.id === d.style ? 'checked' : ''} /><span class="mini-card"><span class="mini-img" style="background-image:url(${s.image})"></span><span class="mini-name">${s.label}</span></span></label>`).join('')}
 				</div>
 
+				<div class="label">Display</div>
+				<label class="switch">
+					<input type="checkbox" data-dark ${d.dark ? 'checked' : ''} />
+					<span class="track" aria-hidden="true"></span>
+					<span class="switch-text">Dark mode <small>white on black</small></span>
+				</label>
+
 				<div class="label">Calendars</div>
 				<div class="cal-list" data-cals><p class="muted small">Loading calendars…</p></div>
 
@@ -129,6 +136,21 @@ if (!userId) return Astro.redirect('/setup');
 		const note = el.querySelector('[data-note]') as HTMLElement;
 		const setPreview = (id: string) => (preview.style.backgroundImage = `url(${styleById(id).image})`);
 		setPreview(d.style);
+
+		// dark mode: saves immediately; previews flip to white-on-black
+		const darkBox = el.querySelector('[data-dark]') as HTMLInputElement;
+		const paintDark = () => el.querySelectorAll('[data-preview], .mini-img').forEach((n) => n.classList.toggle('is-dark', darkBox.checked));
+		paintDark();
+		darkBox.addEventListener('change', async () => {
+			paintDark();
+			const res = await post('/api/dashboard/devices', { deviceId: d.id, dark: darkBox.checked });
+			if (res.ok) flash(note, 'Saved. Press the button on your calendar to see it now.');
+			else {
+				darkBox.checked = !darkBox.checked;
+				paintDark();
+				flash(note, res.error || 'Could not save.', true);
+			}
+		});
 
 		// name: saves when you leave the box or press Enter
 		const nameInput = el.querySelector('.dev-name') as HTMLInputElement;
@@ -336,6 +358,15 @@ if (!userId) return Astro.redirect('/setup');
 	.dash .note.show { opacity: 1; }
 	.dash .note.is-error { color: #e08a8a; }
 	.dash .dev-foot { margin-top: 1.2em; padding-top: 1em; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 0.8em; flex-wrap: wrap; }
+	.dash .switch { display: inline-flex; align-items: center; gap: 0.8em; color: var(--fg); font-size: 0.95em; }
+	.dash .switch input { position: absolute; opacity: 0; pointer-events: none; }
+	.dash .switch .track { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 999px; background: var(--border); position: relative; transition: background 0.2s; }
+	.dash .switch .track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--fg); transition: transform 0.2s, background 0.2s; }
+	.dash .switch input:checked + .track { background: var(--accent); }
+	.dash .switch input:checked + .track::after { transform: translateX(18px); background: var(--bg); }
+	.dash .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.dash .switch small { color: var(--muted); margin-left: 0.4em; }
+	.dash .is-dark { filter: invert(1) hue-rotate(180deg) contrast(1.05); }
 	.dash .weather-hint { margin-top: 0.6em; }
 	.dash .confirm-text { color: var(--muted); font-size: 0.9em; margin: 0; }
 

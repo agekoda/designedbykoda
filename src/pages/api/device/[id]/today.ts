@@ -306,6 +306,14 @@ export async function GET({ params, request, locals }) {
 		}
 	} catch {}
 
+	// Dark mode (white on black), from schema-darkmode.sql. Its own query so a
+	// missing column never affects anything else.
+	let dark = false;
+	try {
+		const dm = await db.prepare('SELECT dark_mode FROM devices WHERE id = ?').bind(deviceId).first();
+		dark = dm?.dark_mode === 1;
+	} catch {}
+
 	await db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(now, deviceId).run();
 
 	return json(
@@ -314,6 +322,7 @@ export async function GET({ params, request, locals }) {
 			refreshIntervalSec: device.refresh_interval_sec || 86400,
 			style,
 			view: viewForStyle(style),
+			...(dark ? { dark: true } : {}),
 			...(weather ? { weatherHigh: weather.high, weatherLow: weather.low } : {}),
 			events: trimmedEvents,
 		},

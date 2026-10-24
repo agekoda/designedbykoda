@@ -35,6 +35,11 @@ export async function GET({ request, locals }) {
 	// Weather location lives in columns from schema-weather.sql; read
 	// separately so the dashboard still loads before that migration is run.
 	const locs = new Map<string, { name: string; lat: number; lon: number }>();
+	const dark = new Set<string>();
+	try {
+		const dr = await db.prepare('SELECT id FROM devices WHERE user_id = ? AND dark_mode = 1').bind(userId).all();
+		for (const d of dr.results ?? []) dark.add(d.id);
+	} catch {} // dark_mode column comes from schema-darkmode.sql
 	try {
 		const lr = await db
 			.prepare('SELECT id, weather_name, weather_lat, weather_lon FROM devices WHERE user_id = ? AND weather_lat IS NOT NULL')
@@ -52,6 +57,7 @@ export async function GET({ request, locals }) {
 		createdAt: d.created_at ?? null,
 		refreshIntervalSec: d.refresh_interval_sec || 86400,
 		location: locs.get(d.id) ?? null,
+		dark: dark.has(d.id),
 	}));
 	return json({ devices }, 200);
 }
@@ -107,12 +113,21 @@ export async function POST({ request, locals }) {
 			vals.push(name, lat, lon);
 		}
 	}
-	if (!sets.length) return json({ ok: true }, 200);
-
-	try {
-		await db.prepare(`UPDATE devices SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`).bind(...vals, deviceId, userId).run();
-	} catch {
-		return json({ error: 'Device settings are not enabled on the server yet.' }, 500);
+	if (sets.length) {
+		try {
+			await db.prepare(`UPDATE devices SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`).bind(...vals, deviceId, userId).run();
+		} catch {
+			return json({ error: 'Device settings are not enabled on the server yet.' }, 500);
+		}
+	}
+	// Dark mode has its own column/migration, so a missing one only fails this part.
+	if (body.dark !== undefined) {
+		if (typeof body.dark !== 'boolean') return json({ error: 'Invalid dark mode value.' }, 400);
+		try {
+			await db.prepare('UPDATE devices SET dark_mode = ? WHERE id = ? AND user_id = ?').bind(body.dark ? 1 : 0, deviceId, userId).run();
+		} catch {
+			return json({ error: 'Dark mode is not enabled on the server yet.' }, 500);
+		}
 	}
 	return json({ ok: true }, 200);
 }

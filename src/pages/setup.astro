@@ -131,6 +131,11 @@ if (userId && hasDevice && !addingDevice) {
 									</label>
 								))}
 							</div>
+							<label class="switch">
+								<input type="checkbox" id="dark-mode" />
+								<span class="track" aria-hidden="true"></span>
+								<span class="switch-text">Dark mode <small>white on black</small></span>
+							</label>
 							<p class="msg" id="style-message" aria-live="polite" />
 							<div class="row">
 								<button type="button" class="btn ghost" data-back>Back</button>
@@ -321,13 +326,20 @@ if (userId && hasDevice && !addingDevice) {
 		});
 
 		/* ---- style ---- */
+		const darkBox = document.getElementById('dark-mode') as HTMLInputElement;
+		const stylesGrid = page.querySelector('.styles') as HTMLElement;
+		darkBox.addEventListener('change', () => stylesGrid.classList.toggle('is-dark', darkBox.checked));
 		const saveStyle = document.getElementById('save-style') as HTMLButtonElement;
 		const styleMsg = document.getElementById('style-message')!;
 		saveStyle.addEventListener('click', async () => {
 			const chosen = page.querySelector<HTMLInputElement>('input[name="style"]:checked');
 			saveStyle.disabled = true;
 			setMsg(styleMsg, '');
-			const r = await post('/api/dashboard/devices', { deviceId, style: chosen ? chosen.value : 'agenda' });
+			const r = await post('/api/dashboard/devices', {
+				deviceId,
+				style: chosen ? chosen.value : 'agenda',
+				dark: (document.getElementById('dark-mode') as HTMLInputElement).checked,
+			});
 			saveStyle.disabled = false;
 			if (r.ok) show('weather');
 			else setMsg(styleMsg, r.error || 'Something went wrong.', true);
@@ -571,6 +583,23 @@ if (userId && hasDevice && !addingDevice) {
 	.setup-page .style-name { font-weight: 700; color: var(--fg); font-size: clamp(0.95em, 1.2vw, 1.25em); }
 	.setup-page .style-note { color: var(--muted); font-size: clamp(0.78em, 0.95vw, 1em); line-height: 1.35; }
 
+	/* dark mode switch + dark previews */
+	.setup-page .switch, .dash .switch { display: inline-flex; align-items: center; gap: 0.8em; color: var(--fg); font-size: 0.95em; }
+	.setup-page .switch { margin-top: 1.4em; }
+	.setup-page .switch input, .dash .switch input { position: absolute; opacity: 0; pointer-events: none; }
+	.setup-page .switch .track, .dash .switch .track {
+		flex: 0 0 auto; width: 44px; height: 26px; border-radius: 999px; background: var(--border);
+		position: relative; transition: background 0.2s;
+	}
+	.setup-page .switch .track::after, .dash .switch .track::after {
+		content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+		background: var(--fg); transition: transform 0.2s, background 0.2s;
+	}
+	.setup-page .switch input:checked + .track, .dash .switch input:checked + .track { background: var(--accent); }
+	.setup-page .switch input:checked + .track::after, .dash .switch input:checked + .track::after { transform: translateX(18px); background: var(--bg); }
+	.setup-page .switch input:focus-visible + .track, .dash .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.setup-page .switch small, .dash .switch small { color: var(--muted); margin-left: 0.4em; }
+	.setup-page .styles.is-dark .style-img, .dash .is-dark { filter: invert(1) hue-rotate(180deg) contrast(1.05); }
 	.setup-page .done-mark {
 		width: 64px;
 		height: 64px;

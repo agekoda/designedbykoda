@@ -19,6 +19,9 @@ export async function releaseDevice(db: any, deviceId: string, userId: string): 
 	try {
 		await db.prepare('UPDATE devices SET weather_name = NULL, weather_lat = NULL, weather_lon = NULL WHERE id = ?').bind(deviceId).run();
 	} catch {}
+	try {
+		await db.prepare('UPDATE devices SET dark_mode = NULL WHERE id = ?').bind(deviceId).run();
+	} catch {}
 	await issuePairingCode(db, deviceId, Math.floor(Date.now() / 1000));
 	return true;
 }
