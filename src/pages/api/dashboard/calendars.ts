@@ -1,5 +1,6 @@
 // Dashboard-only endpoints (session auth, not device auth) for choosing
 // which of the user's Google calendars their device should show.
+import { isStyleId } from '../../../data/calendarStyles';
 export const prerender = false;
 
 async function getAccessToken(userId: string, db: any, clientId: string, clientSecret: string, encryptionKey: string) {
@@ -72,7 +73,14 @@ export async function GET({ request, locals }) {
 		selected = [];
 	}
 
-	return json({ calendars, selected }, 200);
+	// calendar_style may not exist yet if the migration hasn't been run.
+	let style = 'agenda';
+	try {
+		const row = await db.prepare('SELECT calendar_style FROM users WHERE id = ?').bind(userId).first();
+		if (row?.calendar_style) style = row.calendar_style;
+	} catch {}
+
+	return json({ calendars, selected, style }, 200);
 }
 
 export async function POST({ request, locals }) {
@@ -84,20 +92,36 @@ export async function POST({ request, locals }) {
 	const userId = await getSessionUserId(request, db);
 	if (!userId) return json({ error: 'Not logged in.' }, 401);
 
-	let calendarIds: string[];
+	// Either field may be sent on its own: the setup wizard saves the
+	// calendars and the style on different steps.
+	let calendarIds: string[] | null = null;
+	let style: string | null = null;
 	try {
 		const body = await request.json();
-		calendarIds = Array.isArray(body.calendarIds)
-			? body.calendarIds.filter((id: unknown) => typeof id === 'string')
-			: [];
+		if (Array.isArray(body.calendarIds)) {
+			calendarIds = body.calendarIds.filter((id: unknown) => typeof id === 'string');
+		}
+		if (body.style !== undefined) {
+			if (!isStyleId(body.style)) return json({ error: 'Unknown style.' }, 400);
+			style = body.style;
+		}
 	} catch {
 		return json({ error: 'Invalid request.' }, 400);
 	}
 
-	await db
-		.prepare('UPDATE users SET selected_calendar_ids = ? WHERE id = ?')
-		.bind(JSON.stringify(calendarIds), userId)
-		.run();
+	if (calendarIds) {
+		await db
+			.prepare('UPDATE users SET selected_calendar_ids = ? WHERE id = ?')
+			.bind(JSON.stringify(calendarIds), userId)
+			.run();
+	}
+	if (style) {
+		try {
+			await db.prepare('UPDATE users SET calendar_style = ? WHERE id = ?').bind(style, userId).run();
+		} catch {
+			return json({ error: 'Layouts are not enabled on the server yet.' }, 500);
+		}
+	}
 
 	return json({ ok: true }, 200);
 }

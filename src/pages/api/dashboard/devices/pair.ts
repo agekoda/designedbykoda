@@ -35,6 +35,9 @@ export async function POST({ request, locals }) {
 	if (!device) {
 		return json({ error: 'No device found with that pairing code.' }, 404);
 	}
+	if (device.user_id === userId) {
+		return json({ ok: true, deviceId: device.id }, 200);
+	}
 	if (device.user_id) {
 		return json({ error: 'This device is already paired to an account.' }, 409);
 	}

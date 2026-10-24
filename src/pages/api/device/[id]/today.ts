@@ -3,6 +3,7 @@
 // needed, computing "today" correctly in the user's actual timezone
 // (handling DST automatically via Intl, which an ESP32 could never do on
 // its own), and returning a small, pre-formatted payload.
+import { viewForStyle } from '../../../../data/calendarStyles';
 export const prerender = false;
 
 function getCookielessAuthSecret(request: Request): string | null {
@@ -254,12 +255,23 @@ export async function GET({ params, request, locals }) {
 	const trimmedEvents = allEvents.slice(0, 15);
 	console.log(`Total events after merging all calendars: ${allEvents.length}, sending ${trimmedEvents.length}`);
 
+	// Which layout the person picked in setup. Separate query + try/catch so
+	// a missing column (migration not run yet) falls back to Agenda instead
+	// of breaking every device.
+	let style = 'agenda';
+	try {
+		const row = await db.prepare('SELECT calendar_style FROM users WHERE id = ?').bind(device.user_id).first();
+		if (row?.calendar_style) style = row.calendar_style;
+	} catch {}
+
 	await db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(now, deviceId).run();
 
 	return json(
 		{
 			utcOffsetSec: offsetSec,
 			refreshIntervalSec: device.refresh_interval_sec || 86400,
+			style,
+			view: viewForStyle(style),
 			events: trimmedEvents,
 		},
 		200

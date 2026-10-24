@@ -8,12 +8,23 @@ export const prerender = false;
 // }
 import Layout from '../layouts/Layout.astro';
 import { getSessionUserId } from '../lib/session';
+import { CALENDAR_STYLES, DEFAULT_STYLE } from '../data/calendarStyles';
 
 const env = Astro.locals.runtime?.env ?? {};
 const db = env.DB;
 let userId: string | null = null;
 if (db) {
 	userId = await getSessionUserId(Astro.request, db);
+}
+
+// Someone who already paired a device (e.g. coming back to change their
+// layout) skips straight past the pairing step.
+let hasDevice = false;
+if (db && userId) {
+	try {
+		const row = await db.prepare('SELECT 1 AS x FROM devices WHERE user_id = ? LIMIT 1').bind(userId).first();
+		hasDevice = !!row;
+	} catch {}
 }
 
 // If this page was reached by scanning the device's QR code, carry the
@@ -29,329 +40,499 @@ const signInHref = incomingCode
 	title="Device setup — designedbykoda"
 	description="Connect your Google Calendar and pair your E-Ink Calendar."
 >
-	<div class="setup-page">
-		<h1>Set up your E-Ink Calendar</h1>
+	<div class="setup-page" data-signed-in={userId ? '1' : '0'} data-has-device={hasDevice ? '1' : '0'}>
+		<div class="wizard">
+			{userId && (
+				<ol class="dots" aria-hidden="true">
+					<li></li><li></li><li></li><li></li><li></li>
+				</ol>
+			)}
 
-		{
-			!userId ? (
-				<div class="setup-card">
-					<p>Sign in with Google to connect your calendar.</p>
-					<a class="button" data-magnetic href={signInHref}>
-						Sign in with Google
-					</a>
-				</div>
-			) : (
-				<>
-					<div class="setup-card">
-						<p>
-							Enter the pairing code shown on your device's screen — it's under "Almost
-							there!" on the display.
+			{
+				!userId ? (
+					<section class="step is-active" data-step="signin">
+						<div class="step-kicker">Step 1</div>
+						<div class="step-title">Sign in with Google</div>
+						<p class="step-text">
+							This lets your calendar read your events. We only ever read them, never change
+							anything.
 						</p>
-						<form id="pair-form" novalidate>
-							<label for="pairing-code" class="sr-only">Pairing code</label>
-							<input
-								type="text"
-								id="pairing-code"
-								placeholder="XXXXXX"
-								maxlength="6"
-								autocomplete="off"
-								autocapitalize="characters"
-								required
-							/>
-						<button type="submit" data-magnetic>Pair device</button>
-					</form>
-					<p id="pair-message" aria-live="polite"></p>
-					</div>
+						<a class="btn" data-magnetic href={signInHref}>
+							Sign in with Google
+						</a>
+					</section>
+				) : (
+					<>
+						<section class="step" data-step="pair">
+							<div class="step-kicker">Step 2</div>
+							<div class="step-title">Enter your pairing code</div>
+							<p class="step-text">
+								It's on your calendar's screen, under "Almost there!". Or scan the QR code and
+								it fills in by itself.
+							</p>
+							<form id="pair-form" novalidate>
+								<label for="pairing-code" class="sr-only">Pairing code</label>
+								<input
+									type="text"
+									id="pairing-code"
+									placeholder="XXXXXX"
+									maxlength="6"
+									autocomplete="off"
+									autocapitalize="characters"
+									spellcheck="false"
+									required
+								/>
+								<button type="submit" class="btn" data-magnetic>Pair device</button>
+							</form>
+							<p class="msg" id="pair-message" aria-live="polite" />
+							<button type="button" class="link" id="skip-pair">I've already paired</button>
+						</section>
 
-					<div class="setup-card">
-						<p>Which calendar(s) should your device show?</p>
-						<div id="calendar-list">
-							<p class="loading-text">Loading your calendars…</p>
-						</div>
-						<button type="button" id="save-calendars" data-magnetic disabled>
-							Save
-						</button>
-						<p id="calendar-message" aria-live="polite"></p>
-					</div>
-				</>
-			)
-		}
+						<section class="step" data-step="calendars">
+							<div class="step-kicker">Step 3</div>
+							<div class="step-title">Pick your calendars</div>
+							<p class="step-text">Choose which ones your calendar should show.</p>
+							<div id="calendar-list" class="cal-list">
+								<p class="loading-text">Loading your calendars…</p>
+							</div>
+							<p class="msg" id="calendar-message" aria-live="polite" />
+							<div class="row">
+								<button type="button" class="btn ghost" data-back>Back</button>
+								<button type="button" class="btn" id="save-calendars" data-magnetic disabled>
+									Continue
+								</button>
+							</div>
+						</section>
+
+						<section class="step" data-step="style">
+							<div class="step-kicker">Step 4</div>
+							<div class="step-title">Choose a layout</div>
+							<p class="step-text">
+								You can change this any time. Your times automatically follow your Google
+								Calendar's timezone, so there's nothing to set.
+							</p>
+							<div class="styles" role="radiogroup" aria-label="Calendar layout">
+								{CALENDAR_STYLES.map((st) => (
+									<label class="style-opt">
+										<input type="radio" name="style" value={st.id} checked={st.id === DEFAULT_STYLE} />
+										<span class="style-card">
+											<span class="style-img" style={`background-image:url(${st.image})`} />
+											<span class="style-name">{st.label}</span>
+											<span class="style-note">{st.note}</span>
+										</span>
+									</label>
+								))}
+							</div>
+							<p class="msg" id="style-message" aria-live="polite" />
+							<div class="row">
+								<button type="button" class="btn ghost" data-back>Back</button>
+								<button type="button" class="btn" id="save-style" data-magnetic>
+									Finish
+								</button>
+							</div>
+						</section>
+
+						<section class="step" data-step="done">
+							<div class="done-mark" aria-hidden="true">✓</div>
+							<div class="step-title">You're all set</div>
+							<p class="step-text">
+								Your calendar will pick up your events and layout the next time it refreshes.
+								To refresh it right now, press the button on the back.
+							</p>
+							<button type="button" class="link" id="change-again">Change something</button>
+						</section>
+					</>
+				)
+			}
+		</div>
 	</div>
 </Layout>
 
 <script>
-	// Fire-and-forget: the browser already knows the real timezone
-	// precisely, no reason to ask the person to pick one manually. This
-	// runs on every visit to /setup while logged in, keeping it correct
-	// even if someone travels or their system timezone changes later.
-	const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-	if (detectedTimezone) {
-		fetch('/api/dashboard/timezone', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ timezone: detectedTimezone }),
-		}).catch(() => {
-			// Non-critical — if this fails, the account just keeps whatever
-			// timezone it already had rather than blocking anything else
-			// on this page from working.
-		});
-	}
+	const page = document.querySelector('.setup-page') as HTMLElement | null;
+	if (page && page.dataset.signedIn === '1') {
+		const order = ['pair', 'calendars', 'style', 'done'];
+		const steps: Record<string, HTMLElement> = {};
+		page.querySelectorAll<HTMLElement>('.step').forEach((el) => (steps[el.dataset.step!] = el));
+		const dots = Array.from(page.querySelectorAll('.dots li'));
+		let current = '';
 
-	const calendarList = document.getElementById('calendar-list');
-	const saveBtn = document.getElementById('save-calendars') as HTMLButtonElement;
-	const calMessage = document.getElementById('calendar-message') as HTMLParagraphElement;
-
-	if (calendarList && saveBtn) {
-		fetch('/api/dashboard/calendars')
-			.then((res) => res.json())
-			.then((data) => {
-				if (!data.calendars || data.calendars.length === 0) {
-					calendarList.innerHTML = '<p class="loading-text">No calendars found.</p>';
-					return;
-				}
-				calendarList.innerHTML = data.calendars
-					.map((cal: any) => {
-						const checked = data.selected.includes(cal.id) ? 'checked' : '';
-						const label = cal.primary ? `${cal.summary} (primary)` : cal.summary;
-						return `<label class="calendar-item">
-							<input type="checkbox" value="${cal.id}" ${checked} />
-							<span>${label}</span>
-						</label>`;
-					})
-					.join('');
-				saveBtn.disabled = false;
-			})
-			.catch(() => {
-				calendarList.innerHTML = '<p class="loading-text">Could not load calendars.</p>';
+		function show(name: string) {
+			current = name;
+			for (const k of order) steps[k].classList.toggle('is-active', k === name);
+			const i = order.indexOf(name);
+			dots.forEach((d, n) => {
+				// dot 0 is the sign-in step, already done by the time we get here
+				d.classList.toggle('on', n <= i + 1);
+				d.classList.toggle('now', n === i + 1);
 			});
+			(page!.querySelector('.dots') as HTMLElement).style.visibility = name === 'done' ? 'hidden' : 'visible';
+			const focusEl = steps[name].querySelector<HTMLElement>('input[type="text"], .btn:not(.ghost)');
+			if (focusEl && name === 'pair') setTimeout(() => focusEl.focus({ preventScroll: true }), 250);
+		}
 
-		saveBtn.addEventListener('click', async () => {
-			const checked = calendarList.querySelectorAll('input[type="checkbox"]:checked');
-			const calendarIds = Array.from(checked).map((el) => (el as HTMLInputElement).value);
+		page.querySelectorAll('[data-back]').forEach((b) =>
+			b.addEventListener('click', () => {
+				const i = order.indexOf(current);
+				if (i > 0) show(order[i - 1]);
+			})
+		);
 
-			saveBtn.disabled = true;
-			calMessage.textContent = '';
-			calMessage.classList.remove('is-error');
+		// Browser timezone is only a fallback; the server uses the timezone
+		// Google Calendar itself reports on every refresh.
+		const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		if (tz) {
+			fetch('/api/dashboard/timezone', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ timezone: tz }),
+			}).catch(() => {});
+		}
 
+		async function post(url: string, body: unknown) {
 			try {
-				const res = await fetch('/api/dashboard/calendars', {
+				const res = await fetch(url, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ calendarIds }),
+					body: JSON.stringify(body),
 				});
 				const data = await res.json().catch(() => ({}));
-				if (res.ok && data.ok) {
-					calMessage.textContent = 'Saved.';
-				} else {
-					calMessage.textContent = data.error || 'Something went wrong.';
-					calMessage.classList.add('is-error');
-				}
+				return { ok: res.ok && data.ok, error: data.error as string | undefined };
 			} catch {
-				calMessage.textContent = 'Something went wrong.';
-				calMessage.classList.add('is-error');
+				return { ok: false, error: undefined };
 			}
-			saveBtn.disabled = false;
-		});
-	}
-
-	const form = document.getElementById('pair-form');
-	if (form) {
-		const input = document.getElementById('pairing-code') as HTMLInputElement;
-		const button = form.querySelector('button') as HTMLButtonElement;
-		const message = document.getElementById('pair-message') as HTMLParagraphElement;
-
-		// Scanning the QR code on the device's own pairing screen links here
-		// with ?code=XXXXXX already attached — pre-fill it so scanning
-		// really does mean "one tap to pair" instead of retyping what's
-		// already right there on the screen. Not auto-submitted, since a
-		// scan isn't necessarily "yes, pair this right now."
-		const params = new URLSearchParams(window.location.search);
-		const prefilledCode = params.get('code');
-		if (prefilledCode) {
-			input.value = prefilledCode.toUpperCase();
 		}
+		function setMsg(el: HTMLElement, text: string, err = false) {
+			el.textContent = text;
+			el.classList.toggle('is-error', err);
+		}
+		const esc = (v: string) =>
+			v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+		/* ---- pairing ---- */
+		const form = document.getElementById('pair-form') as HTMLFormElement;
+		const input = document.getElementById('pairing-code') as HTMLInputElement;
+		const pairBtn = form.querySelector('button') as HTMLButtonElement;
+		const pairMsg = document.getElementById('pair-message') as HTMLElement;
+		const prefilled = new URLSearchParams(location.search).get('code');
+		if (prefilled) input.value = prefilled.toUpperCase();
 
 		form.addEventListener('submit', async (e) => {
 			e.preventDefault();
 			const code = input.value.trim().toUpperCase();
 			if (!code) return;
-
-			button.disabled = true;
-			input.disabled = true;
-			button.textContent = 'Pairing…';
-			message.textContent = '';
-			message.classList.remove('is-error');
-
-			try {
-				const res = await fetch('/api/dashboard/devices/pair', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ pairingCode: code }),
-				});
-				const data = await res.json().catch(() => ({}));
-
-				if (res.ok && data.ok) {
-					form.style.display = 'none';
-					message.textContent =
-						"Device paired! It'll pick up your calendar on its next refresh.";
-				} else {
-					message.textContent = data.error || 'Something went wrong — try again.';
-					message.classList.add('is-error');
-					button.disabled = false;
-					input.disabled = false;
-					button.textContent = 'Pair device';
-				}
-			} catch {
-				message.textContent = 'Something went wrong — try again.';
-				message.classList.add('is-error');
-				button.disabled = false;
-				input.disabled = false;
-				button.textContent = 'Pair device';
-			}
+			pairBtn.disabled = input.disabled = true;
+			pairBtn.textContent = 'Pairing…';
+			setMsg(pairMsg, '');
+			const r = await post('/api/dashboard/devices/pair', { pairingCode: code });
+			pairBtn.disabled = input.disabled = false;
+			pairBtn.textContent = 'Pair device';
+			if (r.ok) show('calendars');
+			else setMsg(pairMsg, r.error || 'Something went wrong. Try again.', true);
 		});
+		document.getElementById('skip-pair')!.addEventListener('click', () => show('calendars'));
+
+		/* ---- calendars ---- */
+		const list = document.getElementById('calendar-list')!;
+		const saveCals = document.getElementById('save-calendars') as HTMLButtonElement;
+		const calMsg = document.getElementById('calendar-message')!;
+
+		fetch('/api/dashboard/calendars')
+			.then((r) => r.json())
+			.then((data) => {
+				if (data.style) {
+					const radio = page.querySelector<HTMLInputElement>(`input[name="style"][value="${data.style}"]`);
+					if (radio) radio.checked = true;
+				}
+				if (!data.calendars || !data.calendars.length) {
+					list.innerHTML = '<p class="loading-text">No calendars found.</p>';
+					return;
+				}
+				list.innerHTML = data.calendars
+					.map((c: any) => {
+						const on = data.selected.includes(c.id) || (!data.selected.length && c.primary);
+						return `<label class="cal-opt"><input type="checkbox" value="${esc(c.id)}" ${on ? 'checked' : ''} /><span class="box" aria-hidden="true"></span><span class="cal-name">${esc(c.summary)}${c.primary ? ' <em>primary</em>' : ''}</span></label>`;
+					})
+					.join('');
+				saveCals.disabled = false;
+			})
+			.catch(() => {
+				list.innerHTML = '<p class="loading-text">Could not load calendars.</p>';
+			});
+
+		saveCals.addEventListener('click', async () => {
+			const ids = Array.from(list.querySelectorAll<HTMLInputElement>('input:checked')).map((el) => el.value);
+			saveCals.disabled = true;
+			setMsg(calMsg, '');
+			const r = await post('/api/dashboard/calendars', { calendarIds: ids });
+			saveCals.disabled = false;
+			if (r.ok) show('style');
+			else setMsg(calMsg, r.error || 'Something went wrong.', true);
+		});
+
+		/* ---- style ---- */
+		const saveStyle = document.getElementById('save-style') as HTMLButtonElement;
+		const styleMsg = document.getElementById('style-message')!;
+		saveStyle.addEventListener('click', async () => {
+			const chosen = page.querySelector<HTMLInputElement>('input[name="style"]:checked');
+			saveStyle.disabled = true;
+			setMsg(styleMsg, '');
+			const r = await post('/api/dashboard/calendars', { style: chosen ? chosen.value : 'agenda' });
+			saveStyle.disabled = false;
+			if (r.ok) show('done');
+			else setMsg(styleMsg, r.error || 'Something went wrong.', true);
+		});
+
+		document.getElementById('change-again')!.addEventListener('click', () => show('calendars'));
+
+		show(page.dataset.hasDevice === '1' && !prefilled ? 'calendars' : 'pair');
 	}
 </script>
 
-<style>
+<style is:global>
 	.setup-page {
-		max-width: 520px;
-		margin: 0 auto;
+		min-height: calc(100svh - 230px);
+		display: grid;
+		place-items: center;
 		padding: 2em 0;
 	}
-	.setup-page h1 {
-		margin-bottom: 0.6em;
+	.setup-page .wizard {
+		width: 100%;
+		max-width: 860px;
+		display: grid;
+		justify-items: center;
+		text-align: center;
 	}
-	.setup-card {
-		padding: 1.5em 1.6em;
-		background: var(--bg-raised);
-		border: 1px solid var(--border);
-		border-radius: 14px;
-		margin-bottom: 1.2em;
-	}
-	.setup-card p {
-		color: var(--muted);
-		margin: 0 0 1.2em 0;
-	}
-	.loading-text {
-		font-size: 0.9em;
-	}
-	#calendar-list {
+	.setup-page .dots {
 		display: flex;
-		flex-direction: column;
-		gap: 0.6em;
-		margin-bottom: 1.2em;
+		gap: 8px;
+		list-style: none;
+		margin: 0 0 2.2em;
+		padding: 0;
 	}
-	.calendar-item {
-		display: flex;
-		align-items: center;
-		gap: 0.6em;
+	.setup-page .dots li {
+		width: 28px;
+		height: 4px;
+		border-radius: 4px;
+		background: var(--border);
+		transition: background 0.3s, width 0.3s;
+	}
+	.setup-page .dots li.on { background: var(--accent-dark); }
+	.setup-page .dots li.now { background: var(--accent); width: 44px; }
+
+	.setup-page .step { display: none; width: 100%; }
+	.setup-page .step:not([data-step='style']) { max-width: 520px; margin: 0 auto; }
+	.setup-page .step.is-active {
+		display: block;
+		animation: step-in 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+	}
+	@keyframes step-in {
+		from { opacity: 0; transform: translateY(14px); }
+		to { opacity: 1; transform: none; }
+	}
+	.setup-page .step-kicker {
+		font-size: 0.78em;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--accent);
+		margin-bottom: 0.7em;
+	}
+	.setup-page .step-title {
+		font-size: 1.9em;
+		font-weight: 800;
+		line-height: 1.15;
 		color: var(--fg);
-		font-size: 0.95em;
-		cursor: pointer;
+		margin-bottom: 0.5em;
 	}
-	.calendar-item input {
-		accent-color: var(--accent);
-		width: 16px;
-		height: 16px;
+	.setup-page .step-text {
+		color: var(--muted);
+		margin: 0 auto 1.8em;
+		max-width: 44ch;
 	}
-	#save-calendars {
-		padding: 0.6em 1.3em;
-		border: none;
+	.setup-page .loading-text { color: var(--muted); font-size: 0.9em; margin: 0; }
+
+	.setup-page .btn {
+		display: inline-block;
+		padding: 0.75em 1.7em;
+		border: 1px solid transparent;
 		border-radius: 999px;
 		background: var(--fg);
 		color: var(--bg);
+		font: inherit;
 		font-weight: 700;
-		font-size: 0.9em;
-		font-family: inherit;
-		cursor: pointer;
+		font-size: 0.95em;
+		text-decoration: none;
 	}
-	#save-calendars:hover:not(:disabled) {
-		background: var(--accent);
-	}
-	#save-calendars:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-	#calendar-message {
-		margin: 0.8em 0 0 0;
-		font-size: 0.88em;
+	.setup-page .btn:hover:not(:disabled) { background: var(--accent); color: var(--bg); }
+	.setup-page .btn:disabled { opacity: 0.5; }
+	.setup-page .btn.ghost {
+		background: transparent;
 		color: var(--muted);
+		border-color: var(--border);
 	}
-	#calendar-message.is-error {
-		color: #e08a8a;
+	.setup-page .btn.ghost:hover { color: var(--fg); background: transparent; border-color: var(--muted); }
+	.setup-page .row { display: flex; gap: 0.7em; justify-content: center; margin-top: 1.6em; }
+	.setup-page .link {
+		margin-top: 1.4em;
+		background: none;
+		border: none;
+		padding: 0;
+		color: var(--muted);
+		font: inherit;
+		font-size: 0.88em;
+		text-decoration: underline;
+		text-underline-offset: 3px;
 	}
-	#calendar-message:empty {
-		display: none;
-	}
-	.setup-card form {
+	.setup-page .link:hover { color: var(--fg); }
+
+	.setup-page #pair-form {
 		display: flex;
-		gap: 0.6em;
-		flex-wrap: wrap;
+		flex-direction: column;
+		align-items: center;
+		gap: 1em;
 	}
-	.setup-card input {
-		flex: 1 1 160px;
-		min-width: 0;
-		padding: 0.7em 1em;
-		border-radius: 999px;
+	.setup-page #pairing-code {
+		width: 100%;
+		max-width: 320px;
+		padding: 0.6em 1em;
+		border-radius: 16px;
 		border: 1px solid var(--border);
-		background: var(--bg);
+		background: var(--bg-raised);
 		color: var(--fg);
-		font-family: inherit;
-		font-size: 1.1em;
-		letter-spacing: 0.15em;
+		font: inherit;
+		font-size: 2em;
+		font-weight: 700;
+		letter-spacing: 0.3em;
+		text-indent: 0.3em;
 		text-transform: uppercase;
 		text-align: center;
 	}
-	.setup-card input::placeholder {
-		color: var(--muted-dim);
-		letter-spacing: 0.15em;
+	.setup-page #pairing-code::placeholder { color: var(--muted-dim); }
+	.setup-page #pairing-code:focus { outline: none; border-color: var(--accent); }
+	.setup-page #pairing-code:disabled { opacity: 0.6; }
+
+	.setup-page .msg { margin: 1em 0 0; font-size: 0.92em; color: var(--muted); }
+	.setup-page .msg.is-error { color: #e08a8a; }
+	.setup-page .msg:empty { display: none; }
+
+	/* calendar toggles */
+	.setup-page .cal-list {
+		display: grid;
+		gap: 0.6em;
+		text-align: left;
+		max-height: 46vh;
+		overflow-y: auto;
+		padding: 2px;
 	}
-	.setup-card input:focus {
-		outline: none;
-		border-color: var(--accent-dark);
+	.setup-page .cal-opt {
+		display: flex;
+		align-items: center;
+		gap: 0.9em;
+		padding: 0.9em 1.1em;
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		color: var(--fg);
+		transition: border-color 0.2s, background 0.2s;
 	}
-	.setup-card button {
+	.setup-page .cal-opt:hover { border-color: var(--muted); }
+	.setup-page .cal-opt:has(input:checked) { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.08); }
+	.setup-page .cal-opt input,
+	.setup-page .style-opt input {
+		position: absolute;
+		opacity: 0;
+		pointer-events: none;
+	}
+	.setup-page .cal-opt .box {
 		flex: 0 0 auto;
-		padding: 0.7em 1.4em;
-		border: none;
-		border-radius: 999px;
-		background: var(--fg);
-		color: var(--bg);
-		font-weight: 700;
-		font-size: 0.95em;
-		font-family: inherit;
-		cursor: pointer;
+		width: 22px;
+		height: 22px;
+		border-radius: 7px;
+		border: 2px solid var(--muted-dim);
+		display: grid;
+		place-items: center;
+		transition: background 0.2s, border-color 0.2s;
 	}
-	.setup-card button:hover:not(:disabled) {
-		background: var(--accent);
+	.setup-page .cal-opt .box::after {
+		content: '';
+		width: 6px;
+		height: 11px;
+		border: solid var(--bg);
+		border-width: 0 2.5px 2.5px 0;
+		transform: translateY(-1px) rotate(45deg) scale(0);
+		transition: transform 0.18s;
 	}
-	.setup-card button:disabled,
-	.setup-card input:disabled {
-		opacity: 0.6;
-		cursor: default;
-	}
-	#pair-message {
-		margin: 1em 0 0 0;
-		font-size: 0.92em;
+	.setup-page .cal-opt input:checked + .box { background: var(--accent); border-color: var(--accent); }
+	.setup-page .cal-opt input:checked + .box::after { transform: translateY(-1px) rotate(45deg) scale(1); }
+	.setup-page .cal-opt input:focus-visible + .box { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.setup-page .cal-name { overflow-wrap: anywhere; }
+	.setup-page .cal-name em {
+		font-style: normal;
+		font-size: 0.72em;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 		color: var(--muted);
-	}
-	#pair-message.is-error {
-		color: #e08a8a;
-	}
-	#pair-message:empty {
-		display: none;
-	}
-	.setup-card .button {
-		display: inline-block;
-		padding: 0.7em 1.4em;
+		border: 1px solid var(--border);
 		border-radius: 999px;
-		background: var(--fg);
-		color: var(--bg);
-		font-weight: 700;
-		font-size: 0.95em;
+		padding: 0.15em 0.6em;
+		margin-left: 0.5em;
 	}
-	.setup-card .button:hover {
+
+	/* layout picker */
+	.setup-page .styles {
+		display: grid;
+		grid-template-columns: repeat(5, 1fr);
+		gap: 0.8em;
+		text-align: left;
+	}
+	.setup-page .style-card {
+		display: grid;
+		gap: 0.3em;
+		padding: 0.5em;
+		height: 100%;
+		align-content: start;
+		background: var(--bg-raised);
+		border: 2px solid var(--border);
+		border-radius: 14px;
+		transition: border-color 0.2s, background 0.2s;
+	}
+	.setup-page .style-opt:hover .style-card { border-color: var(--muted); }
+	.setup-page .style-opt input:checked + .style-card {
+		border-color: var(--accent);
+		background: rgba(var(--accent-rgb), 0.08);
+	}
+	.setup-page .style-opt input:focus-visible + .style-card { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.setup-page .style-img {
+		aspect-ratio: 4 / 3;
+		border-radius: 8px;
+		background-size: cover;
+		background-position: center;
+		background-color: #fff;
+	}
+	.setup-page .style-name { font-weight: 700; color: var(--fg); font-size: 0.95em; }
+	.setup-page .style-note { color: var(--muted); font-size: 0.78em; line-height: 1.35; }
+
+	.setup-page .done-mark {
+		width: 64px;
+		height: 64px;
+		margin: 0 auto 1em;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
 		background: var(--accent);
 		color: var(--bg);
+		font-size: 2em;
+		font-weight: 800;
+	}
+
+	/* Only the site's circle cursor on this whole page. */
+	html.has-custom-cursor .setup-page,
+	html.has-custom-cursor .setup-page * { cursor: none !important; }
+
+	@media (max-width: 800px) {
+		.setup-page .styles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+	}
+	@media (max-width: 560px) {
+		.setup-page .step-title { font-size: 1.6em; }
 	}
 </style>
