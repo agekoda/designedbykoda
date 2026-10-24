@@ -300,6 +300,7 @@ const signInHref = incomingCode
 		width: 100%;
 		max-width: 860px;
 		display: grid;
+		grid-template-columns: minmax(0, 1fr);
 		justify-items: center;
 		text-align: center;
 	}
@@ -322,6 +323,16 @@ const signInHref = incomingCode
 
 	.setup-page .step { display: none; width: 100%; }
 	.setup-page .step:not([data-step='style']) { max-width: 520px; margin: 0 auto; }
+	/* The layout step spans the whole screen width, not the centre column. */
+	html:has(.setup-page) { overflow-x: clip; }
+	.setup-page .step[data-step='style'] {
+		justify-self: start;
+		width: 100vw;
+		margin-left: calc(50% - 50vw);
+		padding: 0 clamp(16px, 2.5vw, 48px);
+		box-sizing: border-box;
+	}
+	.setup-page .step[data-step='style'] .step-text { max-width: 60ch; }
 	.setup-page .step.is-active {
 		display: block;
 		animation: step-in 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
@@ -482,13 +493,13 @@ const signInHref = incomingCode
 	.setup-page .styles {
 		display: grid;
 		grid-template-columns: repeat(5, 1fr);
-		gap: 0.8em;
+		gap: clamp(0.8em, 1.4vw, 1.6em);
 		text-align: left;
 	}
 	.setup-page .style-card {
 		display: grid;
 		gap: 0.3em;
-		padding: 0.5em;
+		padding: clamp(0.5em, 0.8vw, 0.9em);
 		height: 100%;
 		align-content: start;
 		background: var(--bg-raised);
@@ -509,8 +520,8 @@ const signInHref = incomingCode
 		background-position: center;
 		background-color: #fff;
 	}
-	.setup-page .style-name { font-weight: 700; color: var(--fg); font-size: 0.95em; }
-	.setup-page .style-note { color: var(--muted); font-size: 0.78em; line-height: 1.35; }
+	.setup-page .style-name { font-weight: 700; color: var(--fg); font-size: clamp(0.95em, 1.2vw, 1.25em); }
+	.setup-page .style-note { color: var(--muted); font-size: clamp(0.78em, 0.95vw, 1em); line-height: 1.35; }
 
 	.setup-page .done-mark {
 		width: 64px;
