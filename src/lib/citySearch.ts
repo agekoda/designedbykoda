@@ -68,9 +68,16 @@ export function createCitySearch(opts: {
 		input.setAttribute('aria-expanded', 'false');
 		active = -1;
 	};
+	const esc = (v: string) => v.replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]!);
+	// "Wattle Grove, NSW, Australia": the place name stays plain, the region
+	// and country after it are bold so look-alike names are easy to tell apart.
+	const fmt = (label: string) => {
+		const i = label.indexOf(', ');
+		return i < 0 ? esc(label) : `${esc(label.slice(0, i))}, <b>${esc(label.slice(i + 2))}</b>`;
+	};
 	const paint = () => {
 		list.innerHTML = items.length
-			? items.map((c, i) => `<li role="option" data-i="${i}" class="${i === active ? 'on' : ''}">${c.label.replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]!)}</li>`).join('')
+			? items.map((c, i) => `<li role="option" data-i="${i}" class="${i === active ? 'on' : ''}">${fmt(c.label)}</li>`).join('')
 			: '<li class="none">No match. Try a bigger nearby city.</li>';
 		list.hidden = false;
 		input.setAttribute('aria-expanded', 'true');
