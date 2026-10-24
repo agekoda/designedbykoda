@@ -1,0 +1,336 @@
+---
+export const prerender = false;
+import Layout from '../layouts/Layout.astro';
+import { getSessionUserId } from '../lib/session';
+import { CALENDAR_STYLES } from '../data/calendarStyles';
+
+const db = Astro.locals.runtime?.env?.DB;
+const userId = db ? await getSessionUserId(Astro.request, db) : null;
+// Not signed in: the setup page is where signing in happens.
+if (!userId) return Astro.redirect('/setup');
+---
+
+<Layout title="My devices — designedbykoda" description="Manage your E-Ink Calendar devices.">
+	<div class="dash" data-styles={JSON.stringify(CALENDAR_STYLES)}>
+		<div class="dash-head">
+			<div>
+				<div class="kicker">Your account</div>
+				<div class="dash-title">My devices</div>
+			</div>
+			<a class="btn" data-magnetic href="/setup?new=1">Add a device</a>
+		</div>
+
+		<div id="devices" class="devices">
+			<p class="muted">Loading your devices…</p>
+		</div>
+
+		<div class="danger">
+			<div class="danger-title">Delete my account</div>
+			<p class="muted">
+				Unpairs every calendar, disconnects Google and removes everything we store about you. Your
+				calendars go back to showing a pairing code.
+			</p>
+			<div id="delete-area">
+				<button type="button" class="link danger-link" id="delete-start">Delete my account and data</button>
+			</div>
+		</div>
+	</div>
+</Layout>
+
+<script>
+	const root = document.querySelector('.dash') as HTMLElement;
+	const styles: { id: string; label: string; image: string }[] = JSON.parse(root.dataset.styles!);
+	const styleById = (id: string) => styles.find((s) => s.id === id) || styles[0];
+	const list = document.getElementById('devices')!;
+
+	const esc = (v: string) =>
+		v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+	async function post(url: string, body: unknown) {
+		try {
+			const res = await fetch(url, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body),
+			});
+			const data = await res.json().catch(() => ({}));
+			return { ok: res.ok && data.ok, error: data.error as string | undefined };
+		} catch {
+			return { ok: false, error: undefined };
+		}
+	}
+
+	function ago(sec: number) {
+		const d = Math.max(0, Math.floor(Date.now() / 1000) - sec);
+		if (d < 90) return 'just now';
+		if (d < 3600) return `${Math.round(d / 60)} min ago`;
+		if (d < 86400) return `${Math.round(d / 3600)} h ago`;
+		return `${Math.round(d / 86400)} d ago`;
+	}
+
+	let allCalendars: { id: string; summary: string; primary: boolean }[] | null = null;
+
+	function flash(el: HTMLElement, text: string, err = false) {
+		el.textContent = text;
+		el.classList.toggle('is-error', err);
+		el.classList.add('show');
+		clearTimeout((el as any)._t);
+		if (!err) (el as any)._t = setTimeout(() => el.classList.remove('show'), 1800);
+	}
+
+	function render(devices: any[]) {
+		if (!devices.length) {
+			list.innerHTML = `<div class="empty"><div class="dev-name-static">No devices yet</div><p class="muted">Pair your first E-Ink Calendar to get started.</p><a class="btn" href="/setup?new=1">Set up a device</a></div>`;
+			return;
+		}
+		list.innerHTML = '';
+		devices.forEach((d, i) => list.appendChild(card(d, i)));
+	}
+
+	function card(d: any, index: number): HTMLElement {
+		const el = document.createElement('article');
+		el.className = 'dev';
+		const interval = d.refreshIntervalSec <= 3600 ? 3600 : 86400;
+		let status = '<span class="dot off"></span>Hasn\'t checked in yet';
+		if (d.lastSeenAt) {
+			const fresh = Date.now() / 1000 - d.lastSeenAt < interval * 2 + 600;
+			status = `<span class="dot ${fresh ? 'on' : 'warn'}"></span>Last active ${ago(d.lastSeenAt)}`;
+		}
+		const paired = d.createdAt ? new Date(d.createdAt * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+		el.innerHTML = `
+			<div class="dev-preview" data-preview></div>
+			<div class="dev-body">
+				<input class="dev-name" maxlength="40" value="${esc(d.name)}" placeholder="E-Ink Calendar${index ? ' ' + (index + 1) : ''}" aria-label="Device name" />
+				<div class="dev-meta">${status}${paired ? `<span class="sep">·</span>Paired ${paired}` : ''}</div>
+
+				<div class="label">Layout</div>
+				<div class="mini-styles" role="radiogroup" aria-label="Layout">
+					${styles.map((s) => `<label class="mini"><input type="radio" name="style-${esc(d.id)}" value="${s.id}" ${s.id === d.style ? 'checked' : ''} /><span class="mini-card"><span class="mini-img" style="background-image:url(${s.image})"></span><span class="mini-name">${s.label}</span></span></label>`).join('')}
+				</div>
+
+				<div class="label">Calendars</div>
+				<div class="cal-list" data-cals><p class="muted small">Loading calendars…</p></div>
+
+				<p class="note" data-note aria-live="polite"></p>
+
+				<div class="dev-foot" data-foot>
+					<button type="button" class="link danger-link" data-unpair>Unpair this device</button>
+				</div>
+			</div>`;
+
+		const preview = el.querySelector('[data-preview]') as HTMLElement;
+		const note = el.querySelector('[data-note]') as HTMLElement;
+		const setPreview = (id: string) => (preview.style.backgroundImage = `url(${styleById(id).image})`);
+		setPreview(d.style);
+
+		// name: saves when you leave the box or press Enter
+		const nameInput = el.querySelector('.dev-name') as HTMLInputElement;
+		let lastName = d.name;
+		const saveName = async () => {
+			const v = nameInput.value.trim();
+			if (v === lastName) return;
+			const r = await post('/api/dashboard/devices', { deviceId: d.id, name: v });
+			if (r.ok) { lastName = v; flash(note, 'Saved'); } else flash(note, r.error || 'Could not save the name.', true);
+		};
+		nameInput.addEventListener('change', saveName);
+		nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') nameInput.blur(); });
+
+		// layout: saves the moment you pick one
+		el.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach((r) =>
+			r.addEventListener('change', async () => {
+				setPreview(r.value);
+				const res = await post('/api/dashboard/devices', { deviceId: d.id, style: r.value });
+				if (res.ok) flash(note, 'Saved. Press the button on your calendar to see it now.');
+				else flash(note, res.error || 'Could not save the layout.', true);
+			})
+		);
+
+		// calendars: saves shortly after you stop toggling
+		const calBox = el.querySelector('[data-cals]') as HTMLElement;
+		const drawCalendars = () => {
+			if (!allCalendars) {
+				calBox.innerHTML = '<p class="muted small">Couldn\'t load your calendars right now.</p>';
+				return;
+			}
+			const sel: string[] = d.calendarIds.length ? d.calendarIds : allCalendars.filter((c) => c.primary).map((c) => c.id);
+			calBox.innerHTML = allCalendars
+				.map((c) => `<label class="cal-opt"><input type="checkbox" value="${esc(c.id)}" ${sel.includes(c.id) ? 'checked' : ''} /><span class="box" aria-hidden="true"></span><span class="cal-name">${esc(c.summary)}${c.primary ? ' <em>primary</em>' : ''}</span></label>`)
+				.join('');
+			let timer: any;
+			calBox.querySelectorAll<HTMLInputElement>('input').forEach((cb) =>
+				cb.addEventListener('change', () => {
+					const ids = Array.from(calBox.querySelectorAll<HTMLInputElement>('input:checked')).map((x) => x.value);
+					if (!ids.length) {
+						cb.checked = true;
+						flash(note, 'Keep at least one calendar selected.', true);
+						return;
+					}
+					clearTimeout(timer);
+					timer = setTimeout(async () => {
+						const res = await post('/api/dashboard/devices', { deviceId: d.id, calendarIds: ids });
+						if (res.ok) { d.calendarIds = ids; flash(note, 'Saved'); } else flash(note, res.error || 'Could not save.', true);
+					}, 500);
+				})
+			);
+		};
+		(el as any)._draw = drawCalendars;
+		if (allCalendars !== null) drawCalendars();
+
+		// unpair: two taps
+		const foot = el.querySelector('[data-foot]') as HTMLElement;
+		const askUnpair = () => {
+			foot.innerHTML = `<span class="confirm-text">Unpair this calendar? It goes back to showing a pairing code.</span><button type="button" class="btn small danger-btn" data-yes>Yes, unpair</button><button type="button" class="btn small ghost" data-no>Cancel</button>`;
+			foot.querySelector('[data-no]')!.addEventListener('click', () => {
+				foot.innerHTML = '<button type="button" class="link danger-link" data-unpair>Unpair this device</button>';
+				foot.querySelector('[data-unpair]')!.addEventListener('click', askUnpair);
+			});
+			foot.querySelector('[data-yes]')!.addEventListener('click', async (e) => {
+				(e.target as HTMLButtonElement).disabled = true;
+				const res = await post('/api/dashboard/devices/unpair', { deviceId: d.id });
+				if (res.ok) {
+					el.className = 'dev gone';
+					el.innerHTML = '<div class="gone-text"><div class="dev-name-static">Unpaired</div><p class="muted">Next time it refreshes (press its button to do it now) it will show a new pairing code. Use <a href="/setup?new=1">Add a device</a> to pair it again.</p></div>';
+				} else flash(note, res.error || 'Could not unpair.', true);
+			});
+		};
+		foot.querySelector('[data-unpair]')!.addEventListener('click', askUnpair);
+		return el;
+	}
+
+	fetch('/api/dashboard/devices')
+		.then((r) => r.json())
+		.then((data) => {
+			render(data.devices || []);
+			if (!(data.devices || []).length) return;
+			return fetch('/api/dashboard/calendars')
+				.then((r) => r.json())
+				.then((c) => (allCalendars = c.calendars || null))
+				.catch(() => (allCalendars = null))
+				.then(() => {
+					if (allCalendars === null) allCalendars = null;
+					list.querySelectorAll<any>('.dev').forEach((el) => el._draw && el._draw());
+				});
+		})
+		.catch(() => {
+			list.innerHTML = '<p class="muted">Couldn\'t load your devices. Try refreshing.</p>';
+		});
+
+	// delete account: two taps
+	const delArea = document.getElementById('delete-area')!;
+	function askDelete() {
+		delArea.innerHTML = `<p class="confirm-text">This can't be undone. Delete your account and unpair everything?</p><div class="row"><button type="button" class="btn small danger-btn" id="del-yes">Yes, delete everything</button><button type="button" class="btn small ghost" id="del-no">Cancel</button></div><p class="note show is-error" id="del-msg" hidden></p>`;
+		document.getElementById('del-no')!.addEventListener('click', () => {
+			delArea.innerHTML = '<button type="button" class="link danger-link" id="delete-start">Delete my account and data</button>';
+			document.getElementById('delete-start')!.addEventListener('click', askDelete);
+		});
+		document.getElementById('del-yes')!.addEventListener('click', async (e) => {
+			(e.target as HTMLButtonElement).disabled = true;
+			const res = await post('/api/dashboard/account/delete', {});
+			if (res.ok) {
+				delArea.innerHTML = '<p class="confirm-text">Done. Your account and data are deleted. Taking you home…</p>';
+				setTimeout(() => (location.href = '/'), 1800);
+			} else {
+				const m = document.getElementById('del-msg')!;
+				m.hidden = false;
+				m.textContent = res.error || 'Something went wrong.';
+				(e.target as HTMLButtonElement).disabled = false;
+			}
+		});
+	}
+	document.getElementById('delete-start')!.addEventListener('click', askDelete);
+</script>
+
+<style is:global>
+	.dash { padding: 1em 0 2em; }
+	.dash .dash-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1em; flex-wrap: wrap; margin-bottom: 1.8em; }
+	.dash .kicker { font-size: 0.78em; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.5em; }
+	.dash .dash-title { font-size: 2.2em; font-weight: 800; line-height: 1.1; color: var(--fg); }
+	.dash .muted { color: var(--muted); margin: 0; }
+	.dash .small { font-size: 0.9em; }
+
+	.dash .btn {
+		display: inline-block; padding: 0.7em 1.5em; border: 1px solid transparent; border-radius: 999px;
+		background: var(--fg); color: var(--bg); font: inherit; font-weight: 700; font-size: 0.95em; text-decoration: none;
+	}
+	.dash .btn:hover:not(:disabled) { background: var(--accent); color: var(--bg); }
+	.dash .btn:disabled { opacity: 0.5; }
+	.dash .btn.small { padding: 0.45em 1.1em; font-size: 0.85em; }
+	.dash .btn.ghost { background: transparent; color: var(--muted); border-color: var(--border); }
+	.dash .btn.ghost:hover { background: transparent; color: var(--fg); border-color: var(--muted); }
+	.dash .btn.danger-btn { background: #c75a5a; color: #fff; }
+	.dash .btn.danger-btn:hover:not(:disabled) { background: #d96a6a; color: #fff; }
+	.dash .link { background: none; border: none; padding: 0; font: inherit; font-size: 0.9em; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+	.dash .link:hover { color: var(--fg); }
+	.dash .danger-link { color: #e08a8a; }
+	.dash .danger-link:hover { color: #f0a0a0; }
+
+	.dash .devices { display: grid; gap: 1.2em; }
+	.dash .dev {
+		display: grid; grid-template-columns: 280px 1fr; gap: 1.6em; padding: 1.4em;
+		background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px;
+	}
+	.dash .dev-preview {
+		aspect-ratio: 4 / 3; border-radius: 10px; background-size: cover; background-position: center;
+		background-color: #fff; align-self: start; border: 1px solid var(--border);
+	}
+	.dash .dev-body { min-width: 0; }
+	.dash .dev-name {
+		width: 100%; padding: 0.2em 0.1em; background: transparent; border: none; border-bottom: 1px solid transparent;
+		color: var(--fg); font: inherit; font-size: 1.5em; font-weight: 800; border-radius: 0;
+	}
+	.dash .dev-name::placeholder { color: var(--muted-dim); }
+	.dash .dev-name:hover { border-bottom-color: var(--border); }
+	.dash .dev-name:focus { outline: none; border-bottom-color: var(--accent); }
+	.dash .dev-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4em; color: var(--muted); font-size: 0.88em; margin: 0.3em 0 1.3em; }
+	.dash .dev-meta .sep { opacity: 0.5; }
+	.dash .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 0.15em; background: var(--muted-dim); }
+	.dash .dot.on { background: #4caf7a; }
+	.dash .dot.warn { background: #d9a441; }
+	.dash .label { font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 1.2em 0 0.6em; }
+
+	.dash .mini-styles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5em; }
+	.dash .mini input, .dash .cal-opt input { position: absolute; opacity: 0; pointer-events: none; }
+	.dash .mini-card { display: grid; gap: 0.35em; padding: 0.35em; border: 2px solid var(--border); border-radius: 10px; background: var(--bg); transition: border-color 0.2s, background 0.2s; }
+	.dash .mini:hover .mini-card { border-color: var(--muted); }
+	.dash .mini input:checked + .mini-card { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
+	.dash .mini input:focus-visible + .mini-card { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.dash .mini-img { aspect-ratio: 4 / 3; border-radius: 5px; background-size: cover; background-position: center; background-color: #fff; }
+	.dash .mini-name { font-size: 0.72em; font-weight: 700; color: var(--fg); text-align: center; }
+
+	.dash .cal-list { display: grid; gap: 0.5em; }
+	.dash .cal-opt { display: flex; align-items: center; gap: 0.8em; padding: 0.65em 0.9em; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--fg); font-size: 0.95em; transition: border-color 0.2s, background 0.2s; }
+	.dash .cal-opt:hover { border-color: var(--muted); }
+	.dash .cal-opt:has(input:checked) { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.08); }
+	.dash .cal-opt .box { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--muted-dim); display: grid; place-items: center; transition: background 0.2s, border-color 0.2s; }
+	.dash .cal-opt .box::after { content: ''; width: 5px; height: 10px; border: solid var(--bg); border-width: 0 2.5px 2.5px 0; transform: translateY(-1px) rotate(45deg) scale(0); transition: transform 0.18s; }
+	.dash .cal-opt input:checked + .box { background: var(--accent); border-color: var(--accent); }
+	.dash .cal-opt input:checked + .box::after { transform: translateY(-1px) rotate(45deg) scale(1); }
+	.dash .cal-opt input:focus-visible + .box { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.dash .cal-name { overflow-wrap: anywhere; }
+	.dash .cal-name em { font-style: normal; font-size: 0.72em; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0.15em 0.6em; margin-left: 0.5em; }
+
+	.dash .note { margin: 0.9em 0 0; font-size: 0.88em; color: var(--accent); opacity: 0; transition: opacity 0.25s; min-height: 1.3em; }
+	.dash .note.show { opacity: 1; }
+	.dash .note.is-error { color: #e08a8a; }
+	.dash .dev-foot { margin-top: 1.2em; padding-top: 1em; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 0.8em; flex-wrap: wrap; }
+	.dash .confirm-text { color: var(--muted); font-size: 0.9em; margin: 0; }
+
+	.dash .empty, .dash .dev.gone { padding: 2.2em; text-align: center; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; display: block; }
+	.dash .empty .btn { margin-top: 1.2em; }
+	.dash .dev-name-static { font-size: 1.4em; font-weight: 800; color: var(--fg); margin-bottom: 0.4em; }
+	.dash .gone-text a { color: var(--accent); }
+
+	.dash .danger { margin-top: 3em; padding-top: 1.6em; border-top: 1px solid var(--border); }
+	.dash .danger-title { font-weight: 800; color: var(--fg); margin-bottom: 0.4em; }
+	.dash .danger .muted { margin-bottom: 1em; font-size: 0.92em; max-width: 60ch; }
+	.dash .danger .row { display: flex; gap: 0.6em; margin-top: 0.8em; flex-wrap: wrap; }
+
+	/* Only the site's circle cursor on this whole page. */
+	html.has-custom-cursor .dash, html.has-custom-cursor .dash * { cursor: none !important; }
+
+	@media (max-width: 720px) {
+		.dash .dev { grid-template-columns: 1fr; }
+		.dash .dev-preview { max-width: 340px; }
+		.dash .mini-styles { grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); }
+	}
+</style>

@@ -34,13 +34,21 @@ const incomingCode = Astro.url.searchParams.get('code');
 const signInHref = incomingCode
 	? `/api/auth/google/start?code=${encodeURIComponent(incomingCode)}`
 	: '/api/auth/google/start';
+
+// Once an account has a device, /setup is not the place to change things
+// any more: send them to their device dashboard. Adding another device
+// (or scanning a device's QR code) still comes here: /setup?new=1.
+const addingDevice = Astro.url.searchParams.has('new') || !!incomingCode;
+if (userId && hasDevice && !addingDevice) {
+	return Astro.redirect('/dashboard');
+}
 ---
 
 <Layout
 	title="Device setup — designedbykoda"
 	description="Connect your Google Calendar and pair your E-Ink Calendar."
 >
-	<div class="setup-page" data-signed-in={userId ? '1' : '0'} data-has-device={hasDevice ? '1' : '0'}>
+	<div class="setup-page" data-signed-in={userId ? '1' : '0'}>
 		<div class="wizard">
 			{userId && (
 				<ol class="dots" aria-hidden="true">
@@ -85,7 +93,6 @@ const signInHref = incomingCode
 								<button type="submit" class="btn" data-magnetic>Pair device</button>
 							</form>
 							<p class="msg" id="pair-message" aria-live="polite" />
-							<button type="button" class="link" id="skip-pair">I've already paired</button>
 						</section>
 
 						<section class="step" data-step="calendars">
@@ -139,7 +146,7 @@ const signInHref = incomingCode
 								Your calendar will pick up your events and layout the next time it refreshes.
 								To refresh it right now, press the button on the back.
 							</p>
-							<button type="button" class="link" id="change-again">Change something</button>
+							<a class="btn" data-magnetic href="/dashboard">Go to my devices</a>
 						</section>
 					</>
 				)
@@ -156,6 +163,7 @@ const signInHref = incomingCode
 		page.querySelectorAll<HTMLElement>('.step').forEach((el) => (steps[el.dataset.step!] = el));
 		const dots = Array.from(page.querySelectorAll('.dots li'));
 		let current = '';
+		let deviceId = ''; // the device just paired; calendars + layout are saved to it
 
 		function show(name: string) {
 			current = name;
@@ -197,9 +205,9 @@ const signInHref = incomingCode
 					body: JSON.stringify(body),
 				});
 				const data = await res.json().catch(() => ({}));
-				return { ok: res.ok && data.ok, error: data.error as string | undefined };
+				return { ok: res.ok && data.ok, error: data.error as string | undefined, data };
 			} catch {
-				return { ok: false, error: undefined };
+				return { ok: false, error: undefined, data: {} as any };
 			}
 		}
 		function setMsg(el: HTMLElement, text: string, err = false) {
@@ -227,11 +235,12 @@ const signInHref = incomingCode
 			const r = await post('/api/dashboard/devices/pair', { pairingCode: code });
 			pairBtn.disabled = input.disabled = false;
 			pairBtn.textContent = 'Pair device';
-			if (r.ok) show('calendars');
-			else setMsg(pairMsg, r.error || 'Something went wrong. Try again.', true);
+			if (r.ok) {
+				deviceId = r.data.deviceId || '';
+				show('calendars');
+			} else setMsg(pairMsg, r.error || 'Something went wrong. Try again.', true);
 		});
-		document.getElementById('skip-pair')!.addEventListener('click', () => show('calendars'));
-
+		
 		/* ---- calendars ---- */
 		const list = document.getElementById('calendar-list')!;
 		const saveCals = document.getElementById('save-calendars') as HTMLButtonElement;
@@ -240,17 +249,13 @@ const signInHref = incomingCode
 		fetch('/api/dashboard/calendars')
 			.then((r) => r.json())
 			.then((data) => {
-				if (data.style) {
-					const radio = page.querySelector<HTMLInputElement>(`input[name="style"][value="${data.style}"]`);
-					if (radio) radio.checked = true;
-				}
 				if (!data.calendars || !data.calendars.length) {
 					list.innerHTML = '<p class="loading-text">No calendars found.</p>';
 					return;
 				}
 				list.innerHTML = data.calendars
 					.map((c: any) => {
-						const on = data.selected.includes(c.id) || (!data.selected.length && c.primary);
+						const on = !!c.primary;
 						return `<label class="cal-opt"><input type="checkbox" value="${esc(c.id)}" ${on ? 'checked' : ''} /><span class="box" aria-hidden="true"></span><span class="cal-name">${esc(c.summary)}${c.primary ? ' <em>primary</em>' : ''}</span></label>`;
 					})
 					.join('');
@@ -264,7 +269,7 @@ const signInHref = incomingCode
 			const ids = Array.from(list.querySelectorAll<HTMLInputElement>('input:checked')).map((el) => el.value);
 			saveCals.disabled = true;
 			setMsg(calMsg, '');
-			const r = await post('/api/dashboard/calendars', { calendarIds: ids });
+			const r = await post('/api/dashboard/devices', { deviceId, calendarIds: ids });
 			saveCals.disabled = false;
 			if (r.ok) show('style');
 			else setMsg(calMsg, r.error || 'Something went wrong.', true);
@@ -277,15 +282,13 @@ const signInHref = incomingCode
 			const chosen = page.querySelector<HTMLInputElement>('input[name="style"]:checked');
 			saveStyle.disabled = true;
 			setMsg(styleMsg, '');
-			const r = await post('/api/dashboard/calendars', { style: chosen ? chosen.value : 'agenda' });
+			const r = await post('/api/dashboard/devices', { deviceId, style: chosen ? chosen.value : 'agenda' });
 			saveStyle.disabled = false;
 			if (r.ok) show('done');
 			else setMsg(styleMsg, r.error || 'Something went wrong.', true);
 		});
 
-		document.getElementById('change-again')!.addEventListener('click', () => show('calendars'));
-
-		show(page.dataset.hasDevice === '1' && !prefilled ? 'calendars' : 'pair');
+				show('pair');
 	}
 </script>
 
