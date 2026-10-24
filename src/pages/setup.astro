@@ -9,6 +9,7 @@ export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import { getSessionUserId } from '../lib/session';
 import { CALENDAR_STYLES, DEFAULT_STYLE } from '../data/calendarStyles';
+import CitySearchStyles from '../components/CitySearchStyles.astro';
 
 const env = Astro.locals.runtime?.env ?? {};
 const db = env.DB;
@@ -52,7 +53,7 @@ if (userId && hasDevice && !addingDevice) {
 		<div class="wizard">
 			{userId && (
 				<ol class="dots" aria-hidden="true">
-					<li></li><li></li><li></li><li></li><li></li>
+					<li></li><li></li><li></li><li></li><li></li><li></li>
 				</ol>
 			)}
 
@@ -134,7 +135,24 @@ if (userId && hasDevice && !addingDevice) {
 							<div class="row">
 								<button type="button" class="btn ghost" data-back>Back</button>
 								<button type="button" class="btn" id="save-style" data-magnetic>
-									Finish
+									Continue
+								</button>
+							</div>
+						</section>
+
+						<section class="step" data-step="weather">
+							<div class="step-kicker">Step 5 · Optional</div>
+							<div class="step-title">Show the weather?</div>
+							<p class="step-text">
+								Pick your city and your calendar shows today's high and low. You can skip this
+								and add it later.
+							</p>
+							<div id="weather-box"></div>
+							<p class="msg" id="weather-message" aria-live="polite" />
+							<div class="row">
+								<button type="button" class="btn ghost" data-back>Back</button>
+								<button type="button" class="btn" id="save-weather" data-magnetic>
+									Skip for now
 								</button>
 							</div>
 						</section>
@@ -153,12 +171,14 @@ if (userId && hasDevice && !addingDevice) {
 			}
 		</div>
 	</div>
+	<CitySearchStyles />
 </Layout>
 
 <script>
+	import { createCitySearch, type City } from '../lib/citySearch';
 	const page = document.querySelector('.setup-page') as HTMLElement | null;
 	if (page && page.dataset.signedIn === '1') {
-		const order = ['pair', 'calendars', 'style', 'done'];
+		const order = ['pair', 'calendars', 'style', 'weather', 'done'];
 		const steps: Record<string, HTMLElement> = {};
 		page.querySelectorAll<HTMLElement>('.step').forEach((el) => (steps[el.dataset.step!] = el));
 		const dots = Array.from(page.querySelectorAll('.dots li'));
@@ -275,6 +295,31 @@ if (userId && hasDevice && !addingDevice) {
 			else setMsg(calMsg, r.error || 'Something went wrong.', true);
 		});
 
+		/* ---- weather (optional) ---- */
+		let chosenCity: City | null = null;
+		const saveWeather = document.getElementById('save-weather') as HTMLButtonElement;
+		const weatherMsg = document.getElementById('weather-message')!;
+		document.getElementById('weather-box')!.appendChild(
+			createCitySearch({
+				onSelect: (c) => {
+					chosenCity = c;
+					saveWeather.textContent = c ? 'Finish' : 'Skip for now';
+				},
+			})
+		);
+		saveWeather.addEventListener('click', async () => {
+			if (!chosenCity) return show('done');
+			saveWeather.disabled = true;
+			setMsg(weatherMsg, '');
+			const r = await post('/api/dashboard/devices', {
+				deviceId,
+				location: { name: chosenCity.label, lat: chosenCity.lat, lon: chosenCity.lon },
+			});
+			saveWeather.disabled = false;
+			if (r.ok) show('done');
+			else setMsg(weatherMsg, r.error || 'Something went wrong.', true);
+		});
+
 		/* ---- style ---- */
 		const saveStyle = document.getElementById('save-style') as HTMLButtonElement;
 		const styleMsg = document.getElementById('style-message')!;
@@ -284,7 +329,7 @@ if (userId && hasDevice && !addingDevice) {
 			setMsg(styleMsg, '');
 			const r = await post('/api/dashboard/devices', { deviceId, style: chosen ? chosen.value : 'agenda' });
 			saveStyle.disabled = false;
-			if (r.ok) show('done');
+			if (r.ok) show('weather');
 			else setMsg(styleMsg, r.error || 'Something went wrong.', true);
 		});
 

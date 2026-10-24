@@ -3,6 +3,7 @@ export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import { getSessionUserId } from '../lib/session';
 import { CALENDAR_STYLES } from '../data/calendarStyles';
+import CitySearchStyles from '../components/CitySearchStyles.astro';
 
 const db = Astro.locals.runtime?.env?.DB;
 const userId = db ? await getSessionUserId(Astro.request, db) : null;
@@ -35,9 +36,11 @@ if (!userId) return Astro.redirect('/setup');
 			</div>
 		</div>
 	</div>
+	<CitySearchStyles />
 </Layout>
 
 <script>
+	import { createCitySearch } from '../lib/citySearch';
 	const root = document.querySelector('.dash') as HTMLElement;
 	const styles: { id: string; label: string; image: string }[] = JSON.parse(root.dataset.styles!);
 	const styleById = (id: string) => styles.find((s) => s.id === id) || styles[0];
@@ -111,6 +114,10 @@ if (!userId) return Astro.redirect('/setup');
 				<div class="label">Calendars</div>
 				<div class="cal-list" data-cals><p class="muted small">Loading calendars…</p></div>
 
+				<div class="label">Weather</div>
+				<div data-weather></div>
+				<p class="muted small weather-hint">Shows today's high and low on your calendar. Leave empty for none.</p>
+
 				<p class="note" data-note aria-live="polite"></p>
 
 				<div class="dev-foot" data-foot>
@@ -175,6 +182,22 @@ if (!userId) return Astro.redirect('/setup');
 		};
 		(el as any)._draw = drawCalendars;
 		if (allCalendars !== null) drawCalendars();
+
+		// weather location: saves the moment you pick (or clear) a city
+		el.querySelector('[data-weather]')!.appendChild(
+			createCitySearch({
+				value: d.location?.name || '',
+				placeholder: 'Search for a city…',
+				onSelect: async (c) => {
+					const res = await post('/api/dashboard/devices', {
+						deviceId: d.id,
+						location: c ? { name: c.label, lat: c.lat, lon: c.lon } : null,
+					});
+					if (res.ok) flash(note, c ? 'Saved. Weather appears on the next refresh.' : 'Weather removed.');
+					else flash(note, res.error || 'Could not save the location.', true);
+				},
+			})
+		);
 
 		// unpair: two taps
 		const foot = el.querySelector('[data-foot]') as HTMLElement;
@@ -313,6 +336,7 @@ if (!userId) return Astro.redirect('/setup');
 	.dash .note.show { opacity: 1; }
 	.dash .note.is-error { color: #e08a8a; }
 	.dash .dev-foot { margin-top: 1.2em; padding-top: 1em; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 0.8em; flex-wrap: wrap; }
+	.dash .weather-hint { margin-top: 0.6em; }
 	.dash .confirm-text { color: var(--muted); font-size: 0.9em; margin: 0; }
 
 	.dash .empty, .dash .dev.gone { padding: 2.2em; text-align: center; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; display: block; }

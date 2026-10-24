@@ -32,6 +32,16 @@ export async function GET({ request, locals }) {
 		)
 		.bind(userId)
 		.all();
+	// Weather location lives in columns from schema-weather.sql; read
+	// separately so the dashboard still loads before that migration is run.
+	const locs = new Map<string, { name: string; lat: number; lon: number }>();
+	try {
+		const lr = await db
+			.prepare('SELECT id, weather_name, weather_lat, weather_lon FROM devices WHERE user_id = ? AND weather_lat IS NOT NULL')
+			.bind(userId)
+			.all();
+		for (const l of lr.results ?? []) locs.set(l.id, { name: l.weather_name || '', lat: l.weather_lat, lon: l.weather_lon });
+	} catch {}
 
 	const devices = (rows.results ?? []).map((d: any) => ({
 		id: d.id,
@@ -41,6 +51,7 @@ export async function GET({ request, locals }) {
 		lastSeenAt: d.last_seen_at ?? null,
 		createdAt: d.created_at ?? null,
 		refreshIntervalSec: d.refresh_interval_sec || 86400,
+		location: locs.get(d.id) ?? null,
 	}));
 	return json({ devices }, 200);
 }
@@ -79,6 +90,22 @@ export async function POST({ request, locals }) {
 		const ids = body.calendarIds.filter((x: unknown) => typeof x === 'string').slice(0, 50);
 		sets.push('selected_calendar_ids = ?');
 		vals.push(JSON.stringify(ids));
+	}
+	if (body.location !== undefined) {
+		// null clears it; otherwise { name, lat, lon } from the city search.
+		const loc = body.location;
+		if (loc === null) {
+			sets.push('weather_name = NULL', 'weather_lat = NULL', 'weather_lon = NULL');
+		} else {
+			const lat = Number(loc?.lat);
+			const lon = Number(loc?.lon);
+			const name = typeof loc?.name === 'string' ? loc.name.trim().slice(0, 80) : '';
+			if (!name || !(lat >= -90 && lat <= 90) || !(lon >= -180 && lon <= 180)) {
+				return json({ error: 'Invalid location.' }, 400);
+			}
+			sets.push('weather_name = ?', 'weather_lat = ?', 'weather_lon = ?');
+			vals.push(name, lat, lon);
+		}
 	}
 	if (!sets.length) return json({ ok: true }, 200);
 

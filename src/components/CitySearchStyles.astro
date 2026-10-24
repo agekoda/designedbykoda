@@ -1,0 +1,29 @@
+---
+// Styles for the box built by src/lib/citySearch.ts.
+---
+<style is:global>
+	.citysearch { position: relative; width: 100%; text-align: left; }
+	.citysearch .cs-input {
+		width: 100%; box-sizing: border-box; padding: 0.75em 2.4em 0.75em 1em;
+		border-radius: 14px; border: 1px solid var(--border); background: var(--bg-raised);
+		color: var(--fg); font: inherit; font-size: 1em;
+	}
+	.citysearch .cs-input::placeholder { color: var(--muted-dim); }
+	.citysearch .cs-input:focus { outline: none; border-color: var(--accent); }
+	.citysearch .cs-clear {
+		position: absolute; right: 0.5em; top: 50%; transform: translateY(-50%);
+		width: 1.8em; height: 1.8em; border-radius: 50%; border: none; background: transparent;
+		color: var(--muted); font: inherit; font-size: 1.3em; line-height: 1;
+	}
+	.citysearch .cs-clear:hover { color: var(--fg); background: var(--border); }
+	.citysearch .cs-list {
+		position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 20; margin: 0; padding: 4px;
+		list-style: none; background: var(--bg-raised); border: 1px solid var(--border);
+		border-radius: 14px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); max-height: 320px; overflow-y: auto;
+	}
+	.citysearch .cs-list li { padding: 0.6em 0.8em; border-radius: 10px; color: var(--fg); font-size: 0.95em; }
+	.citysearch .cs-list li.on, .citysearch .cs-list li[data-i]:hover { background: rgba(var(--accent-rgb), 0.15); }
+	.citysearch .cs-list li.none { color: var(--muted); }
+	/* Only the site's circle cursor. */
+	html.has-custom-cursor .citysearch, html.has-custom-cursor .citysearch * { cursor: none !important; }
+</style>

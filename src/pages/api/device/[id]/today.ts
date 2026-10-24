@@ -4,6 +4,7 @@
 // (handling DST automatically via Intl, which an ESP32 could never do on
 // its own), and returning a small, pre-formatted payload.
 import { viewForStyle } from '../../../../data/calendarStyles';
+import { getForecast } from '../../../../lib/weather';
 export const prerender = false;
 
 function getCookielessAuthSecret(request: Request): string | null {
@@ -295,6 +296,16 @@ export async function GET({ params, request, locals }) {
 	} catch {}
 	if (deviceStyle) style = deviceStyle;
 
+	// Optional weather: today's high/low for the location chosen in setup.
+	// Never lets a weather problem break the calendar response.
+	let weather: { high: number; low: number } | null = null;
+	try {
+		const loc = await db.prepare('SELECT weather_lat, weather_lon FROM devices WHERE id = ?').bind(deviceId).first();
+		if (loc && loc.weather_lat !== null && loc.weather_lon !== null) {
+			weather = await getForecast(db, loc.weather_lat, loc.weather_lon);
+		}
+	} catch {}
+
 	await db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(now, deviceId).run();
 
 	return json(
@@ -303,6 +314,7 @@ export async function GET({ params, request, locals }) {
 			refreshIntervalSec: device.refresh_interval_sec || 86400,
 			style,
 			view: viewForStyle(style),
+			...(weather ? { weatherHigh: weather.high, weatherLow: weather.low } : {}),
 			events: trimmedEvents,
 		},
 		200
