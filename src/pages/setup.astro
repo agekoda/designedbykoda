@@ -124,7 +124,7 @@ if (userId && hasDevice && !addingDevice) {
 									<label class="style-opt">
 										<input type="radio" name="style" value={st.id} checked={st.id === DEFAULT_STYLE} />
 										<span class="style-card">
-											<span class="style-img" style={`background-image:url(${st.image})`} />
+											<span class="style-img" data-light={st.image} data-dark={st.imageDark} style={`background-image:url(${st.image})`} />
 											<span class="style-name">{st.label}</span>
 											<span class="style-note">{st.note}</span>
 										</span>
@@ -328,7 +328,13 @@ if (userId && hasDevice && !addingDevice) {
 		/* ---- style ---- */
 		const darkBox = document.getElementById('dark-mode') as HTMLInputElement;
 		const stylesGrid = page.querySelector('.styles') as HTMLElement;
-		darkBox.addEventListener('change', () => stylesGrid.classList.toggle('is-dark', darkBox.checked));
+		// Dark previews are your own screenshots (name-dark.png); the light one
+		// sits underneath so nothing goes blank if a dark file is missing.
+		darkBox.addEventListener('change', () =>
+			stylesGrid.querySelectorAll<HTMLElement>('.style-img').forEach((n) => {
+				n.style.backgroundImage = darkBox.checked ? `url(${n.dataset.dark}), url(${n.dataset.light})` : `url(${n.dataset.light})`;
+			})
+		);
 		const saveStyle = document.getElementById('save-style') as HTMLButtonElement;
 		const styleMsg = document.getElementById('style-message')!;
 		saveStyle.addEventListener('click', async () => {
@@ -599,7 +605,6 @@ if (userId && hasDevice && !addingDevice) {
 	.setup-page .switch input:checked + .track::after, .dash .switch input:checked + .track::after { transform: translateX(18px); background: var(--bg); }
 	.setup-page .switch input:focus-visible + .track, .dash .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.setup-page .switch small, .dash .switch small { color: var(--muted); margin-left: 0.4em; }
-	.setup-page .styles.is-dark .style-img, .dash .is-dark { filter: invert(1) hue-rotate(180deg) contrast(1.05); }
 	.setup-page .done-mark {
 		width: 64px;
 		height: 64px;

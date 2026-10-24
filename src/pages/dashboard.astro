@@ -42,7 +42,7 @@ if (!userId) return Astro.redirect('/setup');
 <script>
 	import { createCitySearch } from '../lib/citySearch';
 	const root = document.querySelector('.dash') as HTMLElement;
-	const styles: { id: string; label: string; image: string }[] = JSON.parse(root.dataset.styles!);
+	const styles: { id: string; label: string; image: string; imageDark: string }[] = JSON.parse(root.dataset.styles!);
 	const styleById = (id: string) => styles.find((s) => s.id === id) || styles[0];
 	const list = document.getElementById('devices')!;
 
@@ -108,7 +108,7 @@ if (!userId) return Astro.redirect('/setup');
 
 				<div class="label">Layout</div>
 				<div class="mini-styles" role="radiogroup" aria-label="Layout">
-					${styles.map((s) => `<label class="mini"><input type="radio" name="style-${esc(d.id)}" value="${s.id}" ${s.id === d.style ? 'checked' : ''} /><span class="mini-card"><span class="mini-img" style="background-image:url(${s.image})"></span><span class="mini-name">${s.label}</span></span></label>`).join('')}
+					${styles.map((s) => `<label class="mini"><input type="radio" name="style-${esc(d.id)}" value="${s.id}" ${s.id === d.style ? 'checked' : ''} /><span class="mini-card"><span class="mini-img" data-sid="${s.id}" style="background-image:url(${s.image})"></span><span class="mini-name">${s.label}</span></span></label>`).join('')}
 				</div>
 
 				<div class="label">Display</div>
@@ -134,12 +134,27 @@ if (!userId) return Astro.redirect('/setup');
 
 		const preview = el.querySelector('[data-preview]') as HTMLElement;
 		const note = el.querySelector('[data-note]') as HTMLElement;
-		const setPreview = (id: string) => (preview.style.backgroundImage = `url(${styleById(id).image})`);
+		// Dark previews are the "name-dark.png" screenshots; the light one sits
+		// underneath so nothing goes blank if a dark file is missing.
+		let isDark = !!d.dark;
+		let currentStyle = d.style;
+		const bg = (id: string) => {
+			const s = styleById(id);
+			return isDark ? `url(${s.imageDark}), url(${s.image})` : `url(${s.image})`;
+		};
+		const setPreview = (id: string) => {
+			currentStyle = id;
+			preview.style.backgroundImage = bg(id);
+		};
 		setPreview(d.style);
 
 		// dark mode: saves immediately; previews flip to white-on-black
 		const darkBox = el.querySelector('[data-dark]') as HTMLInputElement;
-		const paintDark = () => el.querySelectorAll('[data-preview], .mini-img').forEach((n) => n.classList.toggle('is-dark', darkBox.checked));
+		const paintDark = () => {
+			isDark = darkBox.checked;
+			preview.style.backgroundImage = bg(currentStyle);
+			el.querySelectorAll<HTMLElement>('.mini-img').forEach((n) => (n.style.backgroundImage = bg(n.dataset.sid!)));
+		};
 		paintDark();
 		darkBox.addEventListener('change', async () => {
 			paintDark();
@@ -366,7 +381,6 @@ if (!userId) return Astro.redirect('/setup');
 	.dash .switch input:checked + .track::after { transform: translateX(18px); background: var(--bg); }
 	.dash .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.dash .switch small { color: var(--muted); margin-left: 0.4em; }
-	.dash .is-dark { filter: invert(1) hue-rotate(180deg) contrast(1.05); }
 	.dash .weather-hint { margin-top: 0.6em; }
 	.dash .confirm-text { color: var(--muted); font-size: 0.9em; margin: 0; }
 
