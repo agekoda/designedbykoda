@@ -12,7 +12,6 @@ gallery:
   - "/images/projects/eink-calendar/3.jpg"
   - "/images/projects/eink-calendar/4.jpg"
   - "/images/projects/eink-calendar/5.jpg"
-galleryRatio: "3 / 4"
 waitlist: true
 cardBanner: "Join the waitlist now"
 waitlistLabel: "Want one for yourself? Join the waitlist and I'll email you when it's ready."
