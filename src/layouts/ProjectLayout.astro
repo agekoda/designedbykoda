@@ -54,6 +54,10 @@ const ordered = (await getCollection('projects')).sort((a, b) => a.data.order - 
 const at = ordered.findIndex((p) => p.id === slug);
 const prev = at >= 0 ? ordered[(at - 1 + ordered.length) % ordered.length] : null;
 const next = at >= 0 ? ordered[(at + 1) % ordered.length] : null;
+
+// "3 / 4" (tall) vs "4 / 3" (wide) decides how many gallery tiles fit per row.
+const [rw, rh] = galleryRatio.split('/').map((n) => parseFloat(n));
+const portrait = rw > 0 && rh > 0 && rw < rh;
 ---
 
 <Layout title={`${title} — designedbykoda`} description={description} image={`/og/${slug}.png`}>
@@ -125,7 +129,7 @@ const next = at >= 0 ? ordered[(at + 1) % ordered.length] : null;
 
 	{
 		gallery.length > 0 && (
-			<div class="gallery">
+			<div class={`gallery ${portrait ? 'gallery-portrait' : 'gallery-landscape'}`}>
 				{gallery.map((src) => (
 					<ProjectImage
 						src={src}
@@ -308,11 +312,45 @@ const next = at >= 0 ? ordered[(at + 1) % ordered.length] : null;
 	.prose :global(h2:first-child) {
 		margin-top: 0;
 	}
+	/* Gallery breaks out of the centre column and spans the whole screen.
+	   Text + hero are untouched. Tiles are flex-wrapped and centred so a
+	   short last row sits in the middle instead of hugging the left.
+	   Landscape (4:3) = 3 per row, portrait (3:4) = 4 per row; both drop
+	   to 2 then 1 on smaller screens. */
 	.gallery {
+		--gap: 1em;
+		--cols: 3;
+		--gutter: 1.25em;
+		position: relative;
+		left: 50%;
+		width: min(100vw - 2 * var(--gutter), 2200px);
+		transform: translateX(-50%);
 		margin-top: 2.5em;
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-		gap: 1em;
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: var(--gap);
+	}
+	.gallery-portrait {
+		--cols: 4;
+	}
+	.gallery > :global(*) {
+		flex: 0 0 calc((100% - (var(--cols) - 1) * var(--gap)) / var(--cols));
+		min-width: 0;
+	}
+	@media (max-width: 1000px) {
+		.gallery,
+		.gallery-portrait {
+			--cols: 2;
+		}
+	}
+	@media (max-width: 480px) {
+		.gallery-landscape {
+			--cols: 1;
+		}
+	}
+	:global(html:has(.gallery)) {
+		overflow-x: clip;
 	}
 
 	/* ---------- Hero + 3D model(s) ---------- */
