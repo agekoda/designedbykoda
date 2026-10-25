@@ -315,11 +315,11 @@ const portrait = rw > 0 && rh > 0 && rw < rh;
 	/* Gallery breaks out of the centre column and spans the whole screen.
 	   Text + hero are untouched. Tiles are flex-wrapped and centred so a
 	   short last row sits in the middle instead of hugging the left.
-	   Landscape (4:3) = 3 per row, portrait (3:4) = 4 per row; both drop
-	   to 2 then 1 on smaller screens. */
+	   Landscape (4:3) = 5 per row, portrait (3:4) = 6 per row on wide
+	   screens, stepping down to 2 on phones. */
 	.gallery {
-		--gap: 1em;
-		--cols: 3;
+		--gap: 0.8em;
+		--cols: 5;
 		--gutter: 1.25em;
 		position: relative;
 		left: 50%;
@@ -332,21 +332,30 @@ const portrait = rw > 0 && rh > 0 && rw < rh;
 		gap: var(--gap);
 	}
 	.gallery-portrait {
-		--cols: 4;
+		--cols: 6;
 	}
 	.gallery > :global(*) {
 		flex: 0 0 calc((100% - (var(--cols) - 1) * var(--gap)) / var(--cols));
 		min-width: 0;
 	}
+	@media (max-width: 1400px) {
+		.gallery {
+			--cols: 4;
+		}
+		.gallery-portrait {
+			--cols: 5;
+		}
+	}
 	@media (max-width: 1000px) {
 		.gallery,
 		.gallery-portrait {
-			--cols: 2;
+			--cols: 3;
 		}
 	}
-	@media (max-width: 480px) {
-		.gallery-landscape {
-			--cols: 1;
+	@media (max-width: 640px) {
+		.gallery,
+		.gallery-portrait {
+			--cols: 2;
 		}
 	}
 	:global(html:has(.gallery)) {
