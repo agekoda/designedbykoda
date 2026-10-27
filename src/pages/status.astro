@@ -138,7 +138,7 @@ const hasData = data.lastCheck !== null;
 								<span class="uptime">{pct(c.uptime)} uptime</span>
 								<span>Today</span>
 							</div>
-							{c.avgMs !== null && <p class="resp">Average response, last 24 h: {c.avgMs} ms</p>}
+							{c.avgMs !== null && c.id !== 'cloudflare' && <p class="resp">Average response, last 24 h: {c.avgMs} ms</p>}
 						</article>
 					))
 				}

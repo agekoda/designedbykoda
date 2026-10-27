@@ -6,7 +6,8 @@ export type ComponentId =
 	| 'device_api'
 	| 'database'
 	| 'google_signin'
-	| 'google_calendar';
+	| 'google_calendar'
+	| 'cloudflare';
 
 export const COMPONENTS: { id: ComponentId; label: string; blurb: string }[] = [
 	{ id: 'website', label: 'Website', blurb: 'designedbykoda.com pages and the dashboard' },
@@ -14,11 +15,40 @@ export const COMPONENTS: { id: ComponentId; label: string; blurb: string }[] = [
 	{ id: 'database', label: 'Database', blurb: 'Stores pairing, devices and settings' },
 	{ id: 'google_signin', label: 'Google sign-in', blurb: 'Used to connect your Google account (Google)' },
 	{ id: 'google_calendar', label: 'Google Calendar', blurb: 'Where your events come from (Google)' },
+	{ id: 'cloudflare', label: 'Cloudflare', blurb: 'Workers, D1 and the network this site runs on (reported by Cloudflare)' },
 ];
 
 const ORIGIN = 'https://designedbykoda.com';
 const TIMEOUT_MS = 8000;
 const SLOW_MS = 3000;
+
+// Cloudflare's own status feed (a standard Statuspage JSON). We only look at
+// the parts this site actually runs on.
+const CF_FEED = 'https://www.cloudflarestatus.com/api/v2/components.json';
+const CF_WATCH = ['workers', 'd1', 'cdn/cache'];
+const CF_WORDS: Record<string, string> = {
+	partial_outage: 'partial outage',
+	major_outage: 'major outage',
+	degraded_performance: 'degraded performance',
+};
+
+// Reads the feed. Returns null when the feed can't be understood (so the
+// caller records nothing rather than guessing). Otherwise:
+//   ok=false             a watched part has a partial or major outage
+//   ok=true + detail     only degraded performance (shows as "Slow", not an outage)
+//   ok=true, detail=null all clear (maintenance windows don't count)
+export function judgeCloudflare(json: any): { ok: boolean; detail: string | null } | null {
+	const list = json?.components;
+	if (!Array.isArray(list)) return null;
+	const watched = list.filter((c: any) => CF_WATCH.includes(String(c?.name ?? '').trim().toLowerCase()));
+	if (!watched.length) return null;
+	const say = (c: any) => `${String(c.name).trim()} ${CF_WORDS[c.status] ?? c.status}`;
+	const bad = watched.filter((c: any) => c.status === 'partial_outage' || c.status === 'major_outage');
+	if (bad.length) return { ok: false, detail: bad.map(say).join(', ') };
+	const slow = watched.filter((c: any) => c.status === 'degraded_performance');
+	if (slow.length) return { ok: true, detail: slow.map(say).join(', ') };
+	return { ok: true, detail: null };
+}
 
 type Result = { component: ComponentId; ok: boolean; ms: number; detail: string | null };
 
@@ -43,6 +73,21 @@ async function timed(
 
 const signal = () => AbortSignal.timeout(TIMEOUT_MS);
 
+async function checkCloudflare(): Promise<Result | null> {
+	try {
+		const res = await fetch(CF_FEED, { signal: signal(), headers: { 'User-Agent': 'designedbykoda-status' } });
+		if (!res.ok) return null;
+		const verdict = judgeCloudflare(await res.json());
+		if (!verdict) {
+			console.warn('cloudflare status feed: none of', CF_WATCH.join(', '), 'found');
+			return null;
+		}
+		return { component: 'cloudflare', ok: verdict.ok, ms: 0, detail: verdict.detail };
+	} catch {
+		return null; // feed unreachable: unknown, not an outage
+	}
+}
+
 // Most recent check per component. One indexed LIMIT 1 lookup each (uses
 // idx_status_checks_comp_ts), so it reads ~5 rows instead of scanning the whole
 // 3-day table, which a GROUP BY MAX(id) subquery does on every call.
@@ -51,7 +96,7 @@ async function latestChecks(db: any): Promise<any[]> {
 		COMPONENTS.map((c) =>
 			db
 				.prepare(
-					'SELECT component, ok, ms, ts FROM status_checks WHERE component = ? ORDER BY ts DESC LIMIT 1',
+					'SELECT component, ok, ms, ts, detail FROM status_checks WHERE component = ? ORDER BY ts DESC LIMIT 1',
 				)
 				.bind(c.id),
 		),
@@ -66,7 +111,8 @@ export async function runStatusChecks(env: any, appFetch: (req: Request) => Prom
 	const db = env.DB;
 	if (!db) return;
 
-	const results = await Promise.all([
+	const [cf, ...local] = await Promise.all([
+		checkCloudflare(),
 		timed('website', async () => {
 			// Static pages come straight from the assets binding.
 			const res = env.ASSETS
@@ -102,6 +148,7 @@ export async function runStatusChecks(env: any, appFetch: (req: Request) => Prom
 			return { ok: res.ok, detail: `HTTP ${res.status}` };
 		}),
 	]);
+	const results: Result[] = cf ? [...local, cf] : local;
 
 	const now = Math.floor(Date.now() / 1000);
 	const day = new Date(now * 1000).toISOString().slice(0, 10);
@@ -149,7 +196,12 @@ export async function runStatusChecks(env: any, appFetch: (req: Request) => Prom
 						`INSERT INTO status_incidents (component, title, body, severity, source, started_at)
 						 VALUES (?, ?, ?, 'outage', 'auto', ?)`,
 					)
-					.bind(r.component, `${label} is not responding`, r.detail, p.ts),
+					.bind(
+						r.component,
+						r.component === 'cloudflare' ? `Cloudflare reports a problem: ${r.detail}` : `${label} is not responding`,
+						r.detail,
+						p.ts,
+					),
 			);
 		} else if (r.ok && openId) {
 			stmts.push(
@@ -307,7 +359,7 @@ export async function loadStatus(env: any): Promise<StatusData> {
 			const l = latestBy.get(c.id);
 			const fresh = l && now - l.ts < 20 * 60;
 			let state: ComponentState = 'unknown';
-			if (l && fresh) state = !l.ok ? 'outage' : l.ms > SLOW_MS ? 'slow' : 'operational';
+			if (l && fresh) state = !l.ok ? 'outage' : l.ms > SLOW_MS || l.detail ? 'slow' : 'operational';
 			return {
 				...c,
 				state,
