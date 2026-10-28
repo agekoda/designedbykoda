@@ -118,7 +118,7 @@
 	// SWEEP = false: colours cross-fade and the page keeps running (typewriter, marquee, wave).
 	// SWEEP = true: the circle sweep. It looks nice, but the browser freezes the old page as a
 	// still picture while it runs, so animations appear to stop and then jump.
-	const SWEEP = false;
+	const SWEEP = true;
 	let fadeTimer;
 	function switchMode(m, announce, from) {
 		if (calm) { setMode(m, announce); return; }
