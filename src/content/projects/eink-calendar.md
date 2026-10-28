@@ -1,6 +1,6 @@
 ---
 title: "E-Ink Calendar"
-tagline: "Syncs with Google Calendar — 3–4 months per charge"
+tagline: "Syncs with Google Calendar — 5–6 months per charge"
 description: "A low-power e-ink display that syncs with Google Calendar, built for months of unattended battery life."
 category: "Smart Home"
 status: "Complete"
@@ -18,7 +18,7 @@ gallery:
   - "/images/projects/eink-calendar/9.jpg"
 waitlist: true
 cardBanner: "Join the waitlist now"
-waitlistLabel: "Want one for yourself? Join the waitlist and I'll email you when it's ready."
+waitlistLabel: "Want one for yourself? Preorders open 30 November. Join the waitlist for updates."
 model: "/models/projects/eink-calendar/model.glb"
 modelCaption: "E-Ink Calendar"
 cameraOrbit: "180deg 25deg 120%"
