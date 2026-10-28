@@ -115,8 +115,20 @@
 	}
 	drawModeBtn();
 	// Switch with a circle that grows out from the button (View Transitions); falls back to a plain switch.
+	// SWEEP = false: colours cross-fade and the page keeps running (typewriter, marquee, wave).
+	// SWEEP = true: the circle sweep. It looks nice, but the browser freezes the old page as a
+	// still picture while it runs, so animations appear to stop and then jump.
+	const SWEEP = false;
+	let fadeTimer;
 	function switchMode(m, announce, from) {
-		if (calm || !doc.startViewTransition) { setMode(m, announce); return; }
+		if (calm) { setMode(m, announce); return; }
+		if (!SWEEP || !doc.startViewTransition) {
+			root.classList.add('x-fade');
+			setMode(m, announce);
+			clearTimeout(fadeTimer);
+			fadeTimer = setTimeout(() => root.classList.remove('x-fade'), 650);
+			return;
+		}
 		const r = (from || modeBtn).getBoundingClientRect();
 		const x = r.left + r.width / 2, y = r.top + r.height / 2;
 		const rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
