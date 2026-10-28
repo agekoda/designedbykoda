@@ -27,12 +27,17 @@ const banner = {
 
 const stateText = { operational: 'Operational', slow: 'Slow', outage: 'Outage', unknown: 'No data' } as const;
 
+// One formatter for the whole page. Building a new one for each of the ~540
+// bars burned most of the Worker's CPU budget (error 1102).
+const dayFmt = new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const dayLabelCache = new Map<string, string>();
 function dayLabel(day: string) {
-	return new Date(day + 'T00:00:00Z').toLocaleDateString('en-AU', {
-		day: 'numeric',
-		month: 'short',
-		timeZone: 'UTC',
-	});
+	let label = dayLabelCache.get(day);
+	if (label === undefined) {
+		label = dayFmt.format(new Date(day + 'T00:00:00Z'));
+		dayLabelCache.set(day, label);
+	}
+	return label;
 }
 function barClass(pct: number | null) {
 	if (pct === null) return 'none';
