@@ -19,7 +19,7 @@ interface LayoutEntry {
 }
 
 export const LAYOUTS: Record<string, LayoutEntry> = {
-	agenda: { render: agenda, font: 'mono' },
+	agenda: { render: agenda, font: 'jbmono' },
 	month: { render: month, font: 'sans' },
 	bigdate: { render: bigdate, font: 'sans' },
 	week: { render: week, font: 'sans' },
@@ -28,7 +28,7 @@ export const LAYOUTS: Record<string, LayoutEntry> = {
 
 export function renderLayout(styleId: string, ctx: Omit<LayoutCtx, 'family'>, familyOverride?: unknown): string {
 	const entry = LAYOUTS[styleId] ?? LAYOUTS.agenda;
-	const family = isFamily(familyOverride) ? familyOverride : entry.font ?? DEFAULT_FAMILY;
+	const family = isFamily(familyOverride) ? familyOverride : isFamily(entry.font) ? entry.font : DEFAULT_FAMILY;
 	const events = ctx.events.map((e) => ({ ...e, title: cleanTitle(e.title) }));
 	return entry.render({ ...ctx, events, family });
 }
