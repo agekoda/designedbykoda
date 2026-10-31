@@ -1,7 +1,8 @@
 // Month: the whole month as a grid, a small square under each day that has
 // events (up to three), and the next event along the bottom.
 import { Draw, PAPER } from '../draw';
-import { daysInMonth, dayShort, evTimeStr, hiLoText, monthName, tmOf, upcoming, type LayoutCtx } from '../context';
+import { firstThatFits, measure } from '../measure';
+import { daysInMonth, dayShort, evTimeStr, monthName, monthShort, round0, tmOf, upcoming, type LayoutCtx } from '../context';
 
 export function month(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -9,8 +10,26 @@ export function month(ctx: LayoutCtx): string {
 
 	// header bar
 	d.fill(0, 0, 400, 32);
-	d.text(8, 23, 'mb', `${monthName(now)} ${now.year}`, { color: PAPER });
-	d.text(392, 21, 's', hiLoText(ctx, '  '), { align: 'right', color: PAPER });
+	const titles = [`${monthName(now)} ${now.year}`, `${monthShort(now)} ${now.year}`];
+	const hi = ctx.weather ? round0(ctx.weather.high) : '';
+	const lo = ctx.weather ? round0(ctx.weather.low) : '';
+	const wx = ctx.weather ? [`High ${hi}C  Low ${lo}C`, `${hi}C / ${lo}C`, `${hi}C`] : ['---'];
+	let title = titles[titles.length - 1];
+	let wxText = wx[wx.length - 1];
+	let best = Infinity;
+	for (let ti = 0; ti < titles.length; ti++) {
+		for (let wi = 0; wi < wx.length; wi++) {
+			const cost = ti + wi * 1.5;
+			if (cost >= best) continue;
+			if (8 + measure(ctx.family, 'mb', titles[ti]).right + 14 <= 392 - measure(ctx.family, 's', wx[wi]).w) {
+				best = cost;
+				title = titles[ti];
+				wxText = wx[wi];
+			}
+		}
+	}
+	d.text(8, 23, 'mb', title, { color: PAPER });
+	d.text(392, 21, 's', wxText, { align: 'right', color: PAPER });
 
 	const colw = 57;
 	const top = 50;
@@ -48,9 +67,13 @@ export function month(ctx: LayoutCtx): string {
 	const next = upcoming(ctx, 0);
 	if (next) {
 		const t = tmOf(next.startLocal);
+		const nextX = Math.max(52, 8 + measure(ctx.family, 'sb', 'Next').right + (ctx.family === 'sans' ? 4 : 9));
+		// the day + time on the right; drop the weekday if the font is too wide to leave room for the title
+		const when = firstThatFits(ctx.family, 'sb', [`${dayShort(t)} ${t.mday}  ${evTimeStr(next)}`, `${t.mday}  ${evTimeStr(next)}`, evTimeStr(next)], 392 - nextX - 90);
+		const whenW = measure(ctx.family, 'sb', when).w;
 		d.text(8, 288, 'sb', 'Next');
-		d.text(52, 288, 's', next.title, { maxW: 220 });
-		d.text(392, 290, 'sb', `${dayShort(t)} ${t.mday}  ${evTimeStr(next)}`, { align: 'right' });
+		d.text(nextX, 288, 's', next.title, { maxW: Math.min(220, 392 - whenW - 10 - nextX) });
+		d.text(392, 290, 'sb', when, { align: 'right' });
 	} else {
 		d.text(8, 288, 's', 'No upcoming events');
 	}

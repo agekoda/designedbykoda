@@ -2,6 +2,7 @@
 // then the next events grouped by day underneath.
 import { Draw } from '../draw';
 import { CORNER, CORNER_BYTES } from '../image';
+import { firstThatFits, measure } from '../measure';
 import { batteryText, daysInMonth, dayName, evTimeStr, monthName, monthShort, round0, tmOf, type LayoutCtx } from '../context';
 
 export function agenda(ctx: LayoutCtx): string {
@@ -10,11 +11,16 @@ export function agenda(ctx: LayoutCtx): string {
 
 	// ---- left block: weather, big date, weekday, month and year ----
 	// Each is centred in a 40px box that starts at x = 80 (so it centres on x = 100).
-	const weatherText = ctx.weather ? `High:${round0(ctx.weather.high)}C   Low:${round0(ctx.weather.low)}C` : '---';
+	// (each is centred on x = 100, so the widest it may be is about 190 before it touches the right-hand block)
+	const hi = ctx.weather ? round0(ctx.weather.high) : '';
+	const lo = ctx.weather ? round0(ctx.weather.low) : '';
+	const weatherText = ctx.weather
+		? firstThatFits(ctx.family, 's', [`High:${hi}C   Low:${lo}C`, `High:${hi}C Low:${lo}C`, `H:${hi}C  L:${lo}C`, `${hi}C / ${lo}C`], 188)
+		: '---';
 	d.text(80, 15, 's', weatherText, { align: 'box', maxW: 40 });
 	d.text(80, 70, 'bb', String(now.mday), { align: 'box', maxW: 40 });
 	d.text(80, 98, 'mb', dayName(now), { align: 'box', maxW: 40 });
-	d.text(80, 118, 's', `${monthName(now)} ${now.year}`, { align: 'box', maxW: 40 });
+	d.text(80, 118, 's', firstThatFits(ctx.family, 's', [`${monthName(now)} ${now.year}`, `${monthShort(now)} ${now.year}`], 188), { align: 'box', maxW: 40 });
 
 	// ---- top right: a picture if one was set up, otherwise the mini month ----
 	if (ctx.cornerImage && ctx.cornerImage.length === CORNER_BYTES) {
@@ -70,15 +76,21 @@ export function agenda(ctx: LayoutCtx): string {
 		const count = j - i;
 		if (count === 0) continue;
 
+		if (yPos > 290) break; // no room left on the screen for another day
+		const room = Math.min(count, Math.floor((290 - yPos) / 24) + 1, maxEvents - shown);
 		d.text(5, yPos + 10, 'mb', String(tmOf(ev[i].startLocal).mday));
 		const lineStart = yPos - 2;
-		const lineEnd = yPos + count * 24 - 2;
+		const lineEnd = yPos + room * 24 - 2;
 		d.vline(40, lineStart, lineEnd - lineStart + 1);
 
 		for (let k = i; k < j && shown < maxEvents; k++) {
 			if (yPos > 290) break;
-			d.text(48, yPos + 8, 's', ev[k].title, { maxW: 262 });
-			d.text(390, yPos + 8, 'mb', evTimeStr(ev[k]), { align: 'rawR' });
+			const timeText = evTimeStr(ev[k]);
+			const tm = measure(ctx.family, 'mb', timeText);
+			// the title gets whatever the time leaves free (never more than the original 262px)
+			const titleRoom = Math.min(262, 390 - tm.right - 10 - 48);
+			d.text(48, yPos + 8, 's', ev[k].title, { maxW: titleRoom });
+			d.text(390, yPos + 8, 'mb', timeText, { align: 'rawR' });
 			yPos += 24;
 			shown++;
 		}

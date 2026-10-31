@@ -1,6 +1,7 @@
 // Next up: the very next event in huge type, then the four after it.
 import { Draw, PAPER } from '../draw';
-import { batteryText, dayIdx, dayShort, evTimeStr, hiLoText, monthShort, relDayText, tmOf, upcoming, type LayoutCtx } from '../context';
+import { firstThatFits, measure } from '../measure';
+import { batteryText, dayIdx, dayShort, evTimeStr, monthShort, relDayText, round0, tmOf, upcoming, type LayoutCtx } from '../context';
 
 export function nextup(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -27,8 +28,9 @@ export function nextup(ctx: LayoutCtx): string {
 			const et = tmOf(e.startLocal);
 			d.text(10, b + 1, 'mb', String(et.mday));
 			d.vline(44, b - 13, 19);
-			d.text(52, b, 's', e.title, { maxW: 230 });
-			d.text(392, b, 'sb', evTimeStr(e), { align: 'right' });
+			const timeText = evTimeStr(e);
+			d.text(52, b, 's', e.title, { maxW: Math.min(230, 392 - measure(ctx.family, 'sb', timeText).w - 10 - 52) });
+			d.text(392, b, 'sb', timeText, { align: 'right' });
 		}
 	} else {
 		d.text(10, 108, 'mb', 'Nothing coming up');
@@ -36,8 +38,11 @@ export function nextup(ctx: LayoutCtx): string {
 
 	// footer
 	d.hline(0, 270, 400);
-	d.text(10, 290, 's', hiLoText(ctx, '   '));
 	const bat = batteryText(ctx.vbat);
+	const batW = bat ? measure(ctx.family, 's', bat).w : 0;
+	const hi = ctx.weather ? round0(ctx.weather.high) : '';
+	const lo = ctx.weather ? round0(ctx.weather.low) : '';
+	d.text(10, 290, 's', ctx.weather ? firstThatFits(ctx.family, 's', [`High ${hi}C   Low ${lo}C`, `High ${hi}C  Low ${lo}C`, `${hi}C / ${lo}C`], 392 - batW - 20 - 10) : '---');
 	if (bat) d.text(392, 290, 's', bat, { align: 'right' });
 	return d.toString();
 }

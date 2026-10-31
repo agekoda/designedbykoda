@@ -380,8 +380,15 @@ function b64bytes(s: string, need: number): Uint8Array {
 	return out;
 }
 
+// What was drawn where, for automatic layout checks (see tools/check-layouts).
+export interface Trace {
+	texts: { x: number; y: number; w: number; h: number; txt: string }[];
+	lines: { x: number; y: number; w: number; h: number }[]; // H / V rules
+	fills: { x: number; y: number; w: number; h: number }[]; // F bars and I pictures
+}
+
 // Draws a draw list the way the calendar does. `fonts` comes from loadFontPack().
-export function renderDrawList(text: string, fonts: Map<number, LoadedFont>): Rendered {
+export function renderDrawList(text: string, fonts: Map<number, LoadedFont>, trace?: Trace): Rendered {
 	const v = validate(text);
 	const g = new Gfx();
 	if (!v.ok) {
@@ -417,13 +424,13 @@ export function renderDrawList(text: string, fonts: Map<number, LoadedFont>): Re
 				if (maxW > 400) maxW = 400;
 				let txt = text.slice(cur.p, eol);
 				if (txt.length > MAX_TEXT) txt = txt.slice(0, MAX_TEXT);
-				drawText(g, x, y, pickFont(fontId), flags, maxW, txt, ink, paper);
+				drawText(g, x, y, pickFont(fontId), flags, maxW, txt, ink, paper, trace);
 				break;
 			}
-			case 'H': { const x = i16(cur.num()), y = i16(cur.num()), l = i16(cur.num()), c = cur.num(); g.hline(x, y, l, col(c)); break; }
-			case 'V': { const x = i16(cur.num()), y = i16(cur.num()), l = i16(cur.num()), c = cur.num(); g.vline(x, y, l, col(c)); break; }
+			case 'H': { const x = i16(cur.num()), y = i16(cur.num()), l = i16(cur.num()), c = cur.num(); g.hline(x, y, l, col(c)); trace?.lines.push({ x, y, w: l, h: 1 }); break; }
+			case 'V': { const x = i16(cur.num()), y = i16(cur.num()), l = i16(cur.num()), c = cur.num(); g.vline(x, y, l, col(c)); trace?.lines.push({ x, y, w: 1, h: l }); break; }
 			case 'L': { const a = i16(cur.num()), b = i16(cur.num()), c2 = i16(cur.num()), d = i16(cur.num()), c = cur.num(); g.line(a, b, c2, d, col(c)); break; }
-			case 'F': { const x = i16(cur.num()), y = i16(cur.num()), w = i16(cur.num()), h = i16(cur.num()), c = cur.num(); g.fillRect(x, y, w, h, col(c)); break; }
+			case 'F': { const x = i16(cur.num()), y = i16(cur.num()), w = i16(cur.num()), h = i16(cur.num()), c = cur.num(); g.fillRect(x, y, w, h, col(c)); if (!c) trace?.fills.push({ x, y, w, h }); break; }
 			case 'R': { const x = i16(cur.num()), y = i16(cur.num()), w = i16(cur.num()), h = i16(cur.num()), c = cur.num(); g.drawRect(x, y, w, h, col(c)); break; }
 			case 'B': { const x = i16(cur.num()), y = i16(cur.num()), w = i16(cur.num()), h = i16(cur.num()), r = i16(cur.num()), c = cur.num(); g.fillRoundRect(x, y, w, h, r, col(c)); break; }
 			case 'b': { const x = i16(cur.num()), y = i16(cur.num()), w = i16(cur.num()), h = i16(cur.num()), r = i16(cur.num()), c = cur.num(); g.drawRoundRect(x, y, w, h, r, col(c)); break; }
@@ -443,6 +450,7 @@ export function renderDrawList(text: string, fonts: Map<number, LoadedFont>): Re
 				const x = i16(cur.num()), y = i16(cur.num());
 				const w = cur.num(), h = cur.num(), c = cur.num();
 				if (w > 0 && h > 0 && w <= 400 && h <= 300) {
+					trace?.fills.push({ x, y, w, h });
 					const stride = (w + 7) >> 3;
 					const bits = b64bytes(text.slice(cur.p, eol), stride * h);
 					for (let yy = 0; yy < h; yy++)
@@ -459,7 +467,7 @@ export function renderDrawList(text: string, fonts: Map<number, LoadedFont>): Re
 	return { px: g.px, dark: v.dark, ok: true };
 }
 
-function drawText(g: Gfx, x: number, y: number, font: LoadedFont | null, flags: number, maxW: number, txt: string, ink: number, paper: number) {
+function drawText(g: Gfx, x: number, y: number, font: LoadedFont | null, flags: number, maxW: number, txt: string, ink: number, paper: number, trace?: Trace) {
 	const align = flags & 7;
 	const inv = !!(flags & 8);
 	const bold = !!(flags & 16);
@@ -489,6 +497,10 @@ function drawText(g: Gfx, x: number, y: number, font: LoadedFont | null, flags: 
 		const t = g.bounds(txt, cx, y);
 		const rad = Math.trunc(Math.max(t.w, t.h) / 2) + 3;
 		g.fillCircle(t.x1 + Math.trunc(t.w / 2), t.y1 + Math.trunc(t.h / 2), rad, ink);
+	}
+	if (trace) {
+		const t = g.bounds(txt, cx, y);
+		trace.texts.push({ x: t.x1, y: t.y1, w: t.w + (bold ? 1 : 0), h: t.h, txt });
 	}
 	g.color = color;
 	g.cx = cx;
