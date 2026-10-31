@@ -8,11 +8,29 @@ const IMAGES = [
 	'/images/projects/eink-calendar/3.jpg',
 ];
 
+const included = [
+	'E-Ink Calendar, assembled in its frame',
+	'USB-C charging cable',
+	'Built-in 500 mAh rechargeable battery',
+	'Quick-start card with the setup QR code',
+];
+
 const specs = [
 	{ label: 'Display', value: '4.2″ e-ink' },
-	{ label: 'Battery', value: '5–6 months' },
+	{ label: 'Resolution', value: '400 × 300' },
+	{ label: 'Colours', value: 'Black and white' },
+	{ label: 'Power', value: 'USB-C charging, 500 mAh battery' },
+	{ label: 'Battery life', value: '5–6 months per charge' },
+	{ label: 'Wi-Fi', value: '2.4 GHz' },
 	{ label: 'Syncs with', value: 'Google Calendar' },
-	{ label: 'Refresh', value: 'Hourly or daily' },
+	{ label: 'Setup', value: 'In your browser, no app required' },
+	{ label: 'Mounting', value: 'On a desk or on the wall' },
+];
+
+const shipping = [
+	'Estimated to ship by the end of January 2027.',
+	'Your order is paid securely through Stripe when you check out.',
+	"I'll email you when your calendar is on its way.",
 ];
 ---
 <Layout
@@ -61,22 +79,18 @@ const specs = [
 		<div class="hero-grid">
 			<div class="gallery">
 				<div class="stage" id="stage">
-					{IMAGES.map((src, i) => (
-						<img
-							src={src}
-							alt={`E-Ink Calendar product photo ${i + 1}`}
-							class:list={['shot', { active: i === 0 }]}
-							loading="eager"
-							decoding="async"
-						/>
-					))}
-					<button class="arrow left" id="gallery-prev" aria-label="Previous image">
-						<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 5L8 12L15 19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-					</button>
-					<button class="arrow right" id="gallery-next" aria-label="Next image">
-						<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5L16 12L9 19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-					</button>
-					<span class="counter" id="gallery-counter" aria-live="polite">1 / {IMAGES.length}</span>
+					<div class="track" id="track">
+						{IMAGES.map((src, i) => (
+							<img
+								src={src}
+								alt={`E-Ink Calendar product photo ${i + 1}`}
+								class="shot"
+								draggable="false"
+								loading="eager"
+								decoding="async"
+							/>
+						))}
+					</div>
 				</div>
 				<div class="thumbs" role="group" aria-label="Choose image">
 					{IMAGES.map((src, i) => (
@@ -106,7 +120,6 @@ const specs = [
 
 				<div class="price-block">
 					<span class="price" id="price-display">${BASE_PRICE_USD}</span>
-					<span class="price-note">one-time payment</span>
 				</div>
 
 				<button class="preorder-btn" data-magnetic id="preorder-btn">Preorder Now</button>
@@ -122,14 +135,52 @@ const specs = [
 					</li>
 				</ul>
 
-				<dl class="specs">
-					{specs.map((s) => (
-						<div>
-							<dt>{s.label}</dt>
-							<dd>{s.value}</dd>
+				<div class="acc" id="acc">
+					<div class="acc-item">
+						<button type="button" class="acc-head" aria-expanded="true" aria-controls="acc-included" id="acc-included-h">
+							What's included
+							<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+						</button>
+						<div class="acc-panel open" id="acc-included" role="region" aria-labelledby="acc-included-h">
+							<div class="acc-inner">
+								<ul class="acc-list">
+									{included.map((t) => <li>{t}</li>)}
+								</ul>
+							</div>
 						</div>
-					))}
-				</dl>
+					</div>
+					<div class="acc-item">
+						<button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-specs" id="acc-specs-h">
+							Specs
+							<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+						</button>
+						<div class="acc-panel" id="acc-specs" role="region" aria-labelledby="acc-specs-h" inert>
+							<div class="acc-inner">
+								<dl class="spec-list">
+									{specs.map((x) => (
+										<div>
+											<dt>{x.label}</dt>
+											<dd>{x.value}</dd>
+										</div>
+									))}
+								</dl>
+							</div>
+						</div>
+					</div>
+					<div class="acc-item">
+						<button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-shipping" id="acc-shipping-h">
+							Shipping and preorder
+							<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+						</button>
+						<div class="acc-panel" id="acc-shipping" role="region" aria-labelledby="acc-shipping-h" inert>
+							<div class="acc-inner">
+								<ul class="acc-list">
+									{shipping.map((t) => <li>{t}</li>)}
+								</ul>
+							</div>
+						</div>
+					</div>
+				</div>
 			</div>
 		</div>
 
@@ -160,30 +211,95 @@ const specs = [
 </Layout>
 
 <script>
-	// ---------- Gallery: instant swap, nothing animates ----------
-	const shots = Array.from(document.querySelectorAll<HTMLImageElement>('.shot'));
+	// ---------- Gallery: swipeable track, smooth slide between photos ----------
+	const stage = document.getElementById('stage') as HTMLElement;
+	const track = document.getElementById('track') as HTMLElement;
 	const thumbs = Array.from(document.querySelectorAll<HTMLButtonElement>('.thumb'));
-	const counter = document.getElementById('gallery-counter');
+	const last = thumbs.length - 1;
 	let current = 0;
 
-	function show(i: number) {
-		current = (i + shots.length) % shots.length;
-		shots.forEach((s, n) => s.classList.toggle('active', n === current));
+	function setActive() {
 		thumbs.forEach((t, n) => {
 			t.classList.toggle('active', n === current);
 			t.setAttribute('aria-pressed', String(n === current));
 		});
-		if (counter) counter.textContent = `${current + 1} / ${shots.length}`;
 	}
-	document.getElementById('gallery-prev')?.addEventListener('click', () => show(current - 1));
-	document.getElementById('gallery-next')?.addEventListener('click', () => show(current + 1));
+	function place(dragPx = 0, animate = true) {
+		track.style.transition = animate ? '' : 'none';
+		track.style.transform = `translate3d(calc(${-current * 100}% + ${dragPx}px), 0, 0)`;
+	}
+	function show(i: number) {
+		current = Math.max(0, Math.min(last, i));
+		setActive();
+		place();
+	}
 	thumbs.forEach((t) => t.addEventListener('click', () => show(Number(t.dataset.index))));
+
+	// Drag / swipe with mouse, touch or pen. Vertical scrolling still works
+	// because the stage only claims horizontal movement.
+	let downX = 0, downY = 0, dx = 0, downT = 0, pid = -1;
+	let armed = false, dragging = false;
+
+	stage.addEventListener('pointerdown', (e) => {
+		if (e.pointerType === 'mouse' && e.button !== 0) return;
+		armed = true;
+		dragging = false;
+		pid = e.pointerId;
+		downX = e.clientX;
+		downY = e.clientY;
+		downT = performance.now();
+		dx = 0;
+	});
+	stage.addEventListener('pointermove', (e) => {
+		if (!armed || e.pointerId !== pid) return;
+		const mx = e.clientX - downX;
+		const my = e.clientY - downY;
+		if (!dragging) {
+			if (Math.abs(mx) < 6 && Math.abs(my) < 6) return;
+			if (Math.abs(my) > Math.abs(mx)) { armed = false; return; }
+			dragging = true;
+			stage.setPointerCapture(pid);
+			stage.classList.add('dragging');
+		}
+		dx = mx;
+		// Rubber-band a little at the first and last photo.
+		const atEdge = (current === 0 && dx > 0) || (current === last && dx < 0);
+		place(atEdge ? dx * 0.3 : dx, false);
+	});
+	function endDrag(e: PointerEvent) {
+		if (!armed || e.pointerId !== pid) return;
+		armed = false;
+		if (!dragging) return;
+		dragging = false;
+		stage.classList.remove('dragging');
+		const w = stage.clientWidth || 1;
+		const speed = Math.abs(dx) / Math.max(1, performance.now() - downT);
+		const far = Math.abs(dx) > w * 0.18;
+		const flick = speed > 0.4 && Math.abs(dx) > 30;
+		if (far || flick) show(current + (dx < 0 ? 1 : -1));
+		else show(current);
+	}
+	stage.addEventListener('pointerup', endDrag);
+	stage.addEventListener('pointercancel', endDrag);
+
 	document.addEventListener('keydown', (e) => {
 		if (menu && !menu.hidden) return;
 		const tag = (e.target as HTMLElement)?.tagName;
 		if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 		if (e.key === 'ArrowLeft') show(current - 1);
 		if (e.key === 'ArrowRight') show(current + 1);
+	});
+
+	// ---------- Expandable sections ----------
+	document.querySelectorAll<HTMLButtonElement>('.acc-head').forEach((head) => {
+		head.addEventListener('click', () => {
+			const panel = document.getElementById(head.getAttribute('aria-controls') || '');
+			if (!panel) return;
+			const open = head.getAttribute('aria-expanded') !== 'true';
+			head.setAttribute('aria-expanded', String(open));
+			panel.classList.toggle('open', open);
+			panel.toggleAttribute('inert', !open);
+		});
 	});
 
 	// ---------- Currency dropdown ----------
@@ -412,21 +528,29 @@ const specs = [
 		border-radius: 16px;
 		border: 1px solid var(--border);
 		background: var(--bg-raised);
+		touch-action: pan-y;
+		user-select: none;
+		-webkit-user-select: none;
+		cursor: grab;
 	}
-	/* Every photo sits stacked in the same box; switching just changes which
-	   one is visible, so there's nothing to load or animate. */
+	.stage.dragging {
+		cursor: grabbing;
+	}
+	/* All photos sit side by side in one strip; switching slides the strip. */
+	.track {
+		display: flex;
+		height: 100%;
+		will-change: transform;
+		transition: transform 0.55s cubic-bezier(0.22, 0.8, 0.24, 1);
+	}
 	.shot {
-		position: absolute;
-		inset: 0;
+		flex: 0 0 100%;
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		visibility: hidden;
 		border-radius: 0;
 		border: none;
-	}
-	.shot.active {
-		visibility: visible;
+		pointer-events: none;
 	}
 	/* The site gives every image a hover zoom; not on the product photo. */
 	.stage :global(img.shot),
@@ -434,54 +558,10 @@ const specs = [
 		transform: none !important;
 		transition: none !important;
 	}
-	.arrow {
-		position: absolute;
-		z-index: 2;
-		top: 50%;
-		transform: translateY(-50%);
-		width: 42px;
-		height: 42px;
-		padding: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: #fff;
-		background: rgba(10, 14, 20, 0.45);
-		border: 1px solid rgba(255, 255, 255, 0.18);
-		border-radius: 50%;
-		backdrop-filter: blur(6px);
-		-webkit-backdrop-filter: blur(6px);
-		opacity: 0;
-		transition: opacity 0.15s, background 0.15s;
-	}
-	.arrow svg {
-		width: 20px;
-		height: 20px;
-	}
-	.stage:hover .arrow,
-	.arrow:focus-visible {
-		opacity: 1;
-	}
-	.arrow:hover {
-		background: rgba(10, 14, 20, 0.7);
-	}
-	.arrow.left {
-		left: 10px;
-	}
-	.arrow.right {
-		right: 10px;
-	}
-	.counter {
-		position: absolute;
-		z-index: 2;
-		right: 10px;
-		bottom: 10px;
-		font-size: 0.75em;
-		font-variant-numeric: tabular-nums;
-		color: #fff;
-		background: rgba(10, 14, 20, 0.55);
-		border-radius: 999px;
-		padding: 0.25em 0.7em;
+	@media (prefers-reduced-motion: reduce) {
+		.track {
+			transition-duration: 0.01s;
+		}
 	}
 	.thumbs {
 		display: grid;
@@ -535,8 +615,9 @@ const specs = [
 	}
 	.hero-info h1 {
 		margin: 0 0 0.5em 0;
-		font-size: 2.3em;
-		line-height: 1.1;
+		font-size: clamp(2.5em, 5.2vw, 3.4em);
+		line-height: 1.05;
+		letter-spacing: -0.02em;
 	}
 	.tagline {
 		color: var(--muted);
@@ -555,10 +636,6 @@ const specs = [
 		line-height: 1;
 		color: var(--fg);
 		font-variant-numeric: tabular-nums;
-	}
-	.price-note {
-		color: var(--muted-dim);
-		font-size: 0.85em;
 	}
 	.preorder-btn {
 		display: flex;
@@ -601,32 +678,106 @@ const specs = [
 		flex: none;
 		color: var(--muted-dim);
 	}
-	.specs {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.7em;
-		margin: 1.8em 0 0 0;
-		padding-top: 1.6em;
+	/* ---------- expandable sections ---------- */
+	.acc {
+		margin-top: 1.8em;
 		border-top: 1px solid var(--border);
 	}
-	.specs div {
-		background: var(--bg-raised);
-		border: 1px solid var(--border);
-		border-radius: 12px;
-		padding: 0.75em 1em;
+	.acc-item {
+		border-bottom: 1px solid var(--border);
 	}
-	.specs dt {
+	.acc-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		width: 100%;
+		padding: 1.1em 0.1em;
+		font: inherit;
+		font-weight: 600;
+		font-size: 1.02em;
+		text-align: left;
+		color: var(--fg);
+		background: none;
+		border: none;
+	}
+	.acc-head svg {
+		width: 18px;
+		height: 18px;
+		flex: none;
+		color: var(--muted);
+		transition: transform 0.3s ease, color 0.15s;
+	}
+	.acc-head:hover svg {
+		color: var(--fg);
+	}
+	.acc-head[aria-expanded='true'] svg {
+		transform: rotate(180deg);
+	}
+	.acc-panel {
+		display: grid;
+		grid-template-rows: 0fr;
+		opacity: 0;
+		transition: grid-template-rows 0.35s ease, opacity 0.25s ease;
+	}
+	.acc-panel.open {
+		grid-template-rows: 1fr;
+		opacity: 1;
+	}
+	.acc-inner {
+		overflow: hidden;
+		min-height: 0;
+	}
+	.acc-list {
+		list-style: none;
+		margin: 0;
+		padding: 0 0.1em 1.2em 0.1em;
+		display: grid;
+		gap: 0.6em;
+		color: var(--muted);
+		line-height: 1.5;
+	}
+	.acc-list li {
+		position: relative;
+		padding-left: 1.3em;
+	}
+	.acc-list li::before {
+		content: '';
+		position: absolute;
+		left: 0.15em;
+		top: 0.55em;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--accent);
+	}
+	.spec-list {
+		margin: 0;
+		padding: 0 0.1em 1.2em 0.1em;
+	}
+	.spec-list div {
+		display: grid;
+		grid-template-columns: 8.5em 1fr;
+		gap: 1em;
+		padding: 0.55em 0;
+		border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+	}
+	.spec-list div:first-child {
+		border-top: none;
+	}
+	.spec-list dt {
 		color: var(--muted-dim);
-		font-size: 0.75em;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-		margin-bottom: 0.15em;
+		font-size: 0.9em;
 	}
-	.specs dd {
+	.spec-list dd {
 		margin: 0;
 		color: var(--fg);
-		font-weight: 600;
-		font-size: 0.95em;
+		font-weight: 500;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.acc-panel,
+		.acc-head svg {
+			transition: none;
+		}
 	}
 
 	/* ---------- overview ---------- */
@@ -653,9 +804,6 @@ const specs = [
 		}
 		.gallery {
 			position: static;
-		}
-		.arrow {
-			opacity: 1;
 		}
 	}
 </style>
