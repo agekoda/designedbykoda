@@ -4,13 +4,15 @@ import { BASE_PRICE_USD, CURRENCIES } from '../../data/preorderPricing';
 
 const IMAGES = [
 	'/images/projects/eink-calendar/preorder-hero.jpg',
-	'/images/projects/eink-calendar/1.jpg',
-	'/images/projects/eink-calendar/3.jpg',
+	'/images/projects/eink-calendar/7.jpg',
+	'/images/projects/eink-calendar/4.jpg',
+	'/images/projects/eink-calendar/6.jpg',
+	'/images/projects/eink-calendar/8.jpg',
+	'/images/projects/eink-calendar/2.jpg',
 ];
 
 const included = [
-	'E-Ink Calendar, assembled in its frame',
-	'USB-C charging cable',
+	'E-Ink Calendar in its frame',
 	'Built-in 500 mAh rechargeable battery',
 	'Quick-start card with the setup QR code',
 ];
@@ -20,7 +22,6 @@ const specs = [
 	{ label: 'Resolution', value: '400 × 300' },
 	{ label: 'Colours', value: 'Black and white' },
 	{ label: 'Power', value: 'USB-C charging, 500 mAh battery' },
-	{ label: 'Battery life', value: '5–6 months per charge' },
 	{ label: 'Wi-Fi', value: '2.4 GHz' },
 	{ label: 'Syncs with', value: 'Google Calendar' },
 	{ label: 'Setup', value: 'In your browser, no app required' },
@@ -92,7 +93,7 @@ const shipping = [
 						))}
 					</div>
 				</div>
-				<div class="thumbs" role="group" aria-label="Choose image">
+				<div class="thumbs" role="group" aria-label="Choose image" style={`--n:${IMAGES.length}`}>
 					{IMAGES.map((src, i) => (
 						<button
 							type="button"
@@ -103,6 +104,7 @@ const shipping = [
 							style={`background-image:url('${src}')`}
 						></button>
 					))}
+					<span class="thumb-ring" id="thumb-ring" aria-hidden="true"></span>
 				</div>
 			</div>
 
@@ -216,7 +218,22 @@ const shipping = [
 	const track = document.getElementById('track') as HTMLElement;
 	const thumbs = Array.from(document.querySelectorAll<HTMLButtonElement>('.thumb'));
 	const last = thumbs.length - 1;
+	const ring = document.getElementById('thumb-ring') as HTMLElement;
 	let current = 0;
+
+	// Slow ease-in and ease-out. The further the jump, the longer it takes, so
+	// going from the first photo to the last sweeps past the ones in between
+	// and then settles gently on the one you picked.
+	const EASE = 'cubic-bezier(0.65, 0, 0.15, 1)';
+	const durationFor = (steps: number) => Math.min(1.5, 0.6 + 0.14 * steps);
+
+	function moveRing(animate: boolean, dur = 0.6) {
+		const t = thumbs[current];
+		ring.style.transition = animate ? `transform ${dur}s ${EASE}` : 'none';
+		ring.style.width = `${t.offsetWidth}px`;
+		ring.style.height = `${t.offsetHeight}px`;
+		ring.style.transform = `translate(${t.offsetLeft}px, ${t.offsetTop}px)`;
+	}
 
 	function setActive() {
 		thumbs.forEach((t, n) => {
@@ -224,15 +241,21 @@ const shipping = [
 			t.setAttribute('aria-pressed', String(n === current));
 		});
 	}
-	function place(dragPx = 0, animate = true) {
-		track.style.transition = animate ? '' : 'none';
+	function place(dragPx = 0, animate = true, dur = 0.6) {
+		track.style.transition = animate ? `transform ${dur}s ${EASE}` : 'none';
 		track.style.transform = `translate3d(calc(${-current * 100}% + ${dragPx}px), 0, 0)`;
 	}
 	function show(i: number) {
-		current = Math.max(0, Math.min(last, i));
+		const next = Math.max(0, Math.min(last, i));
+		const dur = durationFor(Math.abs(next - current));
+		current = next;
 		setActive();
-		place();
+		place(0, true, dur);
+		moveRing(true, dur);
 	}
+	moveRing(false);
+	window.addEventListener('resize', () => moveRing(false));
+	window.addEventListener('load', () => moveRing(false));
 	thumbs.forEach((t) => t.addEventListener('click', () => show(Number(t.dataset.index))));
 
 	// Drag / swipe with mouse, touch or pen. Vertical scrolling still works
@@ -375,10 +398,18 @@ const shipping = [
 </script>
 
 <style>
+	/* Wider than the site's 860px column, centred on the page, and pulled up
+	   closer to the header. This page only. */
 	.preorder-page {
-		max-width: 1000px;
-		margin: 0 auto;
-		padding: 1em 0 4em 0;
+		position: relative;
+		left: 50%;
+		width: min(1180px, 100vw - 3em);
+		transform: translateX(-50%);
+		margin-top: -1.8em;
+		padding: 0 0 4em 0;
+	}
+	:global(html:has(.preorder-page)) {
+		overflow-x: clip;
 	}
 	/* Circle cursor only: hide the native one on everything here. */
 	:global(html.has-custom-cursor) .preorder-page,
@@ -391,7 +422,7 @@ const shipping = [
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		margin-bottom: 1.6em;
+		margin-bottom: 1.2em;
 	}
 	.back {
 		display: inline-flex;
@@ -511,7 +542,7 @@ const shipping = [
 	.hero-grid {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-		gap: 3em;
+		gap: 3.5em;
 		align-items: start;
 		margin-bottom: 3.5em;
 	}
@@ -541,7 +572,6 @@ const shipping = [
 		display: flex;
 		height: 100%;
 		will-change: transform;
-		transition: transform 0.55s cubic-bezier(0.22, 0.8, 0.24, 1);
 	}
 	.shot {
 		flex: 0 0 100%;
@@ -559,15 +589,29 @@ const shipping = [
 		transition: none !important;
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.track {
-			transition-duration: 0.01s;
+		.track,
+		.thumb-ring {
+			transition-duration: 0.01s !important;
 		}
 	}
 	.thumbs {
+		position: relative;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(64px, 84px));
+		grid-template-columns: repeat(var(--n, 6), minmax(0, 84px));
 		gap: 0.6em;
 		margin-top: 0.8em;
+	}
+	/* One highlight that slides to whichever photo is showing. */
+	.thumb-ring {
+		position: absolute;
+		top: 0;
+		left: 0;
+		z-index: 2;
+		pointer-events: none;
+		border: 1px solid var(--accent);
+		border-radius: 10px;
+		box-shadow: 0 0 0 1px var(--accent);
+		will-change: transform;
 	}
 	.thumb {
 		aspect-ratio: 1;
@@ -577,15 +621,13 @@ const shipping = [
 		border: 1px solid var(--border);
 		border-radius: 10px;
 		opacity: 0.6;
-		transition: opacity 0.15s, border-color 0.15s;
+		transition: opacity 0.4s ease;
 	}
 	.thumb:hover {
 		opacity: 1;
 	}
 	.thumb.active {
 		opacity: 1;
-		border-color: var(--accent);
-		box-shadow: 0 0 0 1px var(--accent);
 	}
 
 	/* ---------- info column ---------- */
@@ -756,7 +798,7 @@ const shipping = [
 	}
 	.spec-list div {
 		display: grid;
-		grid-template-columns: 8.5em 1fr;
+		grid-template-columns: 9em 1fr;
 		gap: 1em;
 		padding: 0.55em 0;
 		border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);

@@ -1,7 +1,11 @@
 // Resizes + compresses every photo under public/images/projects/ in place,
-// so full-resolution camera photos don't end up shipped straight to the
-// browser at 4000px+ wide when they only ever display at a few hundred
-// pixels on the page.
+// so full-resolution camera photos and renders don't end up shipped straight
+// to the browser at 4000px+ wide.
+//
+// This version favours sharpness over file size: high JPEG quality, full
+// colour detail (no chroma subsampling, which is what makes small text and
+// UI renders look smudgy), and a generous size cap so the images stay crisp
+// on retina screens. PNGs are kept lossless.
 //
 // Run it any time after adding new photos:
 //   node scripts/optimize-images.js
@@ -15,14 +19,14 @@ import sharp from 'sharp';
 
 const IMAGES_DIR = path.join(process.cwd(), 'public', 'images', 'projects');
 
-// Hero images are shown bigger (up to full column width), gallery photos
-// (1.jpg, 2.jpg, ...) are shown smaller in a grid — so gallery gets a
-// tighter cap. Both numbers give ~2x headroom over their largest real
-// on-page display size, which covers retina screens without shipping
-// unnecessary pixels.
-const MAX_WIDTH_HERO = 1600;
-const MAX_WIDTH_GALLERY = 1000;
-const JPEG_QUALITY = 78;
+// Longest side allowed, in pixels. Anything smaller is left alone, nothing is
+// ever scaled up. Both leave plenty of headroom for 2x screens.
+const MAX_SIDE_HERO = 2400;
+const MAX_SIDE_GALLERY = 2400;
+const JPEG_QUALITY = 92;
+// Files already within the size cap and under this are not re-encoded at all,
+// so running the script again never costs any more quality.
+const SKIP_UNDER_BYTES = 2.5 * 1024 * 1024;
 
 async function findImages(dir) {
 	const entries = await readdir(dir, { withFileTypes: true });
@@ -43,23 +47,28 @@ function formatKiB(bytes) {
 }
 
 async function optimize(filePath) {
-	const isHero = path.basename(filePath).toLowerCase().startsWith('hero');
-	const maxWidth = isHero ? MAX_WIDTH_HERO : MAX_WIDTH_GALLERY;
+	const isHero = path.basename(filePath).toLowerCase().includes('hero');
+	const maxSide = isHero ? MAX_SIDE_HERO : MAX_SIDE_GALLERY;
 	const isPng = /\.png$/i.test(filePath);
 
 	const before = (await stat(filePath)).size;
 	const image = sharp(filePath);
 	const metadata = await image.metadata();
 
-	if (metadata.width && metadata.width <= maxWidth && before < 400 * 1024) {
+	const longest = Math.max(metadata.width || 0, metadata.height || 0);
+	if (longest <= maxSide && before < SKIP_UNDER_BYTES) {
 		// Already small enough in both dimensions and file size — skip.
 		return { filePath, skipped: true, before, after: before };
 	}
 
-	let pipeline = image.resize({ width: maxWidth, withoutEnlargement: true });
+	// rotate() applies the camera's orientation tag, so phone photos stay the
+	// right way up after the metadata is dropped.
+	let pipeline = image
+		.rotate()
+		.resize({ width: maxSide, height: maxSide, fit: 'inside', withoutEnlargement: true });
 	pipeline = isPng
-		? pipeline.png({ quality: JPEG_QUALITY, compressionLevel: 9 })
-		: pipeline.jpeg({ quality: JPEG_QUALITY, mozjpeg: true });
+		? pipeline.png({ compressionLevel: 9 })
+		: pipeline.jpeg({ quality: JPEG_QUALITY, chromaSubsampling: '4:4:4', mozjpeg: true });
 
 	const buffer = await pipeline.toBuffer();
 
