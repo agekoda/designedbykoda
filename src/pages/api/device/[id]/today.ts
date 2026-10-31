@@ -5,6 +5,7 @@
 // its own), and returning a small, pre-formatted payload.
 import { viewForStyle } from '../../../../data/calendarStyles';
 import { getForecast } from '../../../../lib/weather';
+import { renderLayout } from '../../../../lib/eink/layouts';
 export const prerender = false;
 
 function getCookielessAuthSecret(request: Request): string | null {
@@ -68,8 +69,24 @@ function getTodayRangeUTC(timeZone: string, now: Date) {
 	};
 }
 
+// Seconds until the next refresh boundary (top of the hour for hourly devices,
+// local midnight otherwise), in the user's own timezone. The firmware used to
+// work this out itself from an NTP clock; now the server does, which saves the
+// device a network round trip on every wake. Never less than 30s so a device
+// that wakes a moment early can't loop.
+function secondsUntilNextRefresh(nowLocal: number, intervalSec: number): number {
+	const secsIntoDay = ((nowLocal % 86400) + 86400) % 86400;
+	const raw = intervalSec <= 3600 ? 3600 - (secsIntoDay % 3600) : 86400 - secsIntoDay;
+	return Math.max(30, raw);
+}
+
 export async function GET({ params, request, locals }) {
 	const env = locals.runtime?.env ?? {};
+	const reqUrl = new URL(request.url);
+	// ?p=2 means the firmware draws whatever list the server sends (see
+	// src/lib/eink/draw.ts). Without it, the older JSON reply below is sent, so
+	// devices still on the old firmware keep working.
+	const proto = reqUrl.searchParams.get('p');
 	const db = env.DB;
 	const clientId = env.GOOGLE_CLIENT_ID;
 	const clientSecret = env.GOOGLE_CLIENT_SECRET;
@@ -315,6 +332,27 @@ export async function GET({ params, request, locals }) {
 	} catch {}
 
 	await db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(now, deviceId).run();
+
+	if (proto === '2') {
+		const vRaw = parseFloat(reqUrl.searchParams.get('v') ?? '');
+		const vbat = Number.isFinite(vRaw) && vRaw > 0 && vRaw < 10 ? vRaw : null;
+		const nowLocal = Math.floor(rightNow.getTime() / 1000) + offsetSec;
+		const screen = renderLayout(style, {
+			nowLocal,
+			events: trimmedEvents.map((e) => ({ title: e.title, startLocal: e.startLocal, allDay: e.allDay })),
+			weather,
+			vbat,
+			dark,
+		});
+		return new Response(screen, {
+			status: 200,
+			headers: {
+				'Content-Type': 'text/plain; charset=utf-8',
+				'Cache-Control': 'no-store',
+				'X-Sleep': String(secondsUntilNextRefresh(nowLocal, device.refresh_interval_sec || 86400)),
+			},
+		});
+	}
 
 	return json(
 		{
