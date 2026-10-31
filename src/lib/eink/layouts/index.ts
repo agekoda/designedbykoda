@@ -19,7 +19,7 @@ interface LayoutEntry {
 }
 
 export const LAYOUTS: Record<string, LayoutEntry> = {
-	agenda: { render: agenda, font: 'sans' },
+	agenda: { render: agenda, font: 'mono' },
 	month: { render: month, font: 'sans' },
 	bigdate: { render: bigdate, font: 'sans' },
 	week: { render: week, font: 'sans' },
