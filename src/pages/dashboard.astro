@@ -130,7 +130,14 @@ if (!userId) return Astro.redirect('/setup');
 		const note = el.querySelector('[data-note]') as HTMLElement;
 		// Live preview of this device's display (sample events, real layout/font/dark settings).
 		const canvas = el.querySelector('[data-canvas]') as HTMLCanvasElement;
-		renderPreview({ style: d.style, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null })
+		let cornerImage: Uint8Array | null = null;
+		if (d.cornerBits) {
+			try {
+				const bin = atob(d.cornerBits);
+				cornerImage = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+			} catch {}
+		}
+		renderPreview({ style: d.style, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null, cornerImage })
 			.then((r) => paint(canvas, r.px, 1))
 			.catch(() => {});
 

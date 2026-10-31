@@ -49,11 +49,11 @@ export async function GET({ request, locals }) {
 	} catch {}
 
 	// Battery + chosen font, from schema-display.sql (also read separately, same reason).
-	const extra = new Map<string, { batteryMv: number | null; batteryAt: number | null; font: string | null; cornerMode: string }>();
+	const extra = new Map<string, { batteryMv: number | null; batteryAt: number | null; font: string | null; cornerMode: string; cornerBits: string | null }>();
 	try {
-		const er = await db.prepare('SELECT id, battery_mv, battery_at, layout_font, corner_mode FROM devices WHERE user_id = ?').bind(userId).all();
+		const er = await db.prepare("SELECT id, battery_mv, battery_at, layout_font, corner_mode, CASE WHEN corner_mode = 'image' THEN corner_bits END AS corner_bits FROM devices WHERE user_id = ?").bind(userId).all();
 		for (const e of er.results ?? []) {
-			extra.set(e.id, { batteryMv: e.battery_mv ?? null, batteryAt: e.battery_at ?? null, font: e.layout_font ?? null, cornerMode: e.corner_mode === 'image' ? 'image' : 'calendar' });
+			extra.set(e.id, { batteryMv: e.battery_mv ?? null, batteryAt: e.battery_at ?? null, font: e.layout_font ?? null, cornerMode: e.corner_mode === 'image' ? 'image' : 'calendar', cornerBits: e.corner_mode === 'image' ? e.corner_bits ?? null : null });
 		}
 	} catch {}
 
@@ -71,6 +71,7 @@ export async function GET({ request, locals }) {
 		batteryAt: extra.get(d.id)?.batteryAt ?? null,
 		font: extra.get(d.id)?.font ?? null,
 		cornerMode: extra.get(d.id)?.cornerMode ?? 'calendar',
+		cornerBits: extra.get(d.id)?.cornerBits ?? null,
 	}));
 	return json({ devices }, 200);
 }

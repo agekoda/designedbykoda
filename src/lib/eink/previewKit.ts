@@ -67,7 +67,7 @@ export async function renderPreview(o: PreviewOptions): Promise<Rendered> {
 
 // Paints the screen with e-ink-ish colours. `scale` repeats each pixel into a block.
 const INK = [20, 20, 20];
-const PAPER = [242, 242, 237];
+const PAPER = [223, 219, 208];
 export function paint(canvas: HTMLCanvasElement, px: Uint8Array, scale = 1, w = SCREEN_W, h = SCREEN_H) {
 	canvas.width = w * scale;
 	canvas.height = h * scale;

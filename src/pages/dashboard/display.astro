@@ -23,50 +23,58 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		data-families={JSON.stringify(families)}
 		data-dithers={JSON.stringify(DITHERS)}
 	>
-		<a class="back" href="/dashboard">← My devices</a>
-		<div class="cust-head">
-			<div class="kicker">Customize display</div>
-			<div class="cust-title" id="dev-title">Loading…</div>
+		<div class="topbar">
+			<div class="tb-left">
+				<a class="back" id="back" href="/dashboard">← My devices</a>
+				<div class="cust-title" id="dev-title">Loading…</div>
+			</div>
+			<div class="tb-right">
+				<span class="save-msg" id="save-msg" aria-live="polite"></span>
+				<button type="button" class="btn ghost small" id="revert" disabled>Revert</button>
+				<button type="button" class="btn small" id="save" disabled>Save changes</button>
+			</div>
 		</div>
 
 		<p class="banner" id="banner" hidden></p>
 
-		<div class="cust-grid" id="grid">
-			<div class="cust-left">
+		<div class="stage">
+			<div class="left">
 				<div class="screen-wrap" id="screen-wrap">
-					<canvas id="screen" width="400" height="300" aria-label="Preview of your calendar screen"></canvas>
+					<canvas id="screen" width="800" height="600" aria-label="Preview of your calendar screen"></canvas>
 				</div>
 			</div>
 
-			<div class="cust-right">
-				<section class="panel">
-					<div class="label">Layout</div>
+			<div class="right">
+				<div class="tabs" role="tablist" aria-label="Display settings">
+					<button type="button" role="tab" class="tab on" data-tab="layout">Layout</button>
+					<button type="button" role="tab" class="tab" data-tab="font">Font</button>
+					<button type="button" role="tab" class="tab" data-tab="display">Display</button>
+					<button type="button" role="tab" class="tab" data-tab="picture" id="tab-picture-btn" hidden>Picture</button>
+				</div>
+
+				<section class="tabpanel" data-panel="layout">
 					<div class="layouts" id="layouts" role="radiogroup" aria-label="Layout"></div>
 				</section>
 
-				<section class="panel">
-					<div class="label">Font</div>
+				<section class="tabpanel" data-panel="font" hidden>
 					<div class="fonts" id="fonts" role="radiogroup" aria-label="Font"></div>
 				</section>
 
-				<section class="panel">
-					<div class="label">Display</div>
+				<section class="tabpanel" data-panel="display" hidden>
 					<label class="switch">
 						<input type="checkbox" id="dark" />
 						<span class="track" aria-hidden="true"></span>
 						<span class="switch-text">Dark mode <small>white on black</small></span>
 					</label>
+					<p class="muted small hint">Dark mode swaps the colours: white text on a black screen. The pairing and reconnect screens always stay black on white.</p>
 				</section>
-			</div>
 
-			<div class="cust-pic" id="pic-col" hidden>
-				<section class="panel" id="corner-card">
-					<div class="label">Agenda picture</div>
-					<p class="muted small pic-intro">Swap the mini calendar in the top right for your own picture.</p>
-					<div class="seg" role="radiogroup" aria-label="Top right">
+				<section class="tabpanel" data-panel="picture" hidden>
+					<div class="seg" role="radiogroup" aria-label="Top right of the Agenda">
 						<label><input type="radio" name="corner" value="calendar" checked /><span>Mini calendar</span></label>
 						<label><input type="radio" name="corner" value="image" /><span>Picture</span></label>
 					</div>
+					<p class="muted small pic-intro">The Agenda's top right corner can show a picture instead of the mini calendar.</p>
 
 					<div id="picture-tools" hidden>
 						<div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload a picture">
@@ -75,26 +83,30 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						</div>
 
 						<div id="editor" hidden>
-							<div class="ed-box"><canvas id="ed" aria-label="Picture editor. Drag to move the picture."></canvas></div>
-							<p class="muted small">Drag the picture to move it. It is saved as 184 × 140 black and white dots.</p>
+							<div class="ed-grid">
+								<div class="ed-left">
+									<div class="ed-box"><canvas id="ed" aria-label="Picture editor. Drag to move the picture."></canvas></div>
+									<p class="muted small">Drag to move it, scroll to zoom. 184 × 140 black and white dots.</p>
+								</div>
+								<div class="ed-right">
+									<div class="label sub">Dithering style</div>
+									<div class="seg wrap" id="dithers" role="radiogroup" aria-label="Dithering style"></div>
 
-							<div class="label sub">Dithering style</div>
-							<div class="seg wrap" id="dithers" role="radiogroup" aria-label="Dithering style"></div>
+									<div class="sliders">
+										<label class="slider"><span>Zoom</span><input type="range" id="s-zoom" min="1" max="4" step="0.01" /><output id="o-zoom"></output></label>
+										<label class="slider"><span>Exposure</span><input type="range" id="s-exposure" min="-2" max="2" step="0.05" /><output id="o-exposure"></output></label>
+										<label class="slider"><span>Brightness</span><input type="range" id="s-brightness" min="-100" max="100" step="1" /><output id="o-brightness"></output></label>
+										<label class="slider"><span>Contrast</span><input type="range" id="s-contrast" min="-100" max="100" step="1" /><output id="o-contrast"></output></label>
+										<label class="slider"><span>Cut-off</span><input type="range" id="s-threshold" min="0" max="255" step="1" /><output id="o-threshold"></output></label>
+									</div>
+									<p class="muted small hint">Cut-off decides how bright a spot has to be to print as white: right for more black, left for more white.</p>
 
-							<div class="sliders">
-								<label class="slider"><span>Zoom</span><input type="range" id="s-zoom" min="1" max="4" step="0.01" /><output id="o-zoom"></output></label>
-								<label class="slider"><span>Exposure</span><input type="range" id="s-exposure" min="-2" max="2" step="0.05" /><output id="o-exposure"></output></label>
-								<label class="slider"><span>Brightness</span><input type="range" id="s-brightness" min="-100" max="100" step="1" /><output id="o-brightness"></output></label>
-								<label class="slider"><span>Contrast</span><input type="range" id="s-contrast" min="-100" max="100" step="1" /><output id="o-contrast"></output></label>
-								<label class="slider"><span>Cut-off</span><input type="range" id="s-threshold" min="0" max="255" step="1" /><output id="o-threshold"></output></label>
-							</div>
-
-							<p class="muted small hint">Cut-off decides how bright a spot has to be to print as white. Slide it right for more black, left for more white. Exposure, brightness and contrast change the picture before that.</p>
-
-							<div class="ed-actions">
-								<label class="check"><input type="checkbox" id="invert" /><span class="box" aria-hidden="true"></span><span>Invert</span></label>
-								<button type="button" class="link" id="ed-reset">Reset adjustments</button>
-								<button type="button" class="link" id="ed-replace">Choose a different picture</button>
+									<div class="ed-actions">
+										<label class="check"><input type="checkbox" id="invert" /><span class="box" aria-hidden="true"></span><span>Invert</span></label>
+										<button type="button" class="link" id="ed-reset">Reset</button>
+										<button type="button" class="link" id="ed-replace">New picture</button>
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -102,11 +114,15 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			</div>
 		</div>
 
-		<div class="savebar" id="savebar">
-			<span class="save-msg" id="save-msg" aria-live="polite">No changes yet.</span>
-			<div class="save-btns">
-				<button type="button" class="btn ghost small" id="revert" disabled>Revert</button>
-				<button type="button" class="btn small" id="save" disabled>Save to my calendar</button>
+		<div class="guard" id="guard" hidden>
+			<div class="guard-box" role="alertdialog" aria-labelledby="guard-title">
+				<div class="guard-title" id="guard-title">Save your changes?</div>
+				<p class="muted">You changed how this calendar looks, but haven't saved yet.</p>
+				<div class="guard-btns">
+					<button type="button" class="btn small" id="g-save">Save and leave</button>
+					<button type="button" class="btn small ghost" id="g-discard">Leave without saving</button>
+					<button type="button" class="link" id="g-stay">Keep editing</button>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -137,8 +153,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const layoutsEl = $('layouts');
 	const fontsEl = $('fonts');
 	const darkBox = $<HTMLInputElement>('dark');
-	const picCol = $('pic-col');
-	const grid = $('grid');
+	const tabPicBtn = $('tab-picture-btn');
 	const pictureTools = $('picture-tools');
 	const drop = $('drop');
 	const fileInput = $<HTMLInputElement>('file');
@@ -279,7 +294,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const common = { font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12 };
 		try {
 			const r = await renderPreview({ ...common, style: st.style, cornerImage: cornerForPreview() });
-			paint(screen, r.px, 1);
+			paint(screen, r.px, 2);
 			if (thumbsDirty) {
 				thumbsDirty = false;
 				for (const s of styles) {
@@ -299,7 +314,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 					// the sample only needs the top-left 200x60 corner of the 400x300 screen
 					const px = new Uint8Array(200 * 60);
 					for (let y = 0; y < 60; y++) for (let x = 0; x < 200; x++) px[y * 200 + x] = rr.px[y * 400 + x];
-					paint(cv, px, 1, 200, 60);
+					paint(cv, px, 2, 200, 60);
 				}
 			}
 		} catch {
@@ -308,16 +323,25 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		}
 	}
 
+	// ---------------------------------------------------------------- tabs
+	let activeTab = 'layout';
+	function showTab(name: string) {
+		activeTab = name;
+		document.querySelectorAll<HTMLElement>('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === name));
+		document.querySelectorAll<HTMLElement>('.tabpanel').forEach((p) => (p.hidden = p.dataset.panel !== name));
+	}
+	document.querySelectorAll<HTMLElement>('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab!)));
+
 	// ---------------------------------------------------------------- controls
 	function buildControls() {
 		layoutsEl.innerHTML = styles
 			.map(
-				(s) => `<label class="lay"><input type="radio" name="layout" value="${s.id}" /><span class="lay-card"><canvas data-sid="${s.id}" width="400" height="300"></canvas><span class="lay-name">${s.label}</span></span></label>`
+				(s) => `<label class="lay"><input type="radio" name="layout" value="${s.id}" /><span class="lay-card"><canvas data-sid="${s.id}" width="400" height="300"></canvas><span class="lay-name">${s.label}</span><span class="lay-note">${s.note}</span></span></label>`
 			)
 			.join('');
 		fontsEl.innerHTML = families
 			.map(
-				(f) => `<label class="fnt"><input type="radio" name="font" value="${f.id}" /><span class="fnt-card"><canvas data-fid="${f.id}" width="200" height="60"></canvas><span class="fnt-name">${f.label}</span></span></label>`
+				(f) => `<label class="fnt"><input type="radio" name="font" value="${f.id}" /><span class="fnt-card"><canvas data-fid="${f.id}" width="400" height="120"></canvas><span class="fnt-name">${f.label}</span></span></label>`
 			)
 			.join('');
 		ditherEl.innerHTML = dithers
@@ -480,8 +504,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		layoutsEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.style));
 		fontsEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === effFont()));
 		darkBox.checked = st.dark;
-		picCol.hidden = !supportsCorner();
-		grid.classList.toggle('has-pic', supportsCorner());
+		tabPicBtn.hidden = !supportsCorner();
+		if (!supportsCorner() && activeTab === 'picture') showTab('layout');
 		document.querySelectorAll<HTMLInputElement>('input[name="corner"]').forEach((r) => (r.checked = r.value === st.cornerMode));
 		pictureTools.hidden = st.cornerMode !== 'image';
 		editor.hidden = !srcImg;
@@ -494,6 +518,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	function flash(text: string, err = false) {
 		saveMsg.textContent = text;
 		saveMsg.classList.toggle('is-error', err);
+		saveMsg.classList.remove('is-dirty');
 	}
 	function isDirty() {
 		return JSON.stringify(st) !== base || pictureChanged;
@@ -502,7 +527,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const dirty = isDirty();
 		saveBtn.disabled = !dirty;
 		revertBtn.disabled = !dirty;
-		if (dirty) flash('You have unsaved changes.');
+		if (dirty) {
+			flash('Unsaved changes');
+			saveMsg.classList.add('is-dirty');
+		}
 	}
 
 	async function save() {
@@ -559,10 +587,42 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	saveBtn.addEventListener('click', save);
 	revertBtn.addEventListener('click', revert);
 	window.addEventListener('beforeunload', (e) => {
-		if (isDirty()) {
+		if (isDirty() && !skipUnload) {
 			e.preventDefault();
 			e.returnValue = '';
 		}
+	});
+
+	// ---------------------------------------------------------------- leaving with unsaved changes
+	const guard = $('guard');
+	let leaveTo: string | null = null;
+	document.addEventListener(
+		'click',
+		(e) => {
+			const a = (e.target as HTMLElement).closest('a[href]') as HTMLAnchorElement | null;
+			if (!a || !isDirty() || a.target === '_blank' || a.href.startsWith('javascript:') || a.href.includes('#')) return;
+			e.preventDefault();
+			e.stopPropagation();
+			leaveTo = a.href;
+			guard.hidden = false;
+			$('g-save').focus();
+		},
+		true
+	);
+	const go = () => {
+		skipUnload = true;
+		location.href = leaveTo || '/dashboard';
+	};
+	let skipUnload = false;
+	$('g-stay').addEventListener('click', () => (guard.hidden = true));
+	$('g-discard').addEventListener('click', go);
+	$('g-save').addEventListener('click', async () => {
+		await save();
+		if (!isDirty()) go();
+		else guard.hidden = true;
+	});
+	window.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape' && !guard.hidden) guard.hidden = true;
 	});
 
 	// ---------------------------------------------------------------- start
@@ -620,61 +680,72 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 </script>
 
 <style is:global>
-	.cust { position: relative; left: 50%; width: min(1320px, 100vw - 3em); transform: translateX(-50%); margin-top: -1.8em; padding: 1em 0 5.5em; }
-	.cust .back { color: var(--muted); text-decoration: none; font-size: 0.9em; }
-	.cust .back:hover { color: var(--fg); }
-	.cust .cust-head { margin: 1.2em 0 1.6em; }
-	.cust .kicker { font-size: 0.78em; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.5em; }
-	.cust .cust-title { font-size: 2.2em; font-weight: 800; line-height: 1.1; color: var(--fg); }
+	.cust { position: relative; left: 50%; width: min(1400px, 100vw - 3em); transform: translateX(-50%); margin-top: -1.8em; padding: 0.6em 0 3em; }
 	.cust .muted { color: var(--muted); margin: 0; }
 	.cust .small { font-size: 0.9em; }
-	.cust .banner { background: rgba(217, 164, 65, 0.12); border: 1px solid #d9a441; color: var(--fg); border-radius: 12px; padding: 0.8em 1em; margin: 0 0 1.4em; font-size: 0.92em; }
+	.cust .banner { background: rgba(217, 164, 65, 0.12); border: 1px solid #d9a441; color: var(--fg); border-radius: 12px; padding: 0.8em 1em; margin: 0 0 1.2em; font-size: 0.92em; }
 
-	.cust .cust-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1.8em; align-items: start; }
-	.cust .cust-grid.has-pic { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.95fr) minmax(0, 0.95fr); }
-	.cust .cust-pic[hidden] { display: none; }
-	.cust .pic-intro { margin: -0.3em 0 1em; }
-	.cust .hint { margin-top: 1em; line-height: 1.45; }
-	.cust .cust-left { position: sticky; top: 1em; }
-	.cust .screen-wrap { background: #f2f2ed; border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
-	.cust #screen { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; image-rendering: pixelated; }
-	.cust .screen-note { margin-top: 0.8em; max-width: 56ch; }
-	.cust .cust-right { display: grid; gap: 1.1em; }
-	.cust .panel { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; padding: 1.1em 1.2em 1.2em; }
-	.cust .panel[hidden] { display: none; }
+	/* top bar: where you are, and the save button, always in view */
+	.cust .topbar { position: sticky; top: 0.6em; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 1em; flex-wrap: wrap; padding: 0.7em 0.8em 0.7em 1.3em; margin-bottom: 1.4em; background: color-mix(in srgb, var(--bg-raised) 90%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--border); border-radius: 18px; }
+	.cust .tb-left { display: flex; align-items: baseline; gap: 1.2em; min-width: 0; flex-wrap: wrap; }
+	.cust .back { color: var(--muted); text-decoration: none; font-size: 0.9em; white-space: nowrap; }
+	.cust .back:hover { color: var(--fg); }
+	.cust .cust-title { font-size: 1.5em; font-weight: 800; line-height: 1.2; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.cust .tb-right { display: flex; align-items: center; gap: 0.6em; margin-left: auto; }
+	.cust .save-msg { font-size: 0.88em; color: var(--muted); }
+	.cust .save-msg.is-dirty { color: #d9a441; }
+	.cust .save-msg.is-error { color: #e08a8a; }
+
+	/* the stage: the preview never changes size, whatever the layout */
+	.cust .stage { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 2em; align-items: start; }
+	.cust .left { position: sticky; top: 5.4em; }
+	.cust .screen-wrap { border-radius: 14px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); background: #dfdbd0; }
+	.cust #screen { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; }
+
+	.cust .tabs { display: flex; gap: 0.3em; padding: 4px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 999px; width: fit-content; max-width: 100%; margin-bottom: 1.2em; overflow-x: auto; }
+	.cust .tab { background: none; border: none; font: inherit; font-weight: 700; font-size: 0.95em; color: var(--muted); padding: 0.55em 1.3em; border-radius: 999px; transition: background 0.2s, color 0.2s; white-space: nowrap; }
+	.cust .tab:hover { color: var(--fg); }
+	.cust .tab.on { background: var(--fg); color: var(--bg); }
+	.cust .tab[hidden] { display: none; }
+	.cust .tabpanel[hidden] { display: none; }
+	.cust .tabpanel { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; padding: 1.2em; }
 	.cust .label { font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.8em; }
-	.cust .label.sub { margin-top: 1.2em; }
+	.cust .label.sub { margin-top: 0; }
 
 	.cust input[type='radio'], .cust .switch input, .cust .check input { position: absolute; opacity: 0; pointer-events: none; }
 
-	.cust .layouts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5em; }
-	.cust .lay-card, .cust .fnt-card { display: grid; gap: 0.35em; padding: 0.35em; border: 2px solid var(--border); border-radius: 10px; background: var(--bg); transition: border-color 0.2s, background 0.2s; cursor: pointer; }
-	.cust .lay-card canvas { width: 100%; aspect-ratio: 4 / 3; border-radius: 5px; image-rendering: pixelated; background: #f2f2ed; }
-	.cust .lay-name, .cust .fnt-name { font-size: 0.72em; font-weight: 700; color: var(--fg); text-align: center; }
+	/* layout + font cards: big enough to read */
+	.cust .layouts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8em; }
+	.cust .fonts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8em; }
+	.cust .lay-card, .cust .fnt-card { display: grid; gap: 0.5em; padding: 0.5em; border: 2px solid var(--border); border-radius: 12px; background: var(--bg); transition: border-color 0.2s, background 0.2s; cursor: pointer; }
+	.cust .lay-card canvas, .cust .fnt-card canvas { width: 100%; height: auto; border-radius: 6px; background: #dfdbd0; display: block; }
+	.cust .lay-card canvas { aspect-ratio: 4 / 3; }
+	.cust .fnt-card canvas { aspect-ratio: 10 / 3; }
+	.cust .lay-name, .cust .fnt-name { font-size: 0.85em; font-weight: 700; color: var(--fg); text-align: center; }
+	.cust .lay-note { font-size: 0.74em; color: var(--muted); text-align: center; line-height: 1.3; margin-top: -0.3em; padding: 0 0.2em 0.2em; }
 	.cust label:hover > .lay-card, .cust label:hover > .fnt-card { border-color: var(--muted); }
 	.cust input:checked + .lay-card, .cust input:checked + .fnt-card { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
 	.cust input:focus-visible + .lay-card, .cust input:focus-visible + .fnt-card { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-	.cust .fonts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6em; }
-	.cust .fnt-card canvas { width: 100%; aspect-ratio: 10 / 3; border-radius: 5px; image-rendering: pixelated; background: #f2f2ed; }
-
 	.cust .seg { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
-	.cust .seg.wrap { display: grid; grid-template-columns: repeat(4, auto); border-radius: 16px; width: fit-content; max-width: 100%; }
-	.cust .seg.wrap label span { text-align: center; padding: 0.45em 0.8em; }
-	.cust .seg label span { display: block; padding: 0.45em 1em; border-radius: 999px; font-size: 0.88em; font-weight: 600; color: var(--muted); cursor: pointer; transition: background 0.2s, color 0.2s; }
+	.cust .seg.wrap { display: grid; grid-template-columns: repeat(2, 1fr); border-radius: 16px; width: 100%; }
+	.cust .seg label span { display: block; padding: 0.45em 1em; border-radius: 999px; font-size: 0.88em; font-weight: 600; text-align: center; color: var(--muted); cursor: pointer; transition: background 0.2s, color 0.2s; }
 	.cust .seg input:checked + span { background: var(--fg); color: var(--bg); }
 	.cust .seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.cust .pic-intro { margin: 0.8em 0 0; }
+	.cust .hint { margin-top: 1em; line-height: 1.45; }
 
-	.cust #picture-tools { margin-top: 1em; }
+	.cust #picture-tools { margin-top: 1.1em; }
 	.cust #picture-tools[hidden], .cust #editor[hidden], .cust .drop[hidden] { display: none; }
-	.cust .drop { display: grid; place-items: center; text-align: center; min-height: 120px; padding: 1em; border: 2px dashed var(--border); border-radius: 14px; color: var(--muted); cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; }
+	.cust .drop { display: grid; place-items: center; text-align: center; min-height: 140px; padding: 1em; border: 2px dashed var(--border); border-radius: 14px; color: var(--muted); cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; }
 	.cust .drop:hover, .cust .drop.over, .cust .drop:focus-visible { border-color: var(--accent); color: var(--fg); background: rgba(var(--accent-rgb), 0.06); outline: none; }
-	.cust .ed-box { background: #f2f2ed; border: 1px solid var(--border); border-radius: 10px; padding: 8px; width: fit-content; max-width: 100%; margin-bottom: 0.7em; }
-	.cust #ed { display: block; width: 368px; max-width: 100%; height: auto; aspect-ratio: 184 / 140; image-rendering: pixelated; cursor: grab; touch-action: none; }
+	.cust .ed-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.3em; align-items: start; }
+	.cust .ed-box { background: #dfdbd0; border: 1px solid var(--border); border-radius: 10px; padding: 6px; margin-bottom: 0.6em; }
+	.cust #ed { display: block; width: 100%; height: auto; aspect-ratio: 184 / 140; image-rendering: pixelated; cursor: grab; touch-action: none; }
 	.cust #ed:active { cursor: grabbing; }
 
-	.cust .sliders { display: grid; gap: 0.7em; margin-top: 1.1em; }
-	.cust .slider { display: grid; grid-template-columns: 5.5em 1fr 3.8em; align-items: center; gap: 0.8em; font-size: 0.9em; color: var(--fg); }
+	.cust .sliders { display: grid; gap: 0.55em; margin-top: 1em; }
+	.cust .slider { display: grid; grid-template-columns: 5.2em 1fr 3.4em; align-items: center; gap: 0.6em; font-size: 0.88em; color: var(--fg); }
 	.cust .slider output { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 	.cust input[type='range'] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; margin: 0; }
 	.cust input[type='range']::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: var(--border); }
@@ -682,7 +753,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -7px; border-radius: 50%; background: var(--fg); border: 0; }
 	.cust input[type='range']::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--fg); border: 0; }
 	.cust input[type='range']:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
-	.cust .ed-actions { display: flex; align-items: center; gap: 1.2em; flex-wrap: wrap; margin-top: 1.1em; }
+	.cust .ed-actions { display: flex; align-items: center; gap: 1.2em; flex-wrap: wrap; margin-top: 1em; }
 	.cust .link { background: none; border: none; padding: 0; font: inherit; font-size: 0.9em; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 	.cust .link:hover { color: var(--fg); }
 
@@ -692,11 +763,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .check input:checked + .box { background: var(--accent); border-color: var(--accent); }
 	.cust .check input:checked + .box::after { transform: translateY(-1px) rotate(45deg) scale(1); }
 
-	.cust .switch { display: inline-flex; align-items: center; gap: 0.8em; color: var(--fg); font-size: 0.95em; }
-	.cust .switch .track { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 999px; background: var(--border); position: relative; transition: background 0.2s; }
-	.cust .switch .track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--fg); transition: transform 0.2s, background 0.2s; }
+	.cust .switch { display: inline-flex; align-items: center; gap: 0.8em; color: var(--fg); font-size: 1em; }
+	.cust .switch .track { flex: 0 0 auto; width: 48px; height: 28px; border-radius: 999px; background: var(--border); position: relative; transition: background 0.2s; }
+	.cust .switch .track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--fg); transition: transform 0.2s, background 0.2s; }
 	.cust .switch input:checked + .track { background: var(--accent); }
-	.cust .switch input:checked + .track::after { transform: translateX(18px); background: var(--bg); }
+	.cust .switch input:checked + .track::after { transform: translateX(20px); background: var(--bg); }
 	.cust .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.cust .switch small { color: var(--muted); margin-left: 0.4em; }
 
@@ -707,23 +778,23 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .btn.ghost { background: transparent; color: var(--muted); border-color: var(--border); }
 	.cust .btn.ghost:hover:not(:disabled) { background: transparent; color: var(--fg); border-color: var(--muted); }
 
-	.cust .savebar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 1em; width: min(900px, calc(100vw - 2em)); display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: 0.7em 0.9em 0.7em 1.2em; background: color-mix(in srgb, var(--bg-raised) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 999px; z-index: 20; }
-	.cust .save-msg { font-size: 0.9em; color: var(--muted); min-width: 0; }
-	.cust .save-msg.is-error { color: #e08a8a; }
-	.cust .save-btns { display: flex; gap: 0.5em; flex: 0 0 auto; }
+	/* "save before you leave?" */
+	.cust .guard { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(3px); }
+	.cust .guard[hidden] { display: none; }
+	.cust .guard-box { width: min(420px, calc(100vw - 2em)); background: var(--bg-raised); border: 1px solid var(--border); border-radius: 18px; padding: 1.4em; }
+	.cust .guard-title { font-size: 1.25em; font-weight: 800; color: var(--fg); margin-bottom: 0.4em; }
+	.cust .guard-btns { display: flex; align-items: center; gap: 0.6em; flex-wrap: wrap; margin-top: 1.2em; }
 
 	html.has-custom-cursor .cust, html.has-custom-cursor .cust * { cursor: none !important; }
 
-	@media (max-width: 1180px) {
-		.cust .cust-grid.has-pic { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
-		.cust .cust-grid.has-pic .cust-pic { grid-column: 1 / -1; }
+	@media (max-width: 960px) {
+		.cust .stage { grid-template-columns: 1fr; }
+		.cust .left { position: static; }
+		.cust .ed-grid { grid-template-columns: 1fr; }
+		.cust .layouts { grid-template-columns: repeat(2, 1fr); }
 	}
-	@media (max-width: 900px) {
-		.cust .cust-grid, .cust .cust-grid.has-pic { grid-template-columns: 1fr; }
-		.cust .cust-left { position: static; }
-		.cust .layouts { grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); }
-		.cust .seg.wrap { grid-template-columns: repeat(2, 1fr); width: 100%; }
-		.cust .savebar { border-radius: 18px; flex-direction: column; align-items: stretch; }
-		.cust .save-btns { justify-content: flex-end; }
+	@media (max-width: 560px) {
+		.cust .topbar { border-radius: 16px; }
+		.cust .save-msg { display: none; }
 	}
 </style>
