@@ -214,6 +214,7 @@ const shipping = [
 	// ---------- Gallery: swipeable track, smooth slide between photos ----------
 	const stage = document.getElementById('stage') as HTMLElement;
 	const track = document.getElementById('track') as HTMLElement;
+	const shots = Array.from(document.querySelectorAll<HTMLImageElement>('.shot'));
 	const thumbs = Array.from(document.querySelectorAll<HTMLButtonElement>('.thumb'));
 	const last = thumbs.length - 1;
 	const ring = document.getElementById('thumb-ring') as HTMLElement;
@@ -221,11 +222,13 @@ const shipping = [
 
 	// The further the jump, the longer it takes and the harder it eases out.
 	// Next door is a quick, light switch (0.35s); five photos away (the most
-	// there is to cross) is the long, heavily eased sweep (1.3s).
+	// there is to cross) is the long, heavily eased sweep (1.05s).
 	const MAX_STEPS = Math.max(2, last);
 	const progress = (steps: number) =>
 		Math.min(1, Math.max(0, (steps - 1) / (MAX_STEPS - 1)));
-	const durationFor = (steps: number) => 0.35 + 0.95 * progress(steps);
+	// Seconds for a jump of 1, 2, 3, 4 and 5 photos.
+	const DURATIONS = [0.35, 0.5875, 0.825, 0.94, 1.05];
+	const durationFor = (steps: number) => DURATIONS[Math.min(steps, DURATIONS.length) - 1];
 	const easeFor = (steps: number) => {
 		const t = progress(steps);
 		const x1 = 0.25 + 0.4 * t;
@@ -248,9 +251,13 @@ const shipping = [
 			t.setAttribute('aria-pressed', String(n === current));
 		});
 	}
+	// Always land on a whole pixel. A fractional offset (e.g. -586.25px) makes
+	// the browser resample the photos and soften them.
 	function place(dragPx = 0, animate = true, dur = 0.35, ease = easeFor(1)) {
+		const w = track.getBoundingClientRect().width;
+		const x = -Math.round(current * w) + Math.round(dragPx);
 		track.style.transition = animate ? `transform ${dur}s ${ease}` : 'none';
-		track.style.transform = `translate3d(calc(${-current * 100}% + ${dragPx}px), 0, 0)`;
+		track.style.transform = `translate3d(${x}px, 0, 0)`;
 	}
 	function show(i: number) {
 		const next = Math.max(0, Math.min(last, i));
@@ -263,7 +270,10 @@ const shipping = [
 		moveRing(true, dur, ease);
 	}
 	moveRing(false);
-	window.addEventListener('resize', () => moveRing(false));
+	window.addEventListener('resize', () => {
+		place(0, false);
+		moveRing(false);
+	});
 	window.addEventListener('load', () => moveRing(false));
 	thumbs.forEach((t) => t.addEventListener('click', () => show(Number(t.dataset.index))));
 
@@ -301,7 +311,12 @@ const shipping = [
 	function endDrag(e: PointerEvent) {
 		if (!armed || e.pointerId !== pid) return;
 		armed = false;
-		if (!dragging) return;
+		if (!dragging) {
+			// A plain click (no drag) opens the photo full size in the site's
+			// lightbox, where it's shown at its real resolution.
+			if (e.type === 'pointerup') shots[current]?.click();
+			return;
+		}
 		dragging = false;
 		stage.classList.remove('dragging');
 		const w = stage.clientWidth || 1;
@@ -580,7 +595,6 @@ const shipping = [
 	.track {
 		display: flex;
 		height: 100%;
-		will-change: transform;
 	}
 	.shot {
 		flex: 0 0 100%;
