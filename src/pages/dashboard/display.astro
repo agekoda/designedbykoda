@@ -40,7 +40,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		<div class="stage">
 			<div class="left">
 				<div class="screen-wrap" id="screen-wrap">
-					<canvas id="screen" width="800" height="600" aria-label="Preview of your calendar screen"></canvas>
+					<canvas id="screen" width="1400" height="1050" aria-label="Preview of your calendar screen"></canvas>
 				</div>
 			</div>
 
@@ -129,7 +129,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 </Layout>
 
 <script>
-	import { renderPreview, paint, loadFonts } from '../../lib/eink/previewKit';
+	import { renderPreview, paint, paintScreen, loadFonts } from '../../lib/eink/previewKit';
 	import { defaultFontFor } from '../../lib/eink/layouts';
 	import { Draw } from '../../lib/eink/draw';
 	import { renderDrawList } from '../../lib/eink/preview';
@@ -294,14 +294,14 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const common = { font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12 };
 		try {
 			const r = await renderPreview({ ...common, style: st.style, cornerImage: cornerForPreview() });
-			paint(screen, r.px, 2);
+			paintScreen(screen, r.px, { mode: 'device', width: 1400 });
 			if (thumbsDirty) {
 				thumbsDirty = false;
 				for (const s of styles) {
 					const cv = layoutsEl.querySelector<HTMLCanvasElement>(`canvas[data-sid="${s.id}"]`);
 					if (!cv) continue;
 					const t = await renderPreview({ ...common, style: s.id, cornerImage: s.corner && st.cornerMode === 'image' ? cornerBytes : null });
-					paint(cv, t.px, 1);
+					paintScreen(cv, t.px, { mode: 'screen', scale: 1 });
 				}
 				const fonts = await loadFonts();
 				for (const f of families) {
@@ -482,7 +482,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		// only the Agenda thumbnail changes when the picture does
 		const cv = layoutsEl.querySelector<HTMLCanvasElement>('canvas[data-sid="agenda"]');
 		if (cv)
-			renderPreview({ style: 'agenda', font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12, cornerImage: st.cornerMode === 'image' ? cornerBytes : null }).then((r) => paint(cv, r.px, 1));
+			renderPreview({ style: 'agenda', font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12, cornerImage: st.cornerMode === 'image' ? cornerBytes : null }).then((r) => paintScreen(cv, r.px, { mode: 'screen', scale: 1 }));
 		changed();
 	}
 
@@ -699,7 +699,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	/* the stage: the preview never changes size, whatever the layout */
 	.cust .stage { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 2em; align-items: start; }
 	.cust .left { position: sticky; top: 5.4em; }
-	.cust .screen-wrap { border-radius: 14px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); background: #dfdbd0; }
+	.cust .screen-wrap { border-radius: 14px; overflow: hidden; background: transparent; }
 	.cust #screen { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; }
 
 	.cust .tabs { display: flex; gap: 0.3em; padding: 4px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 999px; width: fit-content; max-width: 100%; margin-bottom: 1.2em; overflow-x: auto; }

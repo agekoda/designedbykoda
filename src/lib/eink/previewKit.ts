@@ -1,5 +1,6 @@
 // Browser helpers for the dashboard's live previews: loads the font data, builds
 // sample events, and paints the 1-bit screen onto a canvas.
+import { renderEink } from './render';
 import { loadFontPack, renderDrawList, SCREEN_W, SCREEN_H, type Rendered } from './preview';
 import { renderLayout } from './layouts';
 import type { CalEvent } from './context';
@@ -86,4 +87,12 @@ export function paint(canvas: HTMLCanvasElement, px: Uint8Array, scale = 1, w = 
 		}
 	}
 	ctx.putImageData(img, 0, 0);
+}
+
+
+// Full-screen previews (400x300 buffers) go through the shared e-paper renderer.
+// "screen" = just the panel, "device" = the panel inside the device mockup.
+// The draw-list renderer already bakes dark mode into the pixels, so dark is never passed on.
+export function paintScreen(canvas: HTMLCanvasElement, px: Uint8Array, opts: { mode?: 'screen' | 'device'; scale?: number; width?: number } = {}) {
+	renderEink(canvas as any, px, { mode: opts.mode ?? 'screen', scale: opts.scale ?? 1, width: opts.width, texture: 1 });
 }
