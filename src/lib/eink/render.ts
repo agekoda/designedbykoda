@@ -77,7 +77,7 @@ export const SCREEN_INK: RGB = [0x14, 0x14, 0x14]; // #141414
 
 /** "device" mode: how the panel reads in the real photo. */
 export const DEVICE_PAPER: RGB = [0xc3, 0xc0, 0xbb]; // #c3c0bb
-export const DEVICE_INK: RGB = [0x3c, 0x38, 0x35]; // #3c3835
+export const DEVICE_INK: RGB = [0x14, 0x13, 0x12]; // near-black, like a real panel
 
 // ---------------------------------------------------------------------------
 // Deterministic noise
@@ -248,6 +248,12 @@ export function renderEink(canvas: CanvasLike, px: Pixels, opts: EinkOptions = {
 // Geometry of the reference 2000x1500 view.
 const REF_W = 2000;
 const REF_H = 1500;
+// The part of the reference view that is drawn: cropped in around the device so the
+// screen fills more of the picture (4:3, centred on the device).
+const VIEW_W = 1600;
+const VIEW_H = 1200;
+const VIEW_X = 198;
+const VIEW_Y = 151;
 const DEV = { x: 462, y: 232, w: 1535 - 462, h: 1270 - 232 };
 const WIN = { x0: 513, y0: 350, x1: 1485, y1: 1082 };
 
@@ -257,38 +263,39 @@ function drawDevice(canvas: CanvasLike, px: Pixels, opts: EinkOptions, dark: boo
   let k: number | null = null; // integer panel-pixel size when exact blocks are wanted
   if (opts.width !== undefined) {
     if (!(opts.width >= 16)) throw new RangeError("width must be a number >= 16");
-    f = opts.width / REF_W;
+    f = opts.width / VIEW_W;
   } else {
     k = integerScale(opts.scale ?? 2);
     f = (W * k) / (WIN.x1 - WIN.x0); // window becomes exactly 400k wide
   }
-  const outW = Math.round(REF_W * f);
-  const outH = Math.round(REF_H * f);
+  const outW = Math.round(VIEW_W * f);
+  const outH = Math.round(VIEW_H * f);
   canvas.width = outW;
   canvas.height = outH;
   const ctx = need2d(canvas);
-  const R = (v: number): number => Math.round(v * f);
+  const Rx = (v: number): number => Math.round((v - VIEW_X) * f);
+  const Ry = (v: number): number => Math.round((v - VIEW_Y) * f);
 
-  const dx = R(DEV.x);
-  const dy = R(DEV.y);
-  const dw = R(DEV.x + DEV.w) - dx;
-  const dh = R(DEV.y + DEV.h) - dy;
-  const devR = 46 * f;
+  const dx = Rx(DEV.x);
+  const dy = Ry(DEV.y);
+  const dw = Rx(DEV.x + DEV.w) - dx;
+  const dh = Ry(DEV.y + DEV.h) - dy;
+  const devR = 24 * f;
 
   // --- 1. peach backdrop + soft shadows (pixel maths, identical everywhere) -
   putRGBA(ctx, backdrop(outW, outH, f, dx, dy, dw, dh, devR), outW, outH, 0, 0);
 
   // --- 2. bezel body -------------------------------------------------------
   const bezel = ctx.createLinearGradient(0, dy, 0, dy + dh);
-  bezel.addColorStop(0, "#2c2b2e");
-  bezel.addColorStop(1, "#201f22");
+  bezel.addColorStop(0, "#161517");
+  bezel.addColorStop(1, "#0e0d0f");
   ctx.fillStyle = bezel;
   roundRectPath(ctx, dx, dy, dw, dh, devR);
   ctx.fill();
 
   // --- 3. the panel, with glass and lighting baked in ----------------------
-  const wx = R(WIN.x0);
-  const wy = R(WIN.y0);
+  const wx = Rx(WIN.x0);
+  const wy = Ry(WIN.y0);
   let ww: number;
   let wh: number;
   let rw: number; // raster size
@@ -296,13 +303,13 @@ function drawDevice(canvas: CanvasLike, px: Pixels, opts: EinkOptions, dark: boo
   let top: number; // raster's row offset inside the window
   if (k !== null) {
     ww = W * k;
-    wh = Math.max(H * k, R(WIN.y1) - wy);
+    wh = Math.max(H * k, Ry(WIN.y1) - wy);
     rw = W * k;
     rh = H * k;
     top = Math.floor((wh - rh) / 2);
   } else {
-    ww = R(WIN.x1) - wx;
-    wh = R(WIN.y1) - wy;
+    ww = Rx(WIN.x1) - wx;
+    wh = Ry(WIN.y1) - wy;
     rw = ww;
     rh = wh;
     top = 0;
@@ -319,7 +326,7 @@ function drawDevice(canvas: CanvasLike, px: Pixels, opts: EinkOptions, dark: boo
   for (let y = 0; y < rh; y++) {
     win.set(raster.subarray(y * rw * 4, (y + 1) * rw * 4), ((top + y) * ww) * 4);
   }
-  const winR = 9 * f;
+  const winR = 5 * f;
   applyGlass(win, ww, wh, f, winR);
   putRGBA(ctx, win, ww, wh, wx, wy);
 
@@ -467,12 +474,12 @@ function applyGlass(win: Uint8ClampedArray, ww: number, wh: number, f: number, w
       // tint along the diagonal
       const t = ((x + 0.5) * ww + (y + 0.5) * wh) / diag;
       if (t < 0.5) {
-        const a = 0.075 * (1 - t / 0.5);
+        const a = 0.03 * (1 - t / 0.5);
         r += (255 - r) * a;
         g += (255 - g) * a;
         b += (255 - b) * a;
       } else {
-        const a = 0.05 * ((t - 0.5) / 0.5);
+        const a = 0.03 * ((t - 0.5) / 0.5);
         r -= r * a;
         g -= g * a;
         b -= b * a;
