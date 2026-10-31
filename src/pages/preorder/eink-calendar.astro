@@ -219,15 +219,24 @@ const shipping = [
 	const ring = document.getElementById('thumb-ring') as HTMLElement;
 	let current = 0;
 
-	// Slow ease-in and ease-out. The further the jump, the longer it takes, so
-	// going from the first photo to the last sweeps past the ones in between
-	// and then settles gently on the one you picked.
-	const EASE = 'cubic-bezier(0.65, 0, 0.15, 1)';
-	const durationFor = (steps: number) => Math.min(1.5, 0.6 + 0.14 * steps);
+	// The further the jump, the longer it takes and the harder it eases out.
+	// Next door is a quick, light switch (0.35s); five photos away (the most
+	// there is to cross) is the long, heavily eased sweep (1.3s).
+	const MAX_STEPS = Math.max(2, last);
+	const progress = (steps: number) =>
+		Math.min(1, Math.max(0, (steps - 1) / (MAX_STEPS - 1)));
+	const durationFor = (steps: number) => 0.35 + 0.95 * progress(steps);
+	const easeFor = (steps: number) => {
+		const t = progress(steps);
+		const x1 = 0.25 + 0.4 * t;
+		const y1 = 0.1 - 0.1 * t;
+		const x2 = 0.25 - 0.1 * t;
+		return `cubic-bezier(${x1.toFixed(3)}, ${y1.toFixed(3)}, ${x2.toFixed(3)}, 1)`;
+	};
 
-	function moveRing(animate: boolean, dur = 0.6) {
+	function moveRing(animate: boolean, dur = 0.35, ease = easeFor(1)) {
 		const t = thumbs[current];
-		ring.style.transition = animate ? `transform ${dur}s ${EASE}` : 'none';
+		ring.style.transition = animate ? `transform ${dur}s ${ease}` : 'none';
 		ring.style.width = `${t.offsetWidth}px`;
 		ring.style.height = `${t.offsetHeight}px`;
 		ring.style.transform = `translate(${t.offsetLeft}px, ${t.offsetTop}px)`;
@@ -239,17 +248,19 @@ const shipping = [
 			t.setAttribute('aria-pressed', String(n === current));
 		});
 	}
-	function place(dragPx = 0, animate = true, dur = 0.6) {
-		track.style.transition = animate ? `transform ${dur}s ${EASE}` : 'none';
+	function place(dragPx = 0, animate = true, dur = 0.35, ease = easeFor(1)) {
+		track.style.transition = animate ? `transform ${dur}s ${ease}` : 'none';
 		track.style.transform = `translate3d(calc(${-current * 100}% + ${dragPx}px), 0, 0)`;
 	}
 	function show(i: number) {
 		const next = Math.max(0, Math.min(last, i));
-		const dur = durationFor(Math.abs(next - current));
+		const steps = Math.max(1, Math.abs(next - current));
+		const dur = durationFor(steps);
+		const ease = easeFor(steps);
 		current = next;
 		setActive();
-		place(0, true, dur);
-		moveRing(true, dur);
+		place(0, true, dur, ease);
+		moveRing(true, dur, ease);
 	}
 	moveRing(false);
 	window.addEventListener('resize', () => moveRing(false));
@@ -539,7 +550,7 @@ const shipping = [
 	/* ---------- layout ---------- */
 	.hero-grid {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
 		gap: 3.5em;
 		align-items: start;
 		margin-bottom: 3.5em;
@@ -595,7 +606,7 @@ const shipping = [
 	.thumbs {
 		position: relative;
 		display: grid;
-		grid-template-columns: repeat(var(--n, 6), minmax(0, 84px));
+		grid-template-columns: repeat(var(--n, 6), minmax(0, 1fr));
 		gap: 0.6em;
 		margin-top: 0.8em;
 	}
@@ -612,7 +623,7 @@ const shipping = [
 		will-change: transform;
 	}
 	.thumb {
-		aspect-ratio: 1;
+		aspect-ratio: 4 / 3;
 		padding: 0;
 		background-size: cover;
 		background-position: center;
@@ -654,7 +665,7 @@ const shipping = [
 		padding: 0.25em 0.8em;
 	}
 	.hero-info h1 {
-		margin: 0 0 0.5em 0;
+		margin: 0 0 0.3em 0;
 		font-size: clamp(2.5em, 5.2vw, 3.4em);
 		line-height: 1.05;
 		letter-spacing: -0.02em;
