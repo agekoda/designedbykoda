@@ -17,6 +17,8 @@ export interface LayoutCtx {
 	vbat: number | null; // volts, as reported by the device
 	dark: boolean;
 	family: Family; // which font family this layout draws with
+	// Optional 1-bit picture (see image.ts) for layouts that have a picture spot. 1 = dark dot.
+	cornerImage?: Uint8Array | null;
 }
 
 export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

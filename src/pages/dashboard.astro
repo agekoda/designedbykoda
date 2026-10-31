@@ -2,7 +2,6 @@
 export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import { getSessionUserId } from '../lib/session';
-import { CALENDAR_STYLES } from '../data/calendarStyles';
 import CitySearchStyles from '../components/CitySearchStyles.astro';
 
 const db = Astro.locals.runtime?.env?.DB;
@@ -12,7 +11,7 @@ if (!userId) return Astro.redirect('/setup');
 ---
 
 <Layout title="My devices — designedbykoda" description="Manage your E-Ink Calendar devices.">
-	<div class="dash" data-styles={JSON.stringify(CALENDAR_STYLES)}>
+	<div class="dash">
 		<div class="dash-head">
 			<div>
 				<div class="kicker">Your account</div>
@@ -41,9 +40,8 @@ if (!userId) return Astro.redirect('/setup');
 
 <script>
 	import { createCitySearch } from '../lib/citySearch';
-	const root = document.querySelector('.dash') as HTMLElement;
-	const styles: { id: string; label: string; image: string; imageDark: string }[] = JSON.parse(root.dataset.styles!);
-	const styleById = (id: string) => styles.find((s) => s.id === id) || styles[0];
+	import { renderPreview, paint } from '../lib/eink/previewKit';
+	import { batteryPercent } from '../lib/eink/battery';
 	const list = document.getElementById('devices')!;
 
 	const esc = (v: string) =>
@@ -99,24 +97,21 @@ if (!userId) return Astro.redirect('/setup');
 			const fresh = Date.now() / 1000 - d.lastSeenAt < interval * 2 + 600;
 			status = `<span class="dot ${fresh ? 'on' : 'warn'}"></span>Last active ${ago(d.lastSeenAt)}`;
 		}
+		let battery = '';
+		if (d.batteryMv) {
+			const v = d.batteryMv / 1000;
+			const pct = batteryPercent(v);
+			battery = `<span class="sep">·</span><span class="batt" title="Estimated from ${v.toFixed(2)} V${d.batteryAt ? ', ' + ago(d.batteryAt) : ''}"><span class="batt-icon ${pct < 20 ? 'low' : ''}"><i style="width:${Math.max(6, pct)}%"></i></span>${pct}% <span class="batt-v">${v.toFixed(2)} V</span></span>`;
+		}
 		const paired = d.createdAt ? new Date(d.createdAt * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 		el.innerHTML = `
-			<div class="dev-preview" data-preview></div>
+			<a class="dev-preview" data-preview href="/dashboard/display?device=${encodeURIComponent(d.id)}" aria-label="Customize this display"><canvas data-canvas width="400" height="300"></canvas><span class="dev-preview-cap">Preview</span></a>
 			<div class="dev-body">
 				<input class="dev-name" maxlength="40" value="${esc(d.name)}" placeholder="E-Ink Calendar${index ? ' ' + (index + 1) : ''}" aria-label="Device name" />
-				<div class="dev-meta">${status}${paired ? `<span class="sep">·</span>Paired ${paired}` : ''}</div>
+				<div class="dev-meta">${status}${paired ? `<span class="sep">·</span>Paired ${paired}` : ''}${battery}</div>
 
-				<div class="label">Layout</div>
-				<div class="mini-styles" role="radiogroup" aria-label="Layout">
-					${styles.map((s) => `<label class="mini"><input type="radio" name="style-${esc(d.id)}" value="${s.id}" ${s.id === d.style ? 'checked' : ''} /><span class="mini-card"><span class="mini-img" data-sid="${s.id}" style="background-image:url(${s.image})"></span><span class="mini-name">${s.label}</span></span></label>`).join('')}
-				</div>
-
-				<div class="label">Display</div>
-				<label class="switch">
-					<input type="checkbox" data-dark ${d.dark ? 'checked' : ''} />
-					<span class="track" aria-hidden="true"></span>
-					<span class="switch-text">Dark mode <small>white on black</small></span>
-				</label>
+					<a class="btn customize" href="/dashboard/display?device=${encodeURIComponent(d.id)}">Customize display</a>
+					<p class="muted small cust-hint">Layout, font, dark mode and the Agenda picture. See changes live before you save.</p>
 
 				<div class="label">Calendars</div>
 				<div class="cal-list" data-cals><p class="muted small">Loading calendars…</p></div>
@@ -132,40 +127,12 @@ if (!userId) return Astro.redirect('/setup');
 				</div>
 			</div>`;
 
-		const preview = el.querySelector('[data-preview]') as HTMLElement;
 		const note = el.querySelector('[data-note]') as HTMLElement;
-		// Dark previews are the "name-dark.png" screenshots; the light one sits
-		// underneath so nothing goes blank if a dark file is missing.
-		let isDark = !!d.dark;
-		let currentStyle = d.style;
-		const bg = (id: string) => {
-			const s = styleById(id);
-			return isDark ? `url(${s.imageDark}), url(${s.image})` : `url(${s.image})`;
-		};
-		const setPreview = (id: string) => {
-			currentStyle = id;
-			preview.style.backgroundImage = bg(id);
-		};
-		setPreview(d.style);
-
-		// dark mode: saves immediately; previews flip to white-on-black
-		const darkBox = el.querySelector('[data-dark]') as HTMLInputElement;
-		const paintDark = () => {
-			isDark = darkBox.checked;
-			preview.style.backgroundImage = bg(currentStyle);
-			el.querySelectorAll<HTMLElement>('.mini-img').forEach((n) => (n.style.backgroundImage = bg(n.dataset.sid!)));
-		};
-		paintDark();
-		darkBox.addEventListener('change', async () => {
-			paintDark();
-			const res = await post('/api/dashboard/devices', { deviceId: d.id, dark: darkBox.checked });
-			if (res.ok) flash(note, 'Saved. Press the button on your calendar to see it now.');
-			else {
-				darkBox.checked = !darkBox.checked;
-				paintDark();
-				flash(note, res.error || 'Could not save.', true);
-			}
-		});
+		// Live preview of this device's display (sample events, real layout/font/dark settings).
+		const canvas = el.querySelector('[data-canvas]') as HTMLCanvasElement;
+		renderPreview({ style: d.style, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null })
+			.then((r) => paint(canvas, r.px, 1))
+			.catch(() => {});
 
 		// name: saves when you leave the box or press Enter
 		const nameInput = el.querySelector('.dev-name') as HTMLInputElement;
@@ -178,16 +145,6 @@ if (!userId) return Astro.redirect('/setup');
 		};
 		nameInput.addEventListener('change', saveName);
 		nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') nameInput.blur(); });
-
-		// layout: saves the moment you pick one
-		el.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach((r) =>
-			r.addEventListener('change', async () => {
-				setPreview(r.value);
-				const res = await post('/api/dashboard/devices', { deviceId: d.id, style: r.value });
-				if (res.ok) flash(note, 'Saved. Press the button on your calendar to see it now.');
-				else flash(note, res.error || 'Could not save the layout.', true);
-			})
-		);
 
 		// calendars: saves shortly after you stop toggling
 		const calBox = el.querySelector('[data-cals]') as HTMLElement;
@@ -330,9 +287,20 @@ if (!userId) return Astro.redirect('/setup');
 		background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px;
 	}
 	.dash .dev-preview {
-		aspect-ratio: 4 / 3; border-radius: 10px; background-size: cover; background-position: center;
-		background-color: #fff; align-self: start; border: 1px solid var(--border);
+		position: relative; display: block; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden;
+		background-color: #f2f2ed; align-self: start; border: 1px solid var(--border);
 	}
+	.dash .dev-preview canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+	.dash .dev-preview-cap { position: absolute; left: 8px; bottom: 8px; font-size: 0.7em; letter-spacing: 0.1em; text-transform: uppercase; background: rgba(0,0,0,0.65); color: #fff; padding: 0.2em 0.6em; border-radius: 999px; opacity: 0; transition: opacity 0.2s; }
+	.dash .dev-preview:hover .dev-preview-cap { opacity: 1; }
+	.dash .customize { margin-top: 1.1em; }
+	.dash .cust-hint { margin-top: 0.6em; }
+	.dash .batt { display: inline-flex; align-items: center; gap: 0.4em; }
+	.dash .batt-v { opacity: 0.6; }
+	.dash .batt-icon { position: relative; width: 22px; height: 11px; border: 1.5px solid var(--muted); border-radius: 3px; display: inline-block; }
+	.dash .batt-icon::after { content: ''; position: absolute; right: -4px; top: 2px; width: 2px; height: 4px; background: var(--muted); border-radius: 0 1px 1px 0; }
+	.dash .batt-icon i { position: absolute; left: 1px; top: 1px; bottom: 1px; background: #4caf7a; border-radius: 1px; max-width: calc(100% - 2px); }
+	.dash .batt-icon.low i { background: #d9a441; }
 	.dash .dev-body { min-width: 0; }
 	.dash .dev-name {
 		width: 100%; padding: 0.2em 0.1em; background: transparent; border: none; border-bottom: 1px solid transparent;

@@ -1,6 +1,7 @@
 // Agenda: today's date and weather on the left, a mini month on the right,
 // then the next events grouped by day underneath.
 import { Draw } from '../draw';
+import { CORNER, CORNER_BYTES } from '../image';
 import { batteryText, daysInMonth, dayName, evTimeStr, monthName, monthShort, round0, tmOf, type LayoutCtx } from '../context';
 
 export function agenda(ctx: LayoutCtx): string {
@@ -15,25 +16,33 @@ export function agenda(ctx: LayoutCtx): string {
 	d.text(80, 98, 'mb', dayName(now), { align: 'box', maxW: 40 });
 	d.text(80, 118, 's', `${monthName(now)} ${now.year}`, { align: 'box', maxW: 40 });
 
-	// ---- mini month ----
-	const cellW = 27;
-	const cellH = 21;
-	const startX = 400 - 7 * cellW - 5;
-	const miniY = 7;
-	d.text(startX + Math.floor((7 * cellW) / 2), miniY + 5, 's', monthShort(now), { align: 'rawC' });
-	['M', 'T', 'W', 'T', 'F', 'S', 'S'].forEach((l, i) => d.text(startX + i * cellW + Math.floor(cellW / 2) - 4, miniY + 28, 's', l));
+	// ---- top right: a picture if one was set up, otherwise the mini month ----
+	if (ctx.cornerImage && ctx.cornerImage.length === CORNER_BYTES) {
+		// Stored as dark dots; on a dark screen the ink is white, so flip it to keep the picture the right way round.
+		let bytes = ctx.cornerImage;
+		if (ctx.dark) bytes = bytes.map((b) => ~b & 0xff);
+		d.bitmapBytes(CORNER.x, CORNER.y, CORNER.w, CORNER.h, bytes);
+	} else {
+		// ---- mini month ----
+		const cellW = 27;
+		const cellH = 21;
+		const startX = 400 - 7 * cellW - 5;
+		const miniY = 7;
+		d.text(startX + Math.floor((7 * cellW) / 2), miniY + 5, 's', monthShort(now), { align: 'rawC' });
+		['M', 'T', 'W', 'T', 'F', 'S', 'S'].forEach((l, i) => d.text(startX + i * cellW + Math.floor(cellW / 2) - 4, miniY + 28, 's', l));
 
-	const firstWday = (((now.wday - (now.mday - 1)) % 7) + 7) % 7;
-	const offset = (firstWday + 6) % 7; // Monday first
-	const dim = daysInMonth(now.year, now.mon);
-	for (let day = 1; day <= dim; day++) {
-		const col = (day + offset - 1) % 7;
-		const row = Math.floor((day + offset - 1) / 7);
-		const x = startX + col * cellW;
-		const y = miniY + 45 + row * cellH;
-		if (y > miniY + 145) break;
-		const cx = x + (day < 10 ? Math.floor(cellW / 2) - 4 : Math.floor(cellW / 2) - 7);
-		d.text(cx, y, 's', String(day), day === now.mday ? { ring: true } : {});
+		const firstWday = (((now.wday - (now.mday - 1)) % 7) + 7) % 7;
+		const offset = (firstWday + 6) % 7; // Monday first
+		const dim = daysInMonth(now.year, now.mon);
+		for (let day = 1; day <= dim; day++) {
+			const col = (day + offset - 1) % 7;
+			const row = Math.floor((day + offset - 1) / 7);
+			const x = startX + col * cellW;
+			const y = miniY + 45 + row * cellH;
+			if (y > miniY + 145) break;
+			const cx = x + (day < 10 ? Math.floor(cellW / 2) - 4 : Math.floor(cellW / 2) - 7);
+			d.text(cx, y, 's', String(day), day === now.mday ? { ring: true } : {});
+		}
 	}
 
 	d.line(0, 147, 400, 147);

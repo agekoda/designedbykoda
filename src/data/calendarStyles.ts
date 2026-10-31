@@ -8,12 +8,13 @@ export interface CalendarStyle {
 	image: string;
 	imageDark: string; // dark-mode screenshot, same name + "-dark"
 	view: number;
+	corner?: boolean; // has a spot that can show a picture instead of the mini calendar
 }
 
 export const DEFAULT_STYLE = 'agenda';
 
 export const CALENDAR_STYLES: CalendarStyle[] = [
-	{ id: 'agenda', label: 'Agenda', note: 'Today, a mini month and your next events', image: '/images/polls/eink-styles/agenda.png', imageDark: '/images/polls/eink-styles/agenda-dark.png', view: 3 },
+	{ id: 'agenda', label: 'Agenda', note: 'Today, a mini month and your next events', image: '/images/polls/eink-styles/agenda.png', imageDark: '/images/polls/eink-styles/agenda-dark.png', view: 3, corner: true },
 	{ id: 'month', label: 'Month', note: 'The whole month, with marks on busy days', image: '/images/polls/eink-styles/month.png', imageDark: '/images/polls/eink-styles/month-dark.png', view: 4 },
 	{ id: 'bigdate', label: 'Big date', note: 'A huge date beside an upcoming list', image: '/images/polls/eink-styles/bigdate.png', imageDark: '/images/polls/eink-styles/bigdate-dark.png', view: 5 },
 	{ id: 'week', label: 'Week', note: 'This week, day by day', image: '/images/polls/eink-styles/week.png', imageDark: '/images/polls/eink-styles/week-dark.png', view: 6 },

@@ -6,6 +6,7 @@
 import { viewForStyle } from '../../../../data/calendarStyles';
 import { getForecast } from '../../../../lib/weather';
 import { renderLayout } from '../../../../lib/eink/layouts';
+import { b64ToBytes } from '../../../../lib/eink/image';
 export const prerender = false;
 
 function getCookielessAuthSecret(request: Request): string | null {
@@ -331,11 +332,35 @@ export async function GET({ params, request, locals }) {
 		dark = dm?.dark_mode === 1;
 	} catch {}
 
-	await db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(now, deviceId).run();
+	// The calendar tells us its battery voltage on every refresh (?v=). Save it
+	// next to last_seen_at (same write, so no extra work) for the dashboard.
+	const vRaw = parseFloat(reqUrl.searchParams.get('v') ?? '');
+	const vbat = Number.isFinite(vRaw) && vRaw > 0 && vRaw < 10 ? vRaw : null;
+	let seenSaved = false;
+	if (vbat !== null) {
+		try {
+			await db
+				.prepare('UPDATE devices SET last_seen_at = ?, battery_mv = ?, battery_at = ? WHERE id = ?')
+				.bind(now, Math.round(vbat * 1000), now, deviceId)
+				.run();
+			seenSaved = true;
+		} catch {} // columns come from schema-display.sql; fall back below if not run yet
+	}
+	if (!seenSaved) await db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(now, deviceId).run();
 
 	if (proto === '2') {
-		const vRaw = parseFloat(reqUrl.searchParams.get('v') ?? '');
-		const vbat = Number.isFinite(vRaw) && vRaw > 0 && vRaw < 10 ? vRaw : null;
+		// Display options from the customise page (schema-display.sql). One query,
+		// and a missing column just means "defaults".
+		let fontChoice: string | null = null;
+		let cornerImage: Uint8Array | null = null;
+		try {
+			const o = await db
+				.prepare("SELECT layout_font, CASE WHEN corner_mode = 'image' THEN corner_bits END AS bits FROM devices WHERE id = ?")
+				.bind(deviceId)
+				.first();
+			fontChoice = o?.layout_font ?? null;
+			if (o?.bits) cornerImage = b64ToBytes(o.bits);
+		} catch {}
 		const nowLocal = Math.floor(rightNow.getTime() / 1000) + offsetSec;
 		const screen = renderLayout(style, {
 			nowLocal,
@@ -343,7 +368,8 @@ export async function GET({ params, request, locals }) {
 			weather,
 			vbat,
 			dark,
-		});
+			cornerImage,
+		}, fontChoice ?? undefined);
 		return new Response(screen, {
 			status: 200,
 			headers: {

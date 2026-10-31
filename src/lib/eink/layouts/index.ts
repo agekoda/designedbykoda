@@ -26,6 +26,12 @@ export const LAYOUTS: Record<string, LayoutEntry> = {
 	nextup: { render: nextup, font: 'sans' },
 };
 
+// The font a layout uses when nothing else is chosen.
+export function defaultFontFor(styleId: string): Family {
+	const f = (LAYOUTS[styleId] ?? LAYOUTS.agenda).font;
+	return isFamily(f) ? f : DEFAULT_FAMILY;
+}
+
 export function renderLayout(styleId: string, ctx: Omit<LayoutCtx, 'family'>, familyOverride?: unknown): string {
 	const entry = LAYOUTS[styleId] ?? LAYOUTS.agenda;
 	const family = isFamily(familyOverride) ? familyOverride : isFamily(entry.font) ? entry.font : DEFAULT_FAMILY;

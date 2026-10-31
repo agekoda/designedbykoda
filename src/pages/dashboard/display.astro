@@ -1,0 +1,719 @@
+---
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+import { getSessionUserId } from '../../lib/session';
+import { CALENDAR_STYLES } from '../../data/calendarStyles';
+import { FAMILIES, FAMILY_LABELS } from '../../lib/eink/fonts';
+import { DITHERS } from '../../lib/eink/image';
+
+const db = Astro.locals.runtime?.env?.DB;
+const userId = db ? await getSessionUserId(Astro.request, db) : null;
+if (!userId) return Astro.redirect('/setup');
+
+const deviceId = Astro.url.searchParams.get('device') ?? '';
+const styles = CALENDAR_STYLES.map((s) => ({ id: s.id, label: s.label, note: s.note, corner: !!s.corner }));
+const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
+---
+
+<Layout title="Customize display — designedbykoda" description="Change how your E-Ink Calendar looks.">
+	<div
+		class="cust"
+		data-device={deviceId}
+		data-styles={JSON.stringify(styles)}
+		data-families={JSON.stringify(families)}
+		data-dithers={JSON.stringify(DITHERS)}
+	>
+		<a class="back" href="/dashboard">← My devices</a>
+		<div class="cust-head">
+			<div class="kicker">Customize display</div>
+			<div class="cust-title" id="dev-title">Loading…</div>
+		</div>
+
+		<p class="banner" id="banner" hidden></p>
+
+		<div class="cust-grid">
+			<div class="cust-left">
+				<div class="screen-wrap" id="screen-wrap">
+					<canvas id="screen" width="400" height="300" aria-label="Preview of your calendar screen"></canvas>
+				</div>
+				<p class="muted small screen-note">
+					Live preview, drawn the same way your calendar draws it. It uses example events so you can see the layout; your real
+					events appear on the device.
+				</p>
+			</div>
+
+			<div class="cust-right">
+				<section class="card">
+					<div class="label">Layout</div>
+					<div class="layouts" id="layouts" role="radiogroup" aria-label="Layout"></div>
+				</section>
+
+				<section class="card">
+					<div class="label">Font</div>
+					<div class="fonts" id="fonts" role="radiogroup" aria-label="Font"></div>
+				</section>
+
+				<section class="card">
+					<div class="label">Display</div>
+					<label class="switch">
+						<input type="checkbox" id="dark" />
+						<span class="track" aria-hidden="true"></span>
+						<span class="switch-text">Dark mode <small>white on black</small></span>
+					</label>
+				</section>
+
+				<section class="card" id="corner-card" hidden>
+					<div class="label">Top right of the Agenda</div>
+					<div class="seg" role="radiogroup" aria-label="Top right">
+						<label><input type="radio" name="corner" value="calendar" checked /><span>Mini calendar</span></label>
+						<label><input type="radio" name="corner" value="image" /><span>Picture</span></label>
+					</div>
+
+					<div id="picture-tools" hidden>
+						<div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload a picture">
+							<input type="file" id="file" accept="image/*" hidden />
+							<span id="drop-text">Choose a picture, or drop one here</span>
+						</div>
+
+						<div id="editor" hidden>
+							<div class="ed-box"><canvas id="ed" aria-label="Picture editor. Drag to move the picture."></canvas></div>
+							<p class="muted small">Drag the picture to move it. It is saved as 184 × 140 black and white dots.</p>
+
+							<div class="label sub">Dithering style</div>
+							<div class="seg wrap" id="dithers" role="radiogroup" aria-label="Dithering style"></div>
+
+							<div class="sliders">
+								<label class="slider"><span>Zoom</span><input type="range" id="s-zoom" min="1" max="4" step="0.01" /><output id="o-zoom"></output></label>
+								<label class="slider"><span>Exposure</span><input type="range" id="s-exposure" min="-2" max="2" step="0.05" /><output id="o-exposure"></output></label>
+								<label class="slider"><span>Brightness</span><input type="range" id="s-brightness" min="-100" max="100" step="1" /><output id="o-brightness"></output></label>
+								<label class="slider"><span>Contrast</span><input type="range" id="s-contrast" min="-100" max="100" step="1" /><output id="o-contrast"></output></label>
+								<label class="slider"><span>Cut-off</span><input type="range" id="s-threshold" min="0" max="255" step="1" /><output id="o-threshold"></output></label>
+							</div>
+
+							<div class="ed-actions">
+								<label class="check"><input type="checkbox" id="invert" /><span class="box" aria-hidden="true"></span><span>Invert</span></label>
+								<button type="button" class="link" id="ed-reset">Reset adjustments</button>
+								<button type="button" class="link" id="ed-replace">Choose a different picture</button>
+							</div>
+						</div>
+					</div>
+				</section>
+			</div>
+		</div>
+
+		<div class="savebar" id="savebar">
+			<span class="save-msg" id="save-msg" aria-live="polite">No changes yet.</span>
+			<div class="save-btns">
+				<button type="button" class="btn ghost small" id="revert" disabled>Revert</button>
+				<button type="button" class="btn small" id="save" disabled>Save to my calendar</button>
+			</div>
+		</div>
+	</div>
+</Layout>
+
+<script>
+	import { renderPreview, paint, loadFonts } from '../../lib/eink/previewKit';
+	import { defaultFontFor } from '../../lib/eink/layouts';
+	import { Draw } from '../../lib/eink/draw';
+	import { renderDrawList } from '../../lib/eink/preview';
+	import {
+		CORNER,
+		DEFAULT_IMAGE_SETTINGS,
+		cleanSettings,
+		ditherGray,
+		packBits,
+		bytesToB64,
+		type ImageSettings,
+	} from '../../lib/eink/image';
+
+	const root = document.querySelector('.cust') as HTMLElement;
+	const styles: { id: string; label: string; note: string; corner: boolean }[] = JSON.parse(root.dataset.styles!);
+	const families: { id: string; label: string }[] = JSON.parse(root.dataset.families!);
+	const dithers: { id: string; label: string; note: string }[] = JSON.parse(root.dataset.dithers!);
+	const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+	const screen = $<HTMLCanvasElement>('screen');
+	const layoutsEl = $('layouts');
+	const fontsEl = $('fonts');
+	const darkBox = $<HTMLInputElement>('dark');
+	const cornerCard = $('corner-card');
+	const pictureTools = $('picture-tools');
+	const drop = $('drop');
+	const fileInput = $<HTMLInputElement>('file');
+	const dropText = $('drop-text');
+	const editor = $('editor');
+	const edCanvas = $<HTMLCanvasElement>('ed');
+	const ditherEl = $('dithers');
+	const saveBtn = $<HTMLButtonElement>('save');
+	const revertBtn = $<HTMLButtonElement>('revert');
+	const saveMsg = $('save-msg');
+	const banner = $('banner');
+
+	// ---------------------------------------------------------------- state
+	interface State {
+		style: string;
+		font: string | null; // null = the layout's own font
+		dark: boolean;
+		cornerMode: 'calendar' | 'image';
+		cfg: ImageSettings;
+		src: string | null; // the uploaded photo (small JPEG data URL)
+	}
+	let deviceId = root.dataset.device || '';
+	let hasWeather = false;
+	let vbat: number | null = null;
+	let st: State = { style: 'agenda', font: null, dark: false, cornerMode: 'calendar', cfg: { ...DEFAULT_IMAGE_SETTINGS }, src: null };
+	let base = JSON.stringify(st); // what is saved on the server
+	let pictureChanged = false; // the picture or its settings differ from what the server has
+	let srcImg: HTMLImageElement | null = null;
+	let cornerBytes: Uint8Array | null = null;
+	let cornerDots: Uint8Array | null = null;
+
+	const effFont = () => st.font ?? defaultFontFor(st.style);
+	const supportsCorner = () => !!styles.find((s) => s.id === st.style)?.corner;
+
+	// ---------------------------------------------------------------- picture pipeline
+	function cropGray(img: HTMLImageElement, s: ImageSettings): Float32Array {
+		const { w, h } = CORNER;
+		const cover = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+		const scale = cover * s.zoom;
+		const dw = img.naturalWidth * scale;
+		const dh = img.naturalHeight * scale;
+		// keep the picture covering the box, and remember the limit so dragging stops at the edge
+		const maxX = Math.max(0, (dw - w) / 2);
+		const maxY = Math.max(0, (dh - h) / 2);
+		s.panX = Math.max(-maxX, Math.min(maxX, s.panX));
+		s.panY = Math.max(-maxY, Math.min(maxY, s.panY));
+		const c = document.createElement('canvas');
+		c.width = w;
+		c.height = h;
+		const ctx = c.getContext('2d', { willReadFrequently: true })!;
+		ctx.fillStyle = '#fff';
+		ctx.fillRect(0, 0, w, h);
+		ctx.imageSmoothingEnabled = true;
+		ctx.imageSmoothingQuality = 'high';
+		ctx.drawImage(img, (w - dw) / 2 + s.panX, (h - dh) / 2 + s.panY, dw, dh);
+		const d = ctx.getImageData(0, 0, w, h).data;
+		const g = new Float32Array(w * h);
+		for (let i = 0; i < g.length; i++) g[i] = d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114;
+		return g;
+	}
+
+	function recomputePicture() {
+		if (!srcImg) {
+			cornerBytes = null;
+			cornerDots = null;
+			return;
+		}
+		const g = cropGray(srcImg, st.cfg);
+		cornerDots = ditherGray(g, CORNER.w, CORNER.h, st.cfg);
+		cornerBytes = packBits(cornerDots, CORNER.w, CORNER.h);
+		// editor canvas: black dots on paper
+		const px = new Uint8Array(cornerDots.length);
+		for (let i = 0; i < px.length; i++) px[i] = cornerDots[i] ? 0 : 1;
+		paint(edCanvas, px, 2, CORNER.w, CORNER.h);
+	}
+
+	function loadSource(dataUrl: string): Promise<void> {
+		return new Promise((resolve, reject) => {
+			const img = new Image();
+			img.onload = () => {
+				srcImg = img;
+				resolve();
+			};
+			img.onerror = () => reject(new Error('load'));
+			img.src = dataUrl;
+		});
+	}
+
+	// Shrinks a chosen photo to something small enough to store (a JPEG under ~250 KB).
+	async function prepareSource(file: File): Promise<string> {
+		const url = URL.createObjectURL(file);
+		try {
+			const img = new Image();
+			await new Promise<void>((res, rej) => {
+				img.onload = () => res();
+				img.onerror = () => rej(new Error('decode'));
+				img.src = url;
+			});
+			let max = 900;
+			for (let attempt = 0; attempt < 5; attempt++) {
+				const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+				const c = document.createElement('canvas');
+				c.width = Math.max(1, Math.round(img.naturalWidth * k));
+				c.height = Math.max(1, Math.round(img.naturalHeight * k));
+				const ctx = c.getContext('2d')!;
+				ctx.fillStyle = '#fff';
+				ctx.fillRect(0, 0, c.width, c.height);
+				ctx.imageSmoothingQuality = 'high';
+				ctx.drawImage(img, 0, 0, c.width, c.height);
+				const out = c.toDataURL('image/jpeg', 0.86 - attempt * 0.08);
+				if (out.length < 250_000) return out;
+				max = Math.round(max * 0.8);
+			}
+			throw new Error('big');
+		} finally {
+			URL.revokeObjectURL(url);
+		}
+	}
+
+	// ---------------------------------------------------------------- drawing the previews
+	let pending = false;
+	let thumbsDirty = true;
+	function schedule(thumbs = true) {
+		if (thumbs) thumbsDirty = true;
+		if (pending) return;
+		pending = true;
+		requestAnimationFrame(async () => {
+			pending = false;
+			await redraw();
+		});
+	}
+
+	function cornerForPreview(): Uint8Array | null {
+		return st.cornerMode === 'image' && supportsCorner() ? cornerBytes : null;
+	}
+
+	async function redraw() {
+		const common = { font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12 };
+		try {
+			const r = await renderPreview({ ...common, style: st.style, cornerImage: cornerForPreview() });
+			paint(screen, r.px, 1);
+			if (thumbsDirty) {
+				thumbsDirty = false;
+				for (const s of styles) {
+					const cv = layoutsEl.querySelector<HTMLCanvasElement>(`canvas[data-sid="${s.id}"]`);
+					if (!cv) continue;
+					const t = await renderPreview({ ...common, style: s.id, cornerImage: s.corner && st.cornerMode === 'image' ? cornerBytes : null });
+					paint(cv, t.px, 1);
+				}
+				const fonts = await loadFonts();
+				for (const f of families) {
+					const cv = fontsEl.querySelector<HTMLCanvasElement>(`canvas[data-fid="${f.id}"]`);
+					if (!cv) continue;
+					const d = new Draw(f.id as any, st.dark);
+					d.text(10, 26, 'mb', 'Thursday 29');
+					d.text(10, 50, 's', 'Team standup');
+					d.text(190, 50, 'mb', '10:30', { align: 'rawR' });
+					const rr = renderDrawList(d.toString(), fonts);
+					// the sample only needs the top-left 200x60 corner of the 400x300 screen
+					const px = new Uint8Array(200 * 60);
+					for (let y = 0; y < 60; y++) for (let x = 0; x < 200; x++) px[y * 200 + x] = rr.px[y * 400 + x];
+					paint(cv, px, 1, 200, 60);
+				}
+			}
+		} catch {
+			banner.hidden = false;
+			banner.textContent = 'Could not load the preview fonts. Try refreshing the page.';
+		}
+	}
+
+	// ---------------------------------------------------------------- controls
+	function buildControls() {
+		layoutsEl.innerHTML = styles
+			.map(
+				(s) => `<label class="lay"><input type="radio" name="layout" value="${s.id}" /><span class="lay-card"><canvas data-sid="${s.id}" width="400" height="300"></canvas><span class="lay-name">${s.label}</span></span></label>`
+			)
+			.join('');
+		fontsEl.innerHTML = families
+			.map(
+				(f) => `<label class="fnt"><input type="radio" name="font" value="${f.id}" /><span class="fnt-card"><canvas data-fid="${f.id}" width="200" height="60"></canvas><span class="fnt-name">${f.label}</span></span></label>`
+			)
+			.join('');
+		ditherEl.innerHTML = dithers
+			.map((d) => `<label title="${d.note}"><input type="radio" name="dither" value="${d.id}" /><span>${d.label}</span></label>`)
+			.join('');
+
+		layoutsEl.addEventListener('change', (e) => {
+			st.style = (e.target as HTMLInputElement).value;
+			syncControls();
+			schedule();
+			changed();
+		});
+		fontsEl.addEventListener('change', (e) => {
+			st.font = (e.target as HTMLInputElement).value;
+			syncControls();
+			schedule();
+			changed();
+		});
+		darkBox.addEventListener('change', () => {
+			st.dark = darkBox.checked;
+			schedule();
+			changed();
+		});
+		document.querySelectorAll<HTMLInputElement>('input[name="corner"]').forEach((r) =>
+			r.addEventListener('change', () => {
+				st.cornerMode = r.value as 'calendar' | 'image';
+				syncControls();
+				schedule();
+				changed();
+			})
+		);
+		ditherEl.addEventListener('change', (e) => {
+			st.cfg.dither = (e.target as HTMLInputElement).value as any;
+			pictureEdited();
+		});
+		const sliders: [string, keyof ImageSettings][] = [
+			['zoom', 'zoom'],
+			['exposure', 'exposure'],
+			['brightness', 'brightness'],
+			['contrast', 'contrast'],
+			['threshold', 'threshold'],
+		];
+		for (const [id, key] of sliders) {
+			$<HTMLInputElement>('s-' + id).addEventListener('input', (e) => {
+				(st.cfg as any)[key] = parseFloat((e.target as HTMLInputElement).value);
+				pictureEdited();
+			});
+		}
+		$<HTMLInputElement>('invert').addEventListener('change', (e) => {
+			st.cfg.invert = (e.target as HTMLInputElement).checked;
+			pictureEdited();
+		});
+		$('ed-reset').addEventListener('click', () => {
+			st.cfg = { ...DEFAULT_IMAGE_SETTINGS };
+			syncControls();
+			pictureEdited();
+		});
+		const choose = () => fileInput.click();
+		$('ed-replace').addEventListener('click', choose);
+		drop.addEventListener('click', choose);
+		drop.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				choose();
+			}
+		});
+		['dragenter', 'dragover'].forEach((ev) =>
+			drop.addEventListener(ev, (e) => {
+				e.preventDefault();
+				drop.classList.add('over');
+			})
+		);
+		['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, () => drop.classList.remove('over')));
+		drop.addEventListener('drop', (e) => {
+			e.preventDefault();
+			const f = (e as DragEvent).dataTransfer?.files?.[0];
+			if (f) takeFile(f);
+		});
+		fileInput.addEventListener('change', () => {
+			const f = fileInput.files?.[0];
+			if (f) takeFile(f);
+			fileInput.value = '';
+		});
+
+		// drag to move the picture inside its box
+		let drag: { x: number; y: number; px: number; py: number } | null = null;
+		edCanvas.addEventListener('pointerdown', (e) => {
+			if (!srcImg) return;
+			edCanvas.setPointerCapture(e.pointerId);
+			drag = { x: e.clientX, y: e.clientY, px: st.cfg.panX, py: st.cfg.panY };
+		});
+		edCanvas.addEventListener('pointermove', (e) => {
+			if (!drag) return;
+			const k = CORNER.w / edCanvas.getBoundingClientRect().width; // screen px -> dots
+			st.cfg.panX = drag.px + (e.clientX - drag.x) * k;
+			st.cfg.panY = drag.py + (e.clientY - drag.y) * k;
+			pictureEdited();
+		});
+		const end = () => (drag = null);
+		edCanvas.addEventListener('pointerup', end);
+		edCanvas.addEventListener('pointercancel', end);
+		edCanvas.addEventListener(
+			'wheel',
+			(e) => {
+				if (!srcImg) return;
+				e.preventDefault();
+				st.cfg.zoom = Math.max(1, Math.min(4, st.cfg.zoom * (e.deltaY < 0 ? 1.06 : 1 / 1.06)));
+				syncControls();
+				pictureEdited();
+			},
+			{ passive: false }
+		);
+	}
+
+	async function takeFile(f: File) {
+		if (!f.type.startsWith('image/')) {
+			flash('That is not an image.', true);
+			return;
+		}
+		try {
+			const src = await prepareSource(f);
+			await loadSource(src);
+			st.src = src;
+			st.cfg = { ...DEFAULT_IMAGE_SETTINGS, dither: st.cfg.dither };
+			st.cornerMode = 'image';
+			syncControls();
+			pictureEdited();
+		} catch {
+			flash("Couldn't read that picture. Try a JPEG or PNG.", true);
+		}
+	}
+
+	function pictureEdited() {
+		pictureChanged = true;
+		syncSliders();
+		recomputePicture();
+		schedule(false);
+		// only the Agenda thumbnail changes when the picture does
+		const cv = layoutsEl.querySelector<HTMLCanvasElement>('canvas[data-sid="agenda"]');
+		if (cv)
+			renderPreview({ style: 'agenda', font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12, cornerImage: st.cornerMode === 'image' ? cornerBytes : null }).then((r) => paint(cv, r.px, 1));
+		changed();
+	}
+
+	function syncSliders() {
+		const c = st.cfg;
+		const set = (id: string, v: number, text: string) => {
+			$<HTMLInputElement>('s-' + id).value = String(v);
+			$('o-' + id).textContent = text;
+		};
+		set('zoom', c.zoom, c.zoom.toFixed(2) + '×');
+		set('exposure', c.exposure, (c.exposure > 0 ? '+' : '') + c.exposure.toFixed(2));
+		set('brightness', c.brightness, String(Math.round(c.brightness)));
+		set('contrast', c.contrast, String(Math.round(c.contrast)));
+		set('threshold', c.threshold, String(Math.round(c.threshold)));
+		$<HTMLInputElement>('invert').checked = c.invert;
+	}
+
+	function syncControls() {
+		layoutsEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.style));
+		fontsEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === effFont()));
+		darkBox.checked = st.dark;
+		cornerCard.hidden = !supportsCorner();
+		document.querySelectorAll<HTMLInputElement>('input[name="corner"]').forEach((r) => (r.checked = r.value === st.cornerMode));
+		pictureTools.hidden = st.cornerMode !== 'image';
+		editor.hidden = !srcImg;
+		drop.hidden = !!srcImg;
+		ditherEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.cfg.dither));
+		syncSliders();
+	}
+
+	// ---------------------------------------------------------------- saving
+	function flash(text: string, err = false) {
+		saveMsg.textContent = text;
+		saveMsg.classList.toggle('is-error', err);
+	}
+	function isDirty() {
+		return JSON.stringify(st) !== base || pictureChanged;
+	}
+	function changed() {
+		const dirty = isDirty();
+		saveBtn.disabled = !dirty;
+		revertBtn.disabled = !dirty;
+		if (dirty) flash('You have unsaved changes.');
+	}
+
+	async function save() {
+		if (st.cornerMode === 'image' && supportsCorner() && !srcImg) {
+			flash('Choose a picture first, or switch back to the mini calendar.', true);
+			return;
+		}
+		saveBtn.disabled = true;
+		flash('Saving…');
+		const body: any = { deviceId, style: st.style, font: st.font, dark: st.dark };
+		if (supportsCorner() || st.cornerMode === 'image') {
+			body.corner = { mode: st.cornerMode };
+			if (st.cornerMode === 'image' && srcImg && cornerBytes && (pictureChanged || JSON.parse(base).cornerMode !== 'image')) {
+				body.corner.bits = bytesToB64(cornerBytes);
+				body.corner.src = st.src;
+				body.corner.cfg = st.cfg;
+			}
+		}
+		try {
+			const res = await fetch('/api/dashboard/display', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body),
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok || !data.ok) throw new Error(data.error || 'Could not save.');
+			base = JSON.stringify(st);
+			pictureChanged = false;
+			flash('Saved. Press the button on your calendar to see it now.');
+			saveBtn.disabled = true;
+			revertBtn.disabled = true;
+		} catch (err: any) {
+			flash(err?.message || 'Could not save.', true);
+			saveBtn.disabled = false;
+		}
+	}
+
+	async function revert() {
+		st = JSON.parse(base);
+		st.cfg = cleanSettings(st.cfg);
+		pictureChanged = false;
+		srcImg = null;
+		if (st.src) {
+			try {
+				await loadSource(st.src);
+			} catch {}
+		}
+		recomputePicture();
+		syncControls();
+		schedule();
+		changed();
+		flash('Reverted.');
+	}
+	saveBtn.addEventListener('click', save);
+	revertBtn.addEventListener('click', revert);
+	window.addEventListener('beforeunload', (e) => {
+		if (isDirty()) {
+			e.preventDefault();
+			e.returnValue = '';
+		}
+	});
+
+	// ---------------------------------------------------------------- start
+	async function start() {
+		buildControls();
+		try {
+			if (!deviceId) {
+				const list = await (await fetch('/api/dashboard/devices')).json();
+				deviceId = list.devices?.[0]?.id || '';
+				if (!deviceId) {
+					$('dev-title').textContent = 'No devices yet';
+					return;
+				}
+			}
+			const [info, list] = await Promise.all([
+				fetch('/api/dashboard/display?deviceId=' + encodeURIComponent(deviceId)).then((r) => r.json()),
+				fetch('/api/dashboard/devices').then((r) => r.json()).catch(() => ({ devices: [] })),
+			]);
+			if (info.error) {
+				$('dev-title').textContent = info.error;
+				return;
+			}
+			const idx = (list.devices || []).findIndex((d: any) => d.id === deviceId);
+			$('dev-title').textContent = info.name || (idx > 0 ? `E-Ink Calendar ${idx + 1}` : 'E-Ink Calendar');
+			hasWeather = !!info.hasWeather;
+			vbat = info.batteryMv ? info.batteryMv / 1000 : null;
+			if (!info.migrated) {
+				banner.hidden = false;
+				banner.textContent = 'Fonts and pictures need a one-off database update on the server (schema-display.sql) before they can be saved.';
+			}
+			st = {
+				style: info.style,
+				font: info.font,
+				dark: !!info.dark,
+				cornerMode: info.cornerMode,
+				cfg: cleanSettings(info.cornerCfg),
+				src: info.cornerSrc,
+			};
+			if (st.src) {
+				try {
+					await loadSource(st.src);
+				} catch {
+					srcImg = null;
+				}
+			}
+			recomputePicture();
+			base = JSON.stringify(st);
+			syncControls();
+			schedule();
+		} catch {
+			$('dev-title').textContent = "Couldn't load this device";
+		}
+	}
+	start();
+</script>
+
+<style is:global>
+	.cust { padding: 1em 0 5.5em; }
+	.cust .back { color: var(--muted); text-decoration: none; font-size: 0.9em; }
+	.cust .back:hover { color: var(--fg); }
+	.cust .cust-head { margin: 1.2em 0 1.6em; }
+	.cust .kicker { font-size: 0.78em; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.5em; }
+	.cust .cust-title { font-size: 2.2em; font-weight: 800; line-height: 1.1; color: var(--fg); }
+	.cust .muted { color: var(--muted); margin: 0; }
+	.cust .small { font-size: 0.9em; }
+	.cust .banner { background: rgba(217, 164, 65, 0.12); border: 1px solid #d9a441; color: var(--fg); border-radius: 12px; padding: 0.8em 1em; margin: 0 0 1.4em; font-size: 0.92em; }
+
+	.cust .cust-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 1.8em; align-items: start; }
+	.cust .cust-left { position: sticky; top: 1em; }
+	.cust .screen-wrap { background: #f2f2ed; border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+	.cust #screen { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; image-rendering: pixelated; }
+	.cust .screen-note { margin-top: 0.8em; max-width: 56ch; }
+	.cust .cust-right { display: grid; gap: 1.1em; }
+	.cust .card { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; padding: 1.1em 1.2em 1.2em; }
+	.cust .card[hidden] { display: none; }
+	.cust .label { font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.8em; }
+	.cust .label.sub { margin-top: 1.2em; }
+
+	.cust input[type='radio'], .cust .switch input, .cust .check input { position: absolute; opacity: 0; pointer-events: none; }
+
+	.cust .layouts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5em; }
+	.cust .lay-card, .cust .fnt-card { display: grid; gap: 0.35em; padding: 0.35em; border: 2px solid var(--border); border-radius: 10px; background: var(--bg); transition: border-color 0.2s, background 0.2s; cursor: pointer; }
+	.cust .lay-card canvas { width: 100%; aspect-ratio: 4 / 3; border-radius: 5px; image-rendering: pixelated; background: #f2f2ed; }
+	.cust .lay-name, .cust .fnt-name { font-size: 0.72em; font-weight: 700; color: var(--fg); text-align: center; }
+	.cust label:hover > .lay-card, .cust label:hover > .fnt-card { border-color: var(--muted); }
+	.cust input:checked + .lay-card, .cust input:checked + .fnt-card { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
+	.cust input:focus-visible + .lay-card, .cust input:focus-visible + .fnt-card { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+	.cust .fonts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6em; }
+	.cust .fnt-card canvas { width: 100%; aspect-ratio: 10 / 3; border-radius: 5px; image-rendering: pixelated; background: #f2f2ed; }
+
+	.cust .seg { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
+	.cust .seg.wrap { display: grid; grid-template-columns: repeat(4, auto); border-radius: 16px; width: fit-content; max-width: 100%; }
+	.cust .seg.wrap label span { text-align: center; padding: 0.45em 0.8em; }
+	.cust .seg label span { display: block; padding: 0.45em 1em; border-radius: 999px; font-size: 0.88em; font-weight: 600; color: var(--muted); cursor: pointer; transition: background 0.2s, color 0.2s; }
+	.cust .seg input:checked + span { background: var(--fg); color: var(--bg); }
+	.cust .seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+	.cust #picture-tools { margin-top: 1em; }
+	.cust #picture-tools[hidden], .cust #editor[hidden], .cust .drop[hidden] { display: none; }
+	.cust .drop { display: grid; place-items: center; text-align: center; min-height: 120px; padding: 1em; border: 2px dashed var(--border); border-radius: 14px; color: var(--muted); cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; }
+	.cust .drop:hover, .cust .drop.over, .cust .drop:focus-visible { border-color: var(--accent); color: var(--fg); background: rgba(var(--accent-rgb), 0.06); outline: none; }
+	.cust .ed-box { background: #f2f2ed; border: 1px solid var(--border); border-radius: 10px; padding: 8px; width: fit-content; max-width: 100%; margin-bottom: 0.7em; }
+	.cust #ed { display: block; width: 368px; max-width: 100%; height: auto; aspect-ratio: 184 / 140; image-rendering: pixelated; cursor: grab; touch-action: none; }
+	.cust #ed:active { cursor: grabbing; }
+
+	.cust .sliders { display: grid; gap: 0.7em; margin-top: 1.1em; }
+	.cust .slider { display: grid; grid-template-columns: 5.5em 1fr 3.8em; align-items: center; gap: 0.8em; font-size: 0.9em; color: var(--fg); }
+	.cust .slider output { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+	.cust input[type='range'] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; margin: 0; }
+	.cust input[type='range']::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: var(--border); }
+	.cust input[type='range']::-moz-range-track { height: 4px; border-radius: 999px; background: var(--border); }
+	.cust input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -7px; border-radius: 50%; background: var(--fg); border: 0; }
+	.cust input[type='range']::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--fg); border: 0; }
+	.cust input[type='range']:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+	.cust .ed-actions { display: flex; align-items: center; gap: 1.2em; flex-wrap: wrap; margin-top: 1.1em; }
+	.cust .link { background: none; border: none; padding: 0; font: inherit; font-size: 0.9em; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+	.cust .link:hover { color: var(--fg); }
+
+	.cust .check { display: inline-flex; align-items: center; gap: 0.6em; color: var(--fg); font-size: 0.92em; }
+	.cust .check .box { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--muted-dim); display: grid; place-items: center; transition: background 0.2s, border-color 0.2s; }
+	.cust .check .box::after { content: ''; width: 5px; height: 10px; border: solid var(--bg); border-width: 0 2.5px 2.5px 0; transform: translateY(-1px) rotate(45deg) scale(0); transition: transform 0.18s; }
+	.cust .check input:checked + .box { background: var(--accent); border-color: var(--accent); }
+	.cust .check input:checked + .box::after { transform: translateY(-1px) rotate(45deg) scale(1); }
+
+	.cust .switch { display: inline-flex; align-items: center; gap: 0.8em; color: var(--fg); font-size: 0.95em; }
+	.cust .switch .track { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 999px; background: var(--border); position: relative; transition: background 0.2s; }
+	.cust .switch .track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--fg); transition: transform 0.2s, background 0.2s; }
+	.cust .switch input:checked + .track { background: var(--accent); }
+	.cust .switch input:checked + .track::after { transform: translateX(18px); background: var(--bg); }
+	.cust .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.cust .switch small { color: var(--muted); margin-left: 0.4em; }
+
+	.cust .btn { display: inline-block; padding: 0.7em 1.5em; border: 1px solid transparent; border-radius: 999px; background: var(--fg); color: var(--bg); font: inherit; font-weight: 700; font-size: 0.95em; text-decoration: none; }
+	.cust .btn:hover:not(:disabled) { background: var(--accent); color: var(--bg); }
+	.cust .btn:disabled { opacity: 0.4; }
+	.cust .btn.small { padding: 0.55em 1.2em; font-size: 0.88em; }
+	.cust .btn.ghost { background: transparent; color: var(--muted); border-color: var(--border); }
+	.cust .btn.ghost:hover:not(:disabled) { background: transparent; color: var(--fg); border-color: var(--muted); }
+
+	.cust .savebar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 1em; width: min(900px, calc(100vw - 2em)); display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: 0.7em 0.9em 0.7em 1.2em; background: color-mix(in srgb, var(--bg-raised) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 999px; z-index: 20; }
+	.cust .save-msg { font-size: 0.9em; color: var(--muted); min-width: 0; }
+	.cust .save-msg.is-error { color: #e08a8a; }
+	.cust .save-btns { display: flex; gap: 0.5em; flex: 0 0 auto; }
+
+	html.has-custom-cursor .cust, html.has-custom-cursor .cust * { cursor: none !important; }
+
+	@media (max-width: 900px) {
+		.cust .cust-grid { grid-template-columns: 1fr; }
+		.cust .cust-left { position: static; }
+		.cust .layouts { grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); }
+		.cust .seg.wrap { grid-template-columns: repeat(2, 1fr); width: 100%; }
+		.cust .savebar { border-radius: 18px; flex-direction: column; align-items: stretch; }
+		.cust .save-btns { justify-content: flex-end; }
+	}
+</style>

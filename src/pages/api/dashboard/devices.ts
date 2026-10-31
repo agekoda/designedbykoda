@@ -48,6 +48,15 @@ export async function GET({ request, locals }) {
 		for (const l of lr.results ?? []) locs.set(l.id, { name: l.weather_name || '', lat: l.weather_lat, lon: l.weather_lon });
 	} catch {}
 
+	// Battery + chosen font, from schema-display.sql (also read separately, same reason).
+	const extra = new Map<string, { batteryMv: number | null; batteryAt: number | null; font: string | null; cornerMode: string }>();
+	try {
+		const er = await db.prepare('SELECT id, battery_mv, battery_at, layout_font, corner_mode FROM devices WHERE user_id = ?').bind(userId).all();
+		for (const e of er.results ?? []) {
+			extra.set(e.id, { batteryMv: e.battery_mv ?? null, batteryAt: e.battery_at ?? null, font: e.layout_font ?? null, cornerMode: e.corner_mode === 'image' ? 'image' : 'calendar' });
+		}
+	} catch {}
+
 	const devices = (rows.results ?? []).map((d: any) => ({
 		id: d.id,
 		name: d.name || '',
@@ -58,6 +67,10 @@ export async function GET({ request, locals }) {
 		refreshIntervalSec: d.refresh_interval_sec || 86400,
 		location: locs.get(d.id) ?? null,
 		dark: dark.has(d.id),
+		batteryMv: extra.get(d.id)?.batteryMv ?? null,
+		batteryAt: extra.get(d.id)?.batteryAt ?? null,
+		font: extra.get(d.id)?.font ?? null,
+		cornerMode: extra.get(d.id)?.cornerMode ?? 'calendar',
 	}));
 	return json({ devices }, 200);
 }

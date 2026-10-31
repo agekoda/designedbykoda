@@ -34,3 +34,13 @@ export function fontId(family: string, role: Role): number {
 	const fi = Math.max(0, (FAMILIES as readonly string[]).indexOf(family));
 	return fi * 8 + ROLES.indexOf(role);
 }
+
+// Names shown in the dashboard's font picker.
+export const FAMILY_LABELS: Record<Family, string> = {
+	sans: 'Classic',
+	atkinson: 'Atkinson',
+	inter: 'Inter',
+	lora: 'Lora',
+	jbmono: 'JetBrains Mono',
+	spacemono: 'Space Mono',
+};
