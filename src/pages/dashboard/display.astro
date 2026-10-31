@@ -40,7 +40,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		<div class="stage">
 			<div class="left">
 				<div class="screen-wrap" id="screen-wrap">
-					<canvas id="screen" width="1400" height="1050" aria-label="Preview of your calendar screen"></canvas>
+					<canvas id="screen" width="675" height="506" aria-label="Preview of your calendar screen"></canvas>
 				</div>
 			</div>
 
@@ -227,7 +227,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		// editor canvas: black dots on paper
 		const px = new Uint8Array(cornerDots.length);
 		for (let i = 0; i < px.length; i++) px[i] = cornerDots[i] ? 0 : 1;
-		paint(edCanvas, px, 2, CORNER.w, CORNER.h);
+		paint(edCanvas, px, 3, CORNER.w, CORNER.h);
 	}
 
 	function loadSource(dataUrl: string): Promise<void> {
@@ -294,7 +294,12 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const common = { font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12 };
 		try {
 			const r = await renderPreview({ ...common, style: st.style, cornerImage: cornerForPreview() });
-			paintScreen(screen, r.px, { mode: 'device', width: 1400 });
+			const dpr = window.devicePixelRatio || 1;
+			// whole-number panel pixels (each dot = k x k real screen pixels) so the dithering stays crisp
+			const avail = (screen.parentElement as HTMLElement).clientWidth * dpr;
+			const k = Math.max(1, Math.floor(avail / 675));
+			paintScreen(screen, r.px, { mode: 'device', scale: k });
+			screen.style.width = screen.width / dpr + 'px';
 			if (thumbsDirty) {
 				thumbsDirty = false;
 				for (const s of styles) {
@@ -625,6 +630,16 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		if (e.key === 'Escape' && !guard.hidden) guard.hidden = true;
 	});
 
+	// browser zoom / window size changes the pixel size the preview should be drawn at
+	let lastKey = '';
+	window.addEventListener('resize', () => {
+		const key = window.devicePixelRatio + ':' + (screen.parentElement as HTMLElement).clientWidth;
+		if (key !== lastKey) {
+			lastKey = key;
+			schedule(false);
+		}
+	});
+
 	// ---------------------------------------------------------------- start
 	async function start() {
 		buildControls();
@@ -700,7 +715,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .stage { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 2em; align-items: start; }
 	.cust .left { position: sticky; top: 5.4em; }
 	.cust .screen-wrap { border-radius: 14px; overflow: hidden; background: transparent; }
-	.cust #screen { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; }
+	.cust #screen { display: block; max-width: 100%; height: auto; margin: 0 auto; }
 
 	.cust .tabs { display: flex; gap: 0.3em; padding: 4px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 999px; width: fit-content; max-width: 100%; margin-bottom: 1.2em; overflow-x: auto; }
 	.cust .tab { background: none; border: none; font: inherit; font-weight: 700; font-size: 0.95em; color: var(--muted); padding: 0.55em 1.3em; border-radius: 999px; transition: background 0.2s, color 0.2s; white-space: nowrap; }
@@ -739,14 +754,16 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust #picture-tools[hidden], .cust #editor[hidden], .cust .drop[hidden] { display: none; }
 	.cust .drop { display: grid; place-items: center; text-align: center; min-height: 140px; padding: 1em; border: 2px dashed var(--border); border-radius: 14px; color: var(--muted); cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; }
 	.cust .drop:hover, .cust .drop.over, .cust .drop:focus-visible { border-color: var(--accent); color: var(--fg); background: rgba(var(--accent-rgb), 0.06); outline: none; }
-	.cust .ed-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.3em; align-items: start; }
+	.cust .ed-grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1.3em; align-items: start; }
 	.cust .ed-box { background: #dfdbd0; border: 1px solid var(--border); border-radius: 10px; padding: 6px; margin-bottom: 0.6em; }
-	.cust #ed { display: block; width: 100%; height: auto; aspect-ratio: 184 / 140; image-rendering: pixelated; cursor: grab; touch-action: none; }
+	.cust #ed { display: block; width: 368px; max-width: 100%; height: auto; aspect-ratio: 184 / 140; image-rendering: pixelated; cursor: grab; touch-action: none; }
 	.cust #ed:active { cursor: grabbing; }
 
 	.cust .sliders { display: grid; gap: 0.55em; margin-top: 1em; }
-	.cust .slider { display: grid; grid-template-columns: 5.2em 1fr 3.4em; align-items: center; gap: 0.6em; font-size: 0.88em; color: var(--fg); }
-	.cust .slider output { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+	.cust .slider { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 0.6em; font-size: 0.88em; color: var(--fg); }
+	.cust .slider span { grid-column: 1; grid-row: 1; }
+	.cust .slider input { grid-column: 1 / -1; grid-row: 2; }
+	.cust .slider output { grid-column: 2; grid-row: 1; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 	.cust input[type='range'] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; margin: 0; }
 	.cust input[type='range']::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: var(--border); }
 	.cust input[type='range']::-moz-range-track { height: 4px; border-radius: 999px; background: var(--border); }

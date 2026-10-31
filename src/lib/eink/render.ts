@@ -256,6 +256,8 @@ const VIEW_X = 198;
 const VIEW_Y = 151;
 const DEV = { x: 462, y: 232, w: 1535 - 462, h: 1270 - 232 };
 const WIN = { x0: 513, y0: 350, x1: 1485, y1: 1082 };
+/** Blank paper border between the glass edge and the picture, in reference px. */
+const WIN_MARGIN = 12;
 
 function drawDevice(canvas: CanvasLike, px: Pixels, opts: EinkOptions, dark: boolean, texture: number): void {
   // Pick the scale factor f (reference px -> output px).
@@ -266,7 +268,7 @@ function drawDevice(canvas: CanvasLike, px: Pixels, opts: EinkOptions, dark: boo
     f = opts.width / VIEW_W;
   } else {
     k = integerScale(opts.scale ?? 2);
-    f = (W * k) / (WIN.x1 - WIN.x0); // window becomes exactly 400k wide
+    f = (W * k) / (WIN.x1 - WIN.x0 - 2 * WIN_MARGIN); // picture becomes exactly 400k wide
   }
   const outW = Math.round(VIEW_W * f);
   const outH = Math.round(VIEW_H * f);
@@ -296,24 +298,14 @@ function drawDevice(canvas: CanvasLike, px: Pixels, opts: EinkOptions, dark: boo
   // --- 3. the panel, with glass and lighting baked in ----------------------
   const wx = Rx(WIN.x0);
   const wy = Ry(WIN.y0);
-  let ww: number;
-  let wh: number;
-  let rw: number; // raster size
-  let rh: number;
-  let top: number; // raster's row offset inside the window
-  if (k !== null) {
-    ww = W * k;
-    wh = Math.max(H * k, Ry(WIN.y1) - wy);
-    rw = W * k;
-    rh = H * k;
-    top = Math.floor((wh - rh) / 2);
-  } else {
-    ww = Rx(WIN.x1) - wx;
-    wh = Ry(WIN.y1) - wy;
-    rw = ww;
-    rh = wh;
-    top = 0;
-  }
+  // The glass is a little bigger than the picture: a real panel has a blank paper border
+  // around the active area, so the screen content never touches the case.
+  const ww = Rx(WIN.x1) - wx;
+  const wh = Ry(WIN.y1) - wy;
+  const rw = k !== null ? W * k : Math.max(W, ww - 2 * Math.round(WIN_MARGIN * f));
+  const rh = k !== null ? H * k : Math.round((rw * H) / W);
+  const left = Math.max(0, Math.floor((ww - rw) / 2));
+  const top = Math.max(0, Math.floor((wh - rh) / 2));
   const pal = palette(DEVICE_PAPER, DEVICE_INK, dark);
   const win = new Uint8ClampedArray(ww * wh * 4);
   for (let i = 0; i < ww * wh; i++) {
@@ -324,7 +316,7 @@ function drawDevice(canvas: CanvasLike, px: Pixels, opts: EinkOptions, dark: boo
   }
   const raster = rasterize(px, rw, rh, { ...pal, texture });
   for (let y = 0; y < rh; y++) {
-    win.set(raster.subarray(y * rw * 4, (y + 1) * rw * 4), ((top + y) * ww) * 4);
+    win.set(raster.subarray(y * rw * 4, (y + 1) * rw * 4), ((top + y) * ww + left) * 4);
   }
   const winR = 5 * f;
   applyGlass(win, ww, wh, f, winR);
