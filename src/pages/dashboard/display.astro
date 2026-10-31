@@ -92,14 +92,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 									<div class="label sub">Dithering style</div>
 									<div class="seg wrap" id="dithers" role="radiogroup" aria-label="Dithering style"></div>
 
-									<div class="sliders">
-										<label class="slider"><span>Zoom</span><input type="range" id="s-zoom" min="1" max="4" step="0.01" /><output id="o-zoom"></output></label>
-										<label class="slider"><span>Exposure</span><input type="range" id="s-exposure" min="-2" max="2" step="0.05" /><output id="o-exposure"></output></label>
-										<label class="slider"><span>Brightness</span><input type="range" id="s-brightness" min="-100" max="100" step="1" /><output id="o-brightness"></output></label>
-										<label class="slider"><span>Contrast</span><input type="range" id="s-contrast" min="-100" max="100" step="1" /><output id="o-contrast"></output></label>
-										<label class="slider"><span>Cut-off</span><input type="range" id="s-threshold" min="0" max="255" step="1" /><output id="o-threshold"></output></label>
-									</div>
-									<p class="muted small hint">Cut-off decides how bright a spot has to be to print as white: right for more black, left for more white.</p>
+									
 
 									<div class="ed-actions">
 										<label class="check"><input type="checkbox" id="invert" /><span class="box" aria-hidden="true"></span><span>Invert</span></label>
@@ -108,6 +101,14 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 									</div>
 								</div>
 							</div>
+							<div class="sliders">
+										<label class="slider"><span>Zoom</span><input type="range" id="s-zoom" min="1" max="4" step="0.01" /><output id="o-zoom"></output></label>
+										<label class="slider"><span>Exposure</span><input type="range" id="s-exposure" min="-2" max="2" step="0.05" /><output id="o-exposure"></output></label>
+										<label class="slider"><span>Brightness</span><input type="range" id="s-brightness" min="-100" max="100" step="1" /><output id="o-brightness"></output></label>
+										<label class="slider"><span>Contrast</span><input type="range" id="s-contrast" min="-100" max="100" step="1" /><output id="o-contrast"></output></label>
+										<label class="slider"><span>Cut-off</span><input type="range" id="s-threshold" min="0" max="255" step="1" /><output id="o-threshold"></output></label>
+									</div>
+									<p class="muted small hint">Cut-off decides how bright a spot has to be to print as white: right for more black, left for more white.</p>
 						</div>
 					</div>
 				</section>
@@ -227,7 +228,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		// editor canvas: black dots on paper
 		const px = new Uint8Array(cornerDots.length);
 		for (let i = 0; i < px.length; i++) px[i] = cornerDots[i] ? 0 : 1;
-		paint(edCanvas, px, 3, CORNER.w, CORNER.h);
+		paint(edCanvas, px, 2, CORNER.w, CORNER.h);
 	}
 
 	function loadSource(dataUrl: string): Promise<void> {
@@ -754,12 +755,17 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust #picture-tools[hidden], .cust #editor[hidden], .cust .drop[hidden] { display: none; }
 	.cust .drop { display: grid; place-items: center; text-align: center; min-height: 140px; padding: 1em; border: 2px dashed var(--border); border-radius: 14px; color: var(--muted); cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; }
 	.cust .drop:hover, .cust .drop.over, .cust .drop:focus-visible { border-color: var(--accent); color: var(--fg); background: rgba(var(--accent-rgb), 0.06); outline: none; }
-	.cust .ed-grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1.3em; align-items: start; }
+	.cust .ed-grid { display: grid; grid-template-columns: 392px minmax(0, 1fr); gap: 1.2em; align-items: start; }
+	.cust .ed-left { width: 392px; max-width: 100%; }
+	.cust .ed-left .small { font-size: 0.82em; line-height: 1.4; }
+	.cust .ed-right .label { letter-spacing: 0.08em; }
+	.cust .seg.wrap label span { padding: 0.45em 0.4em; font-size: 0.82em; }
+	.cust .ed-right .ed-actions { flex-direction: column; align-items: flex-start; gap: 0.7em; }
 	.cust .ed-box { background: #dfdbd0; border: 1px solid var(--border); border-radius: 10px; padding: 6px; margin-bottom: 0.6em; }
 	.cust #ed { display: block; width: 368px; max-width: 100%; height: auto; aspect-ratio: 184 / 140; image-rendering: pixelated; cursor: grab; touch-action: none; }
 	.cust #ed:active { cursor: grabbing; }
 
-	.cust .sliders { display: grid; gap: 0.55em; margin-top: 1em; }
+	.cust .sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7em 1.6em; margin-top: 1.2em; }
 	.cust .slider { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 0.6em; font-size: 0.88em; color: var(--fg); }
 	.cust .slider span { grid-column: 1; grid-row: 1; }
 	.cust .slider input { grid-column: 1 / -1; grid-row: 2; }
@@ -808,6 +814,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		.cust .stage { grid-template-columns: 1fr; }
 		.cust .left { position: static; }
 		.cust .ed-grid { grid-template-columns: 1fr; }
+		.cust .ed-left { width: 100%; }
+		.cust .sliders { grid-template-columns: 1fr; }
 		.cust .layouts { grid-template-columns: repeat(2, 1fr); }
 	}
 	@media (max-width: 560px) {
