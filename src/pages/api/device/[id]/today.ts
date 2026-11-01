@@ -218,6 +218,16 @@ export async function GET({ params, request, locals }) {
 		`Fetching for device ${deviceId}: calendars=${JSON.stringify(calendarIds)} savedTimezone=${user.timezone} from ${rightNow.toISOString()} onward`
 	);
 
+	// Which layout the person picked in setup. Separate query + try/catch so
+	// a missing column (migration not run yet) falls back to Agenda instead
+	// of breaking every device.
+	let style = 'agenda';
+	try {
+		const row = await db.prepare('SELECT calendar_style FROM users WHERE id = ?').bind(device.user_id).first();
+		if (row?.calendar_style) style = row.calendar_style;
+	} catch {}
+	if (deviceStyle) style = deviceStyle;
+
 	// How often this calendar wakes: only the Timeline can wake more than once a day.
 	const intervalSec = LIVE_STYLES.includes(style) && isRefreshSec(device.refresh_interval_sec) ? device.refresh_interval_sec : 86400;
 
@@ -335,15 +345,6 @@ export async function GET({ params, request, locals }) {
 	const trimmedEvents = allEvents.slice(0, 15);
 	console.log(`Total events after merging all calendars: ${allEvents.length}, sending ${trimmedEvents.length}`);
 
-	// Which layout the person picked in setup. Separate query + try/catch so
-	// a missing column (migration not run yet) falls back to Agenda instead
-	// of breaking every device.
-	let style = 'agenda';
-	try {
-		const row = await db.prepare('SELECT calendar_style FROM users WHERE id = ?').bind(device.user_id).first();
-		if (row?.calendar_style) style = row.calendar_style;
-	} catch {}
-	if (deviceStyle) style = deviceStyle;
 
 	// Optional weather: today's high/low for the location chosen in setup.
 	// Never lets a weather problem break the calendar response.
