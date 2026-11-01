@@ -403,20 +403,14 @@ if (userId && hasDevice && !addingDevice) {
 	.setup-page .step[data-step='style'] .step-text { max-width: 60ch; margin-bottom: 1.2em; }
 	.setup-page .step[data-step='style'] .step-title { margin-bottom: 0.3em; }
 	.setup-page .step[data-step='style'] .step-kicker { margin-bottom: 0.4em; }
-	/* Dark mode + Continue share one bar pinned to the bottom, so Continue is
-	   always on screen however many layouts there are. */
+	/* Dark mode on its own line, Back / Continue centred under it. */
 	.setup-page .style-actions {
-		position: sticky;
-		bottom: 0;
-		z-index: 5;
 		display: flex;
+		flex-direction: column;
 		align-items: center;
-		justify-content: center;
-		flex-wrap: wrap;
-		gap: 0.8em 2.2em;
-		margin-top: 1.2em;
-		padding: 0.9em 0 1em;
-		background: linear-gradient(to bottom, transparent, var(--bg) 35%);
+		gap: 1em;
+		margin-top: 1.4em;
+		padding-bottom: 0.5em;
 	}
 	.setup-page .style-actions .switch { margin-top: 0; }
 	.setup-page .style-actions .row { margin-top: 0; }
@@ -578,11 +572,15 @@ if (userId && hasDevice && !addingDevice) {
 
 	/* layout picker */
 	.setup-page .styles {
-		display: grid;
-		grid-template-columns: repeat(6, minmax(0, 1fr));
-		gap: clamp(0.8em, 1.4vw, 1.6em);
+		--cols: 6;
+		--gap: clamp(0.8em, 1.4vw, 1.6em);
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center; /* a short last row (7th, 8th layout…) sits centred */
+		gap: var(--gap);
 		text-align: left;
 	}
+	.setup-page .style-opt { flex: 0 0 calc((100% - (var(--cols) - 1) * var(--gap)) / var(--cols)); min-width: 0; }
 	.setup-page .style-card {
 		display: grid;
 		gap: 0.3em;
@@ -643,12 +641,9 @@ if (userId && hasDevice && !addingDevice) {
 	html.has-custom-cursor .setup-page,
 	html.has-custom-cursor .setup-page * { cursor: none !important; }
 
-	@media (max-width: 800px) {
-		.setup-page .styles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-	}
-	@media (min-width: 801px) and (max-width: 1150px) {
-		.setup-page .styles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-	}
+	@media (max-width: 1150px) { .setup-page .styles { --cols: 3; } }
+	@media (max-width: 800px) { .setup-page .styles { --cols: 2; } }
+	@media (max-width: 420px) { .setup-page .styles { --cols: 1; } }
 	@media (max-width: 560px) {
 		.setup-page .step-title { font-size: 1.6em; }
 	}
