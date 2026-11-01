@@ -131,17 +131,19 @@ if (userId && hasDevice && !addingDevice) {
 									</label>
 								))}
 							</div>
-							<label class="switch">
-								<input type="checkbox" id="dark-mode" />
-								<span class="track" aria-hidden="true"></span>
-								<span class="switch-text">Dark mode <small>white on black</small></span>
-							</label>
 							<p class="msg" id="style-message" aria-live="polite" />
-							<div class="row">
-								<button type="button" class="btn ghost" data-back>Back</button>
-								<button type="button" class="btn" id="save-style" data-magnetic>
-									Continue
-								</button>
+							<div class="style-actions">
+								<label class="switch">
+									<input type="checkbox" id="dark-mode" />
+									<span class="track" aria-hidden="true"></span>
+									<span class="switch-text">Dark mode <small>white on black</small></span>
+								</label>
+								<div class="row">
+									<button type="button" class="btn ghost" data-back>Back</button>
+									<button type="button" class="btn" id="save-style" data-magnetic>
+										Continue
+									</button>
+								</div>
 							</div>
 						</section>
 
@@ -359,8 +361,8 @@ if (userId && hasDevice && !addingDevice) {
 	.setup-page {
 		min-height: calc(100svh - 230px);
 		display: grid;
-		place-items: center;
-		padding: 2em 0;
+		place-items: start center;
+		padding: 0.6em 0 1.5em;
 	}
 	.setup-page .wizard {
 		width: 100%;
@@ -374,7 +376,7 @@ if (userId && hasDevice && !addingDevice) {
 		display: flex;
 		gap: 8px;
 		list-style: none;
-		margin: 0 0 2.2em;
+		margin: 0 0 1.2em;
 		padding: 0;
 	}
 	.setup-page .dots li {
@@ -398,7 +400,26 @@ if (userId && hasDevice && !addingDevice) {
 		padding: 0 clamp(16px, 2.5vw, 48px);
 		box-sizing: border-box;
 	}
-	.setup-page .step[data-step='style'] .step-text { max-width: 60ch; }
+	.setup-page .step[data-step='style'] .step-text { max-width: 60ch; margin-bottom: 1.2em; }
+	.setup-page .step[data-step='style'] .step-title { margin-bottom: 0.3em; }
+	.setup-page .step[data-step='style'] .step-kicker { margin-bottom: 0.4em; }
+	/* Dark mode + Continue share one bar pinned to the bottom, so Continue is
+	   always on screen however many layouts there are. */
+	.setup-page .style-actions {
+		position: sticky;
+		bottom: 0;
+		z-index: 5;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 0.8em 2.2em;
+		margin-top: 1.2em;
+		padding: 0.9em 0 1em;
+		background: linear-gradient(to bottom, transparent, var(--bg) 35%);
+	}
+	.setup-page .style-actions .switch { margin-top: 0; }
+	.setup-page .style-actions .row { margin-top: 0; }
 	.setup-page .step.is-active {
 		display: block;
 		animation: step-in 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
@@ -558,7 +579,7 @@ if (userId && hasDevice && !addingDevice) {
 	/* layout picker */
 	.setup-page .styles {
 		display: grid;
-		grid-template-columns: repeat(5, 1fr);
+		grid-template-columns: repeat(6, minmax(0, 1fr));
 		gap: clamp(0.8em, 1.4vw, 1.6em);
 		text-align: left;
 	}
@@ -624,6 +645,9 @@ if (userId && hasDevice && !addingDevice) {
 
 	@media (max-width: 800px) {
 		.setup-page .styles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+	}
+	@media (min-width: 801px) and (max-width: 1150px) {
+		.setup-page .styles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 	}
 	@media (max-width: 560px) {
 		.setup-page .step-title { font-size: 1.6em; }

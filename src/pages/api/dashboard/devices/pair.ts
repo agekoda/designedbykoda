@@ -54,6 +54,10 @@ export async function POST({ request, locals }) {
 		.prepare('UPDATE devices SET user_id = ?, pairing_code = NULL, pairing_code_expires_at = NULL WHERE id = ?')
 		.bind(userId, device.id)
 		.run();
+	// Remember when this pairing happened (column from schema-paired-at.sql).
+	try {
+		await db.prepare('UPDATE devices SET paired_at = ? WHERE id = ?').bind(now, device.id).run();
+	} catch {}
 
 	return json({ ok: true, deviceId: device.id }, 200);
 }

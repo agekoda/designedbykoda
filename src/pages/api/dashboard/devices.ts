@@ -57,13 +57,21 @@ export async function GET({ request, locals }) {
 		}
 	} catch {}
 
+	// When it was (last) paired, from schema-paired-at.sql. Falls back to the
+	// row's creation date for devices paired before that column existed.
+	const pairedAt = new Map<string, number>();
+	try {
+		const pr = await db.prepare('SELECT id, paired_at FROM devices WHERE user_id = ? AND paired_at IS NOT NULL').bind(userId).all();
+		for (const r of pr.results ?? []) pairedAt.set(r.id, r.paired_at);
+	} catch {}
+
 	const devices = (rows.results ?? []).map((d: any) => ({
 		id: d.id,
 		name: d.name || '',
 		style: isStyleId(d.calendar_style) ? d.calendar_style : isStyleId(user?.calendar_style) ? user.calendar_style : DEFAULT_STYLE,
 		calendarIds: parseIds(d.selected_calendar_ids) ?? parseIds(user?.selected_calendar_ids) ?? [],
 		lastSeenAt: d.last_seen_at ?? null,
-		createdAt: d.created_at ?? null,
+		createdAt: pairedAt.get(d.id) ?? d.created_at ?? null,
 		refreshIntervalSec: d.refresh_interval_sec || 86400,
 		location: locs.get(d.id) ?? null,
 		dark: dark.has(d.id),

@@ -22,6 +22,17 @@ export async function releaseDevice(db: any, deviceId: string, userId: string): 
 	try {
 		await db.prepare('UPDATE devices SET dark_mode = NULL WHERE id = ?').bind(deviceId).run();
 	} catch {}
+	// A fresh start: no leftover refresh choice, picture or pairing date.
+	// Separate statements so a column that doesn't exist yet can't block the rest.
+	for (const sql of [
+		'UPDATE devices SET paired_at = NULL WHERE id = ?',
+		'UPDATE devices SET refresh_interval_sec = 86400 WHERE id = ?',
+		'UPDATE devices SET layout_font = NULL, corner_mode = NULL, corner_bits = NULL, corner_src = NULL, corner_cfg = NULL WHERE id = ?',
+	]) {
+		try {
+			await db.prepare(sql).bind(deviceId).run();
+		} catch {}
+	}
 	await issuePairingCode(db, deviceId, Math.floor(Date.now() / 1000));
 	return true;
 }
