@@ -146,16 +146,9 @@ export function timeline(ctx: LayoutCtx): string {
 		if ((h - w.start) % step === 0) d.text(8, y + 4, 's', `${pad2(h % 24)}:00`);
 	}
 
-	// the bar for "now" (only while it moves across the timeline). Drawn BEHIND the event blocks
-	// so it never cuts through a title; its two ends stick out either side of the blocks.
+	// the bar for "now" (only while it moves across the timeline)
 	const barOn = live && timed.length > 0 && nowH >= w.start - TOLERANCE_H && nowH < w.end - TOLERANCE_H;
-	if (barOn) {
-		const y = Math.round(yOf(Math.max(nowH, w.start)));
-		d.fill(lineX - 4, y - 2, blockR - lineX + 10, 1, PAPER);
-		d.fill(lineX - 4, y + 2, blockR - lineX + 10, 1, PAPER);
-		d.fill(lineX - 4, y - 1, blockR - lineX + 10, 3);
-		d.disc(lineX - 4, y, 5);
-	}
+	const barY = barOn ? Math.round(yOf(Math.max(nowH, w.start))) : -99;
 
 	// events: overlapping ones share the width side by side (up to 3 lanes)
 	const MIN_H = 18;
@@ -190,6 +183,7 @@ export function timeline(ctx: LayoutCtx): string {
 	}
 	flush();
 	const total = blockR - blockX;
+	const blocked: [number, number][] = []; // blocks too short to fit a title and the bar: the bar skips them
 	for (const it of items) {
 		const gap = 3;
 		const bw = Math.floor((total - gap * (it.lanes - 1)) / it.lanes);
@@ -197,7 +191,33 @@ export function timeline(ctx: LayoutCtx): string {
 		const y = Math.round(it.top) + 1;
 		const h = Math.round(it.bottom - it.top) - 1;
 		d.fillRound(x, y, bw, h, 4);
-		d.text(x + 6, y + 14, 'sb', it.t.title, { color: PAPER, maxW: bw - 10 });
+		// keep the title clear of the "now" bar when it crosses this block
+		let base = y + 14;
+		if (barOn && barY >= y && barY <= y + h && barY + 3 >= base - 13 && barY - 3 <= base + 4) {
+			if (barY + 3 + 15 + 3 <= y + h) base = barY + 3 + 15; // below the bar
+			else if (barY - 4 - 3 - 13 >= y) base = barY - 4 - 3; // above it
+			else blocked.push([x, x + bw]);
+		}
+		d.text(x + 6, base, 'sb', it.t.title, { color: PAPER, maxW: bw - 10 });
+	}
+
+	// the bar sits on top of the blocks, with a paper edge so it also shows on black
+	if (barOn) {
+		const x0 = lineX;
+		const x1 = blockR + 10;
+		let cur = x0;
+		const seg = (a: number, b: number) => {
+			if (b <= a) return;
+			d.fill(a, barY - 2, b - a, 1, PAPER);
+			d.fill(a, barY + 2, b - a, 1, PAPER);
+			d.fill(a, barY - 1, b - a, 3);
+		};
+		for (const [bx0, bx1] of blocked.sort((p, q) => p[0] - q[0])) {
+			seg(cur, bx0 - 1);
+			cur = Math.max(cur, bx1 + 1);
+		}
+		seg(cur, x1);
+		d.disc(x0 + 1, barY, 4);
 	}
 
 	// right column

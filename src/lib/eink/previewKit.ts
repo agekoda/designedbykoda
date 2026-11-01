@@ -62,8 +62,8 @@ export interface PreviewOptions {
 export function drawListFor(o: PreviewOptions): string {
 	let nowLocal = Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60;
 	const timeline = o.style === 'timeline';
-	// The live Timeline preview pretends it is a quarter past eleven, so the moving bar is always on show.
-	if (timeline && (o.refreshSec ?? 86400) < 86400) nowLocal = Math.floor(nowLocal / 86400) * 86400 + 11 * 3600 + 15 * 60;
+	// The live Timeline preview pretends it is 9:00 am, so the moving bar is always on show.
+	if (timeline && (o.refreshSec ?? 86400) < 86400) nowLocal = Math.floor(nowLocal / 86400) * 86400 + 9 * 3600;
 	return renderLayout(
 		o.style,
 		{

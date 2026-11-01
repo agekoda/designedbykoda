@@ -27,7 +27,7 @@ const dayEvents = [E('Team standup', 9, 30, 10, 0), E('Design review', 11, 0, 12
 for (const style of ['agenda', 'month', 'bigdate', 'week', 'nextup', 'timeline']) {
 	for (const dark of [false, true]) {
 		const tl = style === 'timeline';
-		const list = renderLayout(style, { nowLocal: tl ? D(8, 7, 11, 15) : D(8, 7, 9), events: tl ? dayEvents : events, weather: { high: 19, low: 12 }, vbat: 4.18, dark, refreshSec: tl ? 3600 : 86400 }, 'sans');
+		const list = renderLayout(style, { nowLocal: tl ? D(8, 7, 9) : D(8, 7, 9), events: tl ? dayEvents : events, weather: { high: 19, low: 12 }, vbat: 4.18, dark, refreshSec: tl ? 3600 : 86400 }, 'sans');
 		const { px } = renderDrawList(list, fonts);
 		const c = createCanvas(1, 1);
 		renderEink(c as any, px, { mode: 'screen', scale: 2 });
