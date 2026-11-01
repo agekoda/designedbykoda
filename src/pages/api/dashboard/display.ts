@@ -1,7 +1,7 @@
 // The customise-display page's API: read and save how one device's screen looks
 // (layout, font, dark mode, and the Agenda's picture). Everything is checked
 // against the logged-in user, so you can only touch your own devices.
-import { isStyleId, DEFAULT_STYLE } from '../../../data/calendarStyles';
+import { isStyleId, isRefreshSec, DEFAULT_STYLE } from '../../../data/calendarStyles';
 import { isFamily } from '../../../lib/eink/fonts';
 import { b64ToBytes, CORNER_BYTES, cleanSettings } from '../../../lib/eink/image';
 export const prerender = false;
@@ -51,6 +51,7 @@ export async function GET({ request, locals }) {
 			name: dev.name || '',
 			style,
 			dark: dev.dark_mode === 1,
+			refreshSec: isRefreshSec(dev.refresh_interval_sec) ? dev.refresh_interval_sec : 86400,
 			font: isFamily(extra.layout_font) ? extra.layout_font : null,
 			cornerMode: extra.corner_mode === 'image' ? 'image' : 'calendar',
 			cornerSrc: extra.corner_src || null,
@@ -77,6 +78,7 @@ export async function POST({ request, locals }) {
 
 	if (body.style !== undefined && !isStyleId(body.style)) return json({ error: 'Unknown layout.' }, 400);
 	if (body.font !== undefined && body.font !== null && !isFamily(body.font)) return json({ error: 'Unknown font.' }, 400);
+	if (body.refreshSec !== undefined && !isRefreshSec(body.refreshSec)) return json({ error: 'Unknown refresh option.' }, 400);
 	if (body.dark !== undefined && typeof body.dark !== 'boolean') return json({ error: 'Invalid dark mode value.' }, 400);
 
 	const sets: string[] = [];
@@ -88,6 +90,10 @@ export async function POST({ request, locals }) {
 	if (body.dark !== undefined) {
 		sets.push('dark_mode = ?');
 		vals.push(body.dark ? 1 : 0);
+	}
+	if (body.refreshSec !== undefined) {
+		sets.push('refresh_interval_sec = ?');
+		vals.push(body.refreshSec);
 	}
 	if (body.font !== undefined) {
 		sets.push('layout_font = ?');

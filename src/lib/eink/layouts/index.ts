@@ -12,6 +12,7 @@ import { month } from './month';
 import { bigdate } from './bigdate';
 import { week } from './week';
 import { nextup } from './nextup';
+import { timeline } from './timeline';
 
 interface LayoutEntry {
 	render: (ctx: LayoutCtx) => string;
@@ -24,6 +25,7 @@ export const LAYOUTS: Record<string, LayoutEntry> = {
 	bigdate: { render: bigdate, font: 'sans' },
 	week: { render: week, font: 'sans' },
 	nextup: { render: nextup, font: 'sans' },
+	timeline: { render: timeline, font: 'sans' },
 };
 
 // The font a layout uses when nothing else is chosen.

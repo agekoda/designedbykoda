@@ -1,3 +1,4 @@
+import { batteryPercent } from './battery';
 // What a layout gets to work with, plus the small date helpers every layout
 // needs. Everything is "local wall-clock seconds": the real instant shifted by
 // the user's timezone offset and then read with the UTC getters, so no Intl
@@ -8,6 +9,7 @@ export interface CalEvent {
 	title: string;
 	startLocal: number; // local wall-clock seconds (all-day events: that date's midnight)
 	allDay: boolean;
+	endLocal?: number; // local wall-clock end (all-day events: the midnight after the last day)
 }
 
 export interface LayoutCtx {
@@ -19,6 +21,8 @@ export interface LayoutCtx {
 	family: Family; // which font family this layout draws with
 	// Optional 1-bit picture (see image.ts) for layouts that have a picture spot. 1 = dark dot.
 	cornerImage?: Uint8Array | null;
+	// How often the calendar wakes up, in seconds (86400 = once a day). Only the Timeline cares.
+	refreshSec?: number;
 }
 
 export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -67,8 +71,11 @@ export function round0(x: number): string {
 	return String(r === 0 ? 0 : r);
 }
 
+// "87%", or "Low 12%" once it is worth charging. Same voltage reading the device used.
 export function batteryText(v: number | null): string | null {
-	return v === null ? null : `${v.toFixed(2)}V`;
+	if (v === null) return null;
+	const pct = batteryPercent(v);
+	return pct <= 15 ? `Low ${pct}%` : `${pct}%`;
 }
 
 // "High 19C  Low 12C"; `sep` is the gap between the two halves.

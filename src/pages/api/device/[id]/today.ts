@@ -3,7 +3,8 @@
 // needed, computing "today" correctly in the user's actual timezone
 // (handling DST automatically via Intl, which an ESP32 could never do on
 // its own), and returning a small, pre-formatted payload.
-import { viewForStyle } from '../../../../data/calendarStyles';
+import { viewForStyle, LIVE_STYLES, isRefreshSec } from '../../../../data/calendarStyles';
+import { timelineSleep } from '../../../../lib/eink/layouts/timeline';
 import { getForecast } from '../../../../lib/weather';
 import { renderLayout } from '../../../../lib/eink/layouts';
 import { b64ToBytes } from '../../../../lib/eink/image';
@@ -217,14 +218,36 @@ export async function GET({ params, request, locals }) {
 		`Fetching for device ${deviceId}: calendars=${JSON.stringify(calendarIds)} savedTimezone=${user.timezone} from ${rightNow.toISOString()} onward`
 	);
 
-	const rawEvents: { title: string; ms: number; allDay: boolean; dateOnly?: string }[] = [];
+	// How often this calendar wakes: only the Timeline can wake more than once a day.
+	const intervalSec = LIVE_STYLES.includes(style) && isRefreshSec(device.refresh_interval_sec) ? device.refresh_interval_sec : 86400;
+
+	// The Timeline shows the WHOLE of today, including events that already finished, so it
+	// asks Google from local midnight. A wake a few minutes before midnight (a fast timer)
+	// counts as already tomorrow. Everything else asks "from right now onwards".
+	let effNowMs = rightNow.getTime();
+	let fetchFrom = rightNow;
+	if (style === 'timeline') {
+		let tzGuess = 'UTC';
+		try {
+			if (user.timezone) {
+				new Intl.DateTimeFormat('en-US', { timeZone: user.timezone });
+				tzGuess = user.timezone;
+			}
+		} catch {}
+		const offGuess = getUtcOffsetSeconds(tzGuess, rightNow);
+		const intoDay = ((((effNowMs / 1000 + offGuess) % 86400) + 86400) % 86400);
+		if (intoDay > 86400 - 600) effNowMs += 600 * 1000;
+		fetchFrom = getTodayRangeUTC(tzGuess, new Date(effNowMs)).start;
+	}
+
+	const rawEvents: { title: string; ms: number; allDay: boolean; dateOnly?: string; endMs?: number; endDateOnly?: string }[] = [];
 	let googleTz: string | null = null;
 
 	for (const calId of calendarIds) {
 		const eventsUrl = new URL(
 			`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`
 		);
-		eventsUrl.searchParams.set('timeMin', rightNow.toISOString());
+		eventsUrl.searchParams.set('timeMin', fetchFrom.toISOString());
 		// No timeMax — maxResults + orderBy=startTime is what actually
 		// gives us "the next N upcoming events", regardless of how many
 		// days out they fall.
@@ -262,6 +285,8 @@ export async function GET({ params, request, locals }) {
 				ms: new Date(startValue).getTime(),
 				allDay: isAllDay,
 				dateOnly: isAllDay ? startValue : undefined,
+				endMs: !isAllDay && item.end?.dateTime ? new Date(item.end.dateTime).getTime() : undefined,
+				endDateOnly: isAllDay ? item.end?.date : undefined,
 			});
 		}
 	}
@@ -293,7 +318,13 @@ export async function GET({ params, request, locals }) {
 		const startLocal = e.allDay
 			? Math.floor(Date.parse(`${e.dateOnly}T00:00:00Z`) / 1000)
 			: startUnix + getUtcOffsetSeconds(timezone, new Date(e.ms));
-		return { title: e.title, startUnix, startLocal, allDay: e.allDay };
+		let endLocal: number | undefined;
+		if (e.allDay) {
+			if (e.endDateOnly) endLocal = Math.floor(Date.parse(`${e.endDateOnly}T00:00:00Z`) / 1000);
+		} else if (e.endMs && e.endMs > e.ms) {
+			endLocal = Math.floor(e.endMs / 1000) + getUtcOffsetSeconds(timezone, new Date(e.endMs));
+		}
+		return { title: e.title, startUnix, startLocal, allDay: e.allDay, endLocal };
 	});
 
 	allEvents.sort((a, b) => a.startUnix - b.startUnix);
@@ -361,21 +392,26 @@ export async function GET({ params, request, locals }) {
 			fontChoice = o?.layout_font ?? null;
 			if (o?.bits) cornerImage = b64ToBytes(o.bits);
 		} catch {}
-		const nowLocal = Math.floor(rightNow.getTime() / 1000) + offsetSec;
+		const nowLocal = Math.floor(effNowMs / 1000) + offsetSec;
 		const screen = renderLayout(style, {
 			nowLocal,
-			events: trimmedEvents.map((e) => ({ title: e.title, startLocal: e.startLocal, allDay: e.allDay })),
+			events: trimmedEvents.map((e) => ({ title: e.title, startLocal: e.startLocal, allDay: e.allDay, endLocal: e.endLocal })),
 			weather,
 			vbat,
 			dark,
 			cornerImage,
+			refreshSec: intervalSec,
 		}, fontChoice ?? undefined);
 		return new Response(screen, {
 			status: 200,
 			headers: {
 				'Content-Type': 'text/plain; charset=utf-8',
 				'Cache-Control': 'no-store',
-				'X-Sleep': String(secondsUntilNextRefresh(nowLocal, device.refresh_interval_sec || 86400)),
+				'X-Sleep': String(
+					style === 'timeline'
+						? timelineSleep(nowLocal, trimmedEvents.map((e) => ({ title: e.title, startLocal: e.startLocal, allDay: e.allDay, endLocal: e.endLocal })), intervalSec)
+						: secondsUntilNextRefresh(nowLocal, 86400)
+				),
 			},
 		});
 	}
@@ -383,7 +419,7 @@ export async function GET({ params, request, locals }) {
 	return json(
 		{
 			utcOffsetSec: offsetSec,
-			refreshIntervalSec: device.refresh_interval_sec || 86400,
+			refreshIntervalSec: 86400,
 			style,
 			view: viewForStyle(style),
 			...(dark ? { dark: true } : {}),

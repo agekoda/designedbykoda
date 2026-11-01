@@ -5,6 +5,7 @@ import { getSessionUserId } from '../../lib/session';
 import { CALENDAR_STYLES } from '../../data/calendarStyles';
 import { FAMILIES, FAMILY_LABELS } from '../../lib/eink/fonts';
 import { DITHERS } from '../../lib/eink/image';
+import { REFRESH_CHOICES } from '../../data/calendarStyles';
 
 const db = Astro.locals.runtime?.env?.DB;
 const userId = db ? await getSessionUserId(Astro.request, db) : null;
@@ -22,6 +23,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		data-styles={JSON.stringify(styles)}
 		data-families={JSON.stringify(families)}
 		data-dithers={JSON.stringify(DITHERS)}
+		data-refreshes={JSON.stringify(REFRESH_CHOICES)}
 	>
 		<div class="topbar">
 			<div class="tb-left">
@@ -66,6 +68,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						<span class="track" aria-hidden="true"></span>
 						<span class="switch-text">Dark mode <small>white on black</small></span>
 					</label>
+					<div id="refresh-box" hidden>
+						<div class="label sub" style="margin-top:1.6em">How often it updates</div>
+						<div class="seg wrap" id="refreshes" role="radiogroup" aria-label="How often the Timeline updates"></div>
+						<p class="muted small hint" id="refresh-hint"></p>
+					</div>
 					<p class="muted small hint">Dark mode swaps the colours: white text on a black screen. The pairing and reconnect screens always stay black on white.</p>
 				</section>
 
@@ -162,6 +169,17 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const editor = $('editor');
 	const edCanvas = $<HTMLCanvasElement>('ed');
 	const ditherEl = $('dithers');
+	const refreshEl = $('refreshes');
+	const refreshBox = $('refresh-box');
+	const refreshHint = $('refresh-hint');
+	const refreshes: { sec: number; label: string }[] = JSON.parse(root.dataset.refreshes!);
+	const REFRESH_HINTS: Record<number, string> = {
+		86400: 'Updates once a day, at midnight. Best battery life. The timeline stays as it was; press the button on the calendar to refresh sooner.',
+		43200: 'Twice a day, while the day is happening. Good battery life.',
+		14400: 'Every 4 hours, only while the day is happening. The "now" bar moves along the timeline. Medium battery life.',
+		7200: 'Every 2 hours, only while the day is happening. The "now" bar moves along the timeline. Shorter battery life.',
+		3600: 'Every hour, only while the day is happening, and it sleeps overnight. The shortest battery life: weeks rather than months.',
+	};
 	const saveBtn = $<HTMLButtonElement>('save');
 	const revertBtn = $<HTMLButtonElement>('revert');
 	const saveMsg = $('save-msg');
@@ -172,6 +190,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		style: string;
 		font: string | null; // null = the layout's own font
 		dark: boolean;
+		refreshSec: number;
 		cornerMode: 'calendar' | 'image';
 		cfg: ImageSettings;
 		src: string | null; // the uploaded photo (small JPEG data URL)
@@ -179,7 +198,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	let deviceId = root.dataset.device || '';
 	let hasWeather = false;
 	let vbat: number | null = null;
-	let st: State = { style: 'agenda', font: null, dark: false, cornerMode: 'calendar', cfg: { ...DEFAULT_IMAGE_SETTINGS }, src: null };
+	let st: State = { style: 'agenda', font: null, dark: false, refreshSec: 86400, cornerMode: 'calendar', cfg: { ...DEFAULT_IMAGE_SETTINGS }, src: null };
 	let base = JSON.stringify(st); // what is saved on the server
 	let pictureChanged = false; // the picture or its settings differ from what the server has
 	let srcImg: HTMLImageElement | null = null;
@@ -292,7 +311,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	async function redraw() {
-		const common = { font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12 };
+		const common = { font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12, refreshSec: st.refreshSec };
 		try {
 			const r = await renderPreview({ ...common, style: st.style, cornerImage: cornerForPreview() });
 			const dpr = window.devicePixelRatio || 1;
@@ -350,6 +369,15 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				(f) => `<label class="fnt"><input type="radio" name="font" value="${f.id}" /><span class="fnt-card"><canvas data-fid="${f.id}" width="400" height="120"></canvas><span class="fnt-name">${f.label}</span></span></label>`
 			)
 			.join('');
+		refreshEl.innerHTML = refreshes
+			.map((x) => `<label><input type="radio" name="refresh" value="${x.sec}" /><span>${x.label}</span></label>`)
+			.join('');
+		refreshEl.addEventListener('change', (e) => {
+			st.refreshSec = parseInt((e.target as HTMLInputElement).value, 10);
+			syncControls();
+			schedule();
+			changed();
+		});
 		ditherEl.innerHTML = dithers
 			.map((d) => `<label title="${d.note}"><input type="radio" name="dither" value="${d.id}" /><span>${d.label}</span></label>`)
 			.join('');
@@ -510,6 +538,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		layoutsEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.style));
 		fontsEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === effFont()));
 		darkBox.checked = st.dark;
+		refreshBox.hidden = st.style !== 'timeline';
+		refreshEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = parseInt(i.value, 10) === st.refreshSec));
+		refreshHint.textContent = REFRESH_HINTS[st.refreshSec] ?? '';
 		tabPicBtn.hidden = !supportsCorner();
 		if (!supportsCorner() && activeTab === 'picture') showTab('layout');
 		document.querySelectorAll<HTMLInputElement>('input[name="corner"]').forEach((r) => (r.checked = r.value === st.cornerMode));
@@ -546,7 +577,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		}
 		saveBtn.disabled = true;
 		flash('Saving…');
-		const body: any = { deviceId, style: st.style, font: st.font, dark: st.dark };
+		const body: any = { deviceId, style: st.style, font: st.font, dark: st.dark, refreshSec: st.refreshSec };
 		if (supportsCorner() || st.cornerMode === 'image') {
 			body.corner = { mode: st.cornerMode };
 			if (st.cornerMode === 'image' && srcImg && cornerBytes && (pictureChanged || JSON.parse(base).cornerMode !== 'image')) {
@@ -673,6 +704,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				style: info.style,
 				font: info.font,
 				dark: !!info.dark,
+				refreshSec: info.refreshSec || 86400,
 				cornerMode: info.cornerMode,
 				cfg: cleanSettings(info.cornerCfg),
 				src: info.cornerSrc,

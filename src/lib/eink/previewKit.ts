@@ -36,6 +36,19 @@ export function sampleEvents(nowLocal: number): CalEvent[] {
 	];
 }
 
+// A typical working day, for the Timeline preview (which needs several events today, with ends).
+export function sampleDay(nowLocal: number): CalEvent[] {
+	const day = Math.floor(nowLocal / 86400) * 86400;
+	const at = (h: number, m = 0) => day + h * 3600 + m * 60;
+	return [
+		{ title: 'Mum\'s birthday', startLocal: day, endLocal: day + 86400, allDay: true },
+		{ title: 'Team standup', startLocal: at(9, 30), endLocal: at(10), allDay: false },
+		{ title: 'Design review', startLocal: at(11), endLocal: at(12, 30), allDay: false },
+		{ title: 'Lunch with Sam', startLocal: at(13), endLocal: at(14), allDay: false },
+		{ title: 'Project review', startLocal: at(15, 15), endLocal: at(16, 15), allDay: false },
+	];
+}
+
 export interface PreviewOptions {
 	style: string;
 	font?: string | null;
@@ -43,19 +56,24 @@ export interface PreviewOptions {
 	hasWeather: boolean;
 	vbat?: number | null;
 	cornerImage?: Uint8Array | null;
+	refreshSec?: number;
 }
 
 export function drawListFor(o: PreviewOptions): string {
-	const nowLocal = Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60;
+	let nowLocal = Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60;
+	const timeline = o.style === 'timeline';
+	// The live Timeline preview pretends it is a quarter past eleven, so the moving bar is always on show.
+	if (timeline && (o.refreshSec ?? 86400) < 86400) nowLocal = Math.floor(nowLocal / 86400) * 86400 + 11 * 3600 + 15 * 60;
 	return renderLayout(
 		o.style,
 		{
 			nowLocal,
-			events: sampleEvents(nowLocal),
+			events: timeline ? sampleDay(nowLocal) : sampleEvents(nowLocal),
 			weather: o.hasWeather ? { high: 21, low: 12 } : null,
 			vbat: o.vbat ?? null,
 			dark: o.dark,
 			cornerImage: o.cornerImage ?? null,
+			refreshSec: o.refreshSec ?? 86400,
 		},
 		o.font ?? undefined
 	);
