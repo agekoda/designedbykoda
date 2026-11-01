@@ -1,8 +1,9 @@
 // Rough LiPo charge level from the cell voltage the calendar reports. It is an
 // estimate: the real curve moves a little with load and temperature.
 const CURVE: [number, number][] = [
-	[4.2, 100], [4.15, 95], [4.11, 90], [4.08, 85], [4.02, 75], [3.98, 65], [3.92, 55],
-	[3.87, 45], [3.84, 35], [3.79, 25], [3.73, 15], [3.67, 8], [3.5, 3], [3.3, 0],
+	[4.2, 100], [4.15, 95], [4.11, 90], [4.08, 85], [4.02, 80], [3.98, 75], [3.95, 70], [3.91, 65],
+	[3.87, 60], [3.85, 55], [3.84, 50], [3.82, 45], [3.8, 40], [3.79, 35], [3.77, 30], [3.75, 25],
+	[3.73, 20], [3.71, 15], [3.69, 10], [3.61, 5], [3.5, 3], [3.3, 0],
 ];
 export function batteryPercent(v: number): number {
 	if (v >= CURVE[0][0]) return 100;
