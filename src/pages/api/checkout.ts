@@ -2,7 +2,7 @@
 // client to redirect to. The price for each currency is looked up here,
 // server-side, never trusted from the client — a client could otherwise
 // submit any amount it wanted for the "AUD" price, for example.
-import { STANDARD_PRICES, countryByCode, productPrice, shippingPrice, zoneLabel } from '../../data/preorderPricing';
+import { STANDARD_PRICES, preorderOpen, countryByCode, productPrice, shippingPrice, zoneLabel } from '../../data/preorderPricing';
 
 export const prerender = false;
 
@@ -11,6 +11,10 @@ export async function POST({ request, locals }) {
 	const secretKey = env.STRIPE_SECRET_KEY;
 	if (!secretKey) {
 		return json({ error: 'Payments are not configured yet.' }, 500);
+	}
+
+	if (!preorderOpen()) {
+		return json({ error: 'Preorders are not open yet.' }, 403);
 	}
 
 	let currency = 'USD';

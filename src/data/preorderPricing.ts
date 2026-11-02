@@ -6,6 +6,14 @@
 // price), then it goes up to the standard price. The server decides which one
 // applies when someone checks out, so the page can't be used to cheat the timer.
 //
+// Preorders open at this moment (midnight at the start of 20 November, Perth).
+// Until then the preorder page sends visitors to the project page and checkout
+// refuses orders. To open early, set this to a time that has already passed.
+export const PREORDER_OPENS = '2026-11-19T16:00:00Z';
+export function preorderOpen(now: number = Date.now()): boolean {
+	return now >= Date.parse(PREORDER_OPENS);
+}
+
 // EARLY_BIRD_ENDS is when the early-bird price stops. To test the countdown,
 // set it a minute or two from now; to start a real launch, set it to 72 hours
 // after you go live. Use UTC, e.g. '2026-11-05T13:30:00Z' (Perth is UTC+8).
