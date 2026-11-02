@@ -9,7 +9,7 @@
 // EARLY_BIRD_ENDS is when the early-bird price stops. To test the countdown,
 // set it a minute or two from now; to start a real launch, set it to 72 hours
 // after you go live. Use UTC, e.g. '2026-11-05T13:30:00Z' (Perth is UTC+8).
-export const EARLY_BIRD_ENDS = '2026-11-05T13:30:00Z';
+export const EARLY_BIRD_ENDS = '2026-11-22T16:00:00Z';
 
 // What the calendar costs, in each currency, in whole units.
 export const EARLY_PRICES: Record<string, number> = { USD: 77, EUR: 66, GBP: 57, AUD: 109, CAD: 106 };
