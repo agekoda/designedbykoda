@@ -1,6 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { BASE_PRICE_USD, CURRENCIES } from '../../data/preorderPricing';
+import { PRICES, CURRENCIES, COUNTRIES, ZONES, PRICE_OVERRIDES } from '../../data/preorderPricing';
+
+const pricingJson = JSON.stringify({ prices: PRICES, overrides: PRICE_OVERRIDES, zones: ZONES, countries: COUNTRIES });
 
 const IMAGES = [
 	'/images/projects/eink-calendar/preorder-hero.jpg',
@@ -28,6 +30,7 @@ const specs = [
 
 const shipping = [
 	'Estimated to ship by the end of January 2027.',
+	'Shipping is a fixed price for your country, shown before you pay. US prices include estimated import duty.',
 	'Your order is paid securely through Stripe when you check out.',
 	"I'll email you when your calendar is on its way.",
 ];
@@ -64,7 +67,6 @@ const shipping = [
 							aria-selected={i === 0 ? 'true' : 'false'}
 							data-code={c.code}
 							data-symbol={c.symbol}
-							data-rate={c.rate}
 						>
 							<span class="opt-code">{c.code}</span>
 							<span class="opt-name">{c.name}</span>
@@ -119,10 +121,25 @@ const shipping = [
 				</p>
 
 				<div class="price-block">
-					<span class="price" id="price-display">${BASE_PRICE_USD}</span>
+					<span class="price" id="price-display">${PRICES.USD}</span>
+					<span class="price-note" id="price-note">+ shipping</span>
 				</div>
 
-				<button class="preorder-btn" data-magnetic id="preorder-btn">Preorder Now</button>
+				<div class="ship-to">
+					<label for="country">Ship to</label>
+					<select id="country" aria-describedby="ship-lines">
+						<option value="">Choose your country…</option>
+						{COUNTRIES.map((c) => <option value={c.code}>{c.name}</option>)}
+					</select>
+				</div>
+				<div class="ship-lines" id="ship-lines" aria-live="polite" hidden>
+					<div><span id="ship-label">Shipping</span><span id="ship-amount"></span></div>
+					<div class="ship-total"><span>Total</span><span id="total-amount"></span></div>
+					<p id="ship-note" class="ship-fine" hidden>Includes estimated US import duty.</p>
+				</div>
+				<script type="application/json" id="pricing-data" set:html={pricingJson}></script>
+
+				<button class="preorder-btn" data-magnetic id="preorder-btn" disabled>Choose your country</button>
 
 				<ul class="assure">
 					<li>
@@ -349,14 +366,57 @@ const shipping = [
 		});
 	});
 
-	// ---------- Currency dropdown ----------
-	const BASE_PRICE_USD = Number(document.getElementById('price-display')?.textContent?.replace(/[^0-9.]/g, '')) || 70;
+	// ---------- Currency, country, price and shipping ----------
+	const pricing = JSON.parse(document.getElementById('pricing-data')?.textContent || '{}');
 	const btn = document.getElementById('cur-btn') as HTMLButtonElement;
 	const menu = document.getElementById('cur-menu') as HTMLDivElement;
 	const codeEl = document.getElementById('cur-code') as HTMLElement;
 	const priceDisplay = document.getElementById('price-display') as HTMLElement;
+	const priceNote = document.getElementById('price-note') as HTMLElement;
+	const countrySel = document.getElementById('country') as HTMLSelectElement;
+	const shipLines = document.getElementById('ship-lines') as HTMLElement;
+	const shipLabel = document.getElementById('ship-label') as HTMLElement;
+	const shipAmount = document.getElementById('ship-amount') as HTMLElement;
+	const totalAmount = document.getElementById('total-amount') as HTMLElement;
+	const shipNote = document.getElementById('ship-note') as HTMLElement;
+	const preorderBtn = document.getElementById('preorder-btn') as HTMLButtonElement;
 	const opts = Array.from(menu.querySelectorAll<HTMLButtonElement>('.cur-opt'));
 	let selected = opts[0];
+
+	// Same sums as the server (src/data/preorderPricing.ts). The server works out
+	// what is actually charged; this is only what is shown.
+	function productPrice(cur: string, country: string): number {
+		return pricing.overrides?.[country]?.[cur] ?? pricing.prices[cur];
+	}
+	function shippingFor(cur: string, country: string): number {
+		const c = pricing.countries.find((x: any) => x.code === country);
+		if (!c) return 0;
+		return Math.round((pricing.zones[c.zone].aud * pricing.prices[cur]) / pricing.prices.AUD);
+	}
+
+	function render() {
+		const cur = selected.dataset.code || 'USD';
+		const sym = selected.dataset.symbol || '$';
+		const country = countrySel.value;
+		const c = pricing.countries.find((x: any) => x.code === country);
+		priceDisplay.textContent = `${sym}${productPrice(cur, country)}`;
+		if (!c) {
+			priceNote.hidden = false;
+			shipLines.hidden = true;
+			preorderBtn.disabled = true;
+			preorderBtn.textContent = 'Choose your country';
+			return;
+		}
+		const ship = shippingFor(cur, country);
+		priceNote.hidden = true;
+		shipLabel.textContent = `Shipping to ${pricing.zones[c.zone].label}`;
+		shipAmount.textContent = `${sym}${ship}`;
+		totalAmount.textContent = `${sym}${productPrice(cur, country) + ship}`;
+		shipNote.hidden = c.zone !== 'us';
+		shipLines.hidden = false;
+		preorderBtn.disabled = false;
+		preorderBtn.textContent = 'Preorder Now';
+	}
 
 	function openMenu() {
 		menu.hidden = false;
@@ -368,13 +428,12 @@ const shipping = [
 		btn.setAttribute('aria-expanded', 'false');
 		if (refocus) btn.focus();
 	}
-	function choose(opt: HTMLButtonElement) {
+	function choose(opt: HTMLButtonElement, refocus = true) {
 		selected = opt;
 		opts.forEach((o) => o.setAttribute('aria-selected', String(o === opt)));
 		codeEl.textContent = opt.dataset.code || 'USD';
-		const rate = parseFloat(opt.dataset.rate || '1');
-		priceDisplay.textContent = `${opt.dataset.symbol || '$'}${Math.round(BASE_PRICE_USD * rate)}`;
-		closeMenu(true);
+		render();
+		closeMenu(refocus);
 	}
 
 	btn.addEventListener('click', () => (menu.hidden ? openMenu() : closeMenu()));
@@ -390,10 +449,29 @@ const shipping = [
 		else if (e.key === 'Tab') closeMenu();
 	});
 
+	// Picking a country also picks that country's usual currency (still changeable).
+	function setCountry(code: string) {
+		countrySel.value = code;
+		const c = pricing.countries.find((x: any) => x.code === code);
+		const opt = c && opts.find((o) => o.dataset.code === c.cur);
+		if (opt) choose(opt, false);
+		else render();
+	}
+	countrySel.addEventListener('change', () => setCountry(countrySel.value));
+
+	// Start on the visitor's own country when we can tell where they are.
+	fetch('/api/country')
+		.then((r) => r.json())
+		.then((d) => {
+			if (d?.country && !countrySel.value && pricing.countries.some((x: any) => x.code === d.country)) setCountry(d.country);
+		})
+		.catch(() => {});
+
 	// ---------- Checkout ----------
-	const preorderBtn = document.getElementById('preorder-btn') as HTMLButtonElement;
 	preorderBtn?.addEventListener('click', async () => {
 		const currency = selected.dataset.code || 'USD';
+		const country = countrySel.value;
+		if (!country) return;
 
 		preorderBtn.disabled = true;
 		const originalText = preorderBtn.textContent;
@@ -403,7 +481,7 @@ const shipping = [
 			const res = await fetch('/api/checkout', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ currency }),
+				body: JSON.stringify({ currency, country }),
 			});
 			const data = await res.json();
 			if (res.ok && data.url) {
@@ -701,6 +779,65 @@ const shipping = [
 		line-height: 1;
 		color: var(--fg);
 		font-variant-numeric: tabular-nums;
+	}
+	.price-note {
+		color: var(--muted);
+		font-size: 0.95em;
+	}
+	.price-note[hidden] {
+		display: none;
+	}
+	.ship-to {
+		display: grid;
+		gap: 0.4em;
+		margin-bottom: 1em;
+	}
+	.ship-to label {
+		font-size: 0.8em;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+	.ship-to select {
+		font: inherit;
+		color: var(--fg);
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		padding: 0.75em 0.9em;
+	}
+	.ship-to select:hover,
+	.ship-to select:focus-visible {
+		border-color: var(--accent);
+		outline: none;
+	}
+	.ship-lines {
+		display: grid;
+		gap: 0.35em;
+		margin-bottom: 1.1em;
+		font-size: 0.95em;
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
+	}
+	.ship-lines[hidden] {
+		display: none;
+	}
+	.ship-lines > div {
+		display: flex;
+		justify-content: space-between;
+		gap: 1em;
+	}
+	.ship-total {
+		color: var(--fg);
+		font-weight: 700;
+		border-top: 1px solid var(--border);
+		padding-top: 0.45em;
+		margin-top: 0.15em;
+	}
+	.ship-fine {
+		margin: 0.2em 0 0;
+		font-size: 0.85em;
 	}
 	.preorder-btn {
 		display: flex;
