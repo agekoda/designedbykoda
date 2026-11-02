@@ -2,7 +2,7 @@
 // client to redirect to. The price for each currency is looked up here,
 // server-side, never trusted from the client — a client could otherwise
 // submit any amount it wanted for the "AUD" price, for example.
-import { PRICES, countryByCode, productPrice, shippingPrice, zoneLabel } from '../../data/preorderPricing';
+import { STANDARD_PRICES, countryByCode, productPrice, shippingPrice, zoneLabel } from '../../data/preorderPricing';
 
 export const prerender = false;
 
@@ -23,7 +23,7 @@ export async function POST({ request, locals }) {
 		return json({ error: 'Invalid request.' }, 400);
 	}
 
-	if (!(currency in PRICES)) {
+	if (!(currency in STANDARD_PRICES)) {
 		return json({ error: 'Unsupported currency.' }, 400);
 	}
 	if (!countryByCode(country)) {
@@ -32,7 +32,7 @@ export async function POST({ request, locals }) {
 
 	// Stripe expects amounts in the smallest currency unit (cents), not
 	// dollars/euros/etc directly.
-	const amountInMinorUnits = productPrice(currency, country) * 100;
+	const amountInMinorUnits = productPrice(currency) * 100;
 	const shippingInMinorUnits = shippingPrice(currency, country) * 100;
 
 	const origin = new URL(request.url).origin;

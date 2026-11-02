@@ -1,8 +1,9 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { PRICES, CURRENCIES, COUNTRIES, ZONES, PRICE_OVERRIDES } from '../../data/preorderPricing';
+import { EARLY_PRICES, STANDARD_PRICES, EARLY_BIRD_ENDS, SHIPPING_FX, CURRENCIES, COUNTRIES, ZONES, earlyBirdActive } from '../../data/preorderPricing';
 
-const pricingJson = JSON.stringify({ prices: PRICES, overrides: PRICE_OVERRIDES, zones: ZONES, countries: COUNTRIES });
+const pricingJson = JSON.stringify({ early: EARLY_PRICES, standard: STANDARD_PRICES, ends: Date.parse(EARLY_BIRD_ENDS), fx: SHIPPING_FX, zones: ZONES, countries: COUNTRIES });
+const firstPrice = (earlyBirdActive() ? EARLY_PRICES : STANDARD_PRICES).USD;
 
 const IMAGES = [
 	'/images/projects/eink-calendar/preorder-hero.jpg',
@@ -147,9 +148,14 @@ const shipping = [
 				</p>
 
 				<div class="price-block">
-					<span class="price" id="price-display">${PRICES.USD}</span>
+					<span class="price" id="price-display">${firstPrice}</span>
+					<s class="price-was" id="price-was" hidden></s>
 					<span class="price-note" id="price-note">+ shipping</span>
 				</div>
+				<p class="early" id="early" hidden>
+					<span class="early-tag">Early-bird price</span>
+					Ends in <b id="early-time"></b>, then it goes up to <b id="early-then"></b>.
+				</p>
 
 				<div class="ship-lines" id="ship-lines" aria-live="polite" hidden>
 					<div><span id="ship-label">Shipping</span><span id="ship-amount"></span></div>
@@ -392,6 +398,10 @@ const shipping = [
 	const codeEl = document.getElementById('cur-code') as HTMLElement;
 	const priceDisplay = document.getElementById('price-display') as HTMLElement;
 	const priceNote = document.getElementById('price-note') as HTMLElement;
+	const priceWas = document.getElementById('price-was') as HTMLElement;
+	const earlyEl = document.getElementById('early') as HTMLElement;
+	const earlyTime = document.getElementById('early-time') as HTMLElement;
+	const earlyThen = document.getElementById('early-then') as HTMLElement;
 	const ctryBtn = document.getElementById('ctry-btn') as HTMLButtonElement;
 	const ctryMenu = document.getElementById('ctry-menu') as HTMLDivElement;
 	const ctryName = document.getElementById('ctry-name') as HTMLElement;
@@ -408,13 +418,16 @@ const shipping = [
 
 	// Same sums as the server (src/data/preorderPricing.ts). The server works out
 	// what is actually charged; this is only what is shown.
-	function productPrice(cur: string, country: string): number {
-		return pricing.overrides?.[country]?.[cur] ?? pricing.prices[cur];
+	// The server's clock decides, so the countdown matches what checkout charges.
+	let clockOffset = 0;
+	const earlyOn = () => Date.now() + clockOffset < pricing.ends;
+	function productPrice(cur: string): number {
+		return (earlyOn() ? pricing.early : pricing.standard)[cur];
 	}
 	function shippingFor(cur: string, country: string): number {
 		const c = pricing.countries.find((x: any) => x.code === country);
 		if (!c) return 0;
-		return Math.round((pricing.zones[c.zone].aud * pricing.prices[cur]) / pricing.prices.AUD);
+		return Math.round(pricing.zones[c.zone].aud * pricing.fx[cur]);
 	}
 
 	function render() {
@@ -422,7 +435,12 @@ const shipping = [
 		const sym = selected.dataset.symbol || '$';
 		const country = countryCode;
 		const c = pricing.countries.find((x: any) => x.code === country);
-		priceDisplay.textContent = `${sym}${productPrice(cur, country)}`;
+		priceDisplay.textContent = `${sym}${productPrice(cur)}`;
+		const on = earlyOn();
+		priceWas.hidden = !on;
+		priceWas.textContent = `${sym}${pricing.standard[cur]}`;
+		earlyEl.hidden = !on;
+		earlyThen.textContent = `${sym}${pricing.standard[cur]}`;
 		if (!c) {
 			priceNote.hidden = false;
 			shipLines.hidden = true;
@@ -434,7 +452,7 @@ const shipping = [
 		priceNote.hidden = true;
 		shipLabel.textContent = `Shipping to ${pricing.zones[c.zone].label}`;
 		shipAmount.textContent = `${sym}${ship}`;
-		totalAmount.textContent = `${sym}${productPrice(cur, country) + ship}`;
+		totalAmount.textContent = `${sym}${productPrice(cur) + ship}`;
 		shipNote.hidden = c.zone !== 'us';
 		shipLines.hidden = false;
 		preorderBtn.disabled = false;
@@ -519,13 +537,30 @@ const shipping = [
 		else render();
 	}
 
-	// Start on the visitor's own country when we can tell where they are.
-	fetch('/api/country')
+	// Early-bird countdown. Ticks every second; when it hits zero the price
+	// flips to the standard one by itself.
+	function tick() {
+		const ms = pricing.ends - (Date.now() + clockOffset);
+		if (ms <= 0) {
+			if (!earlyEl.hidden) render();
+			return;
+		}
+		const t = Math.floor(ms / 1000);
+		const d = Math.floor(t / 86400);
+		const hms = [Math.floor((t % 86400) / 3600), Math.floor((t % 3600) / 60), t % 60].map((n) => String(n).padStart(2, '0')).join(':');
+		earlyTime.textContent = d > 0 ? `${d}d ${hms}` : hms;
+	}
+	fetch('/api/offer')
 		.then((r) => r.json())
 		.then((d) => {
-			if (d?.country && !countryCode && pricing.countries.some((x: any) => x.code === d.country)) setCountry(d.country);
+			if (typeof d?.now === 'number') clockOffset = d.now - Date.now();
 		})
-		.catch(() => {});
+		.catch(() => {})
+		.finally(() => {
+			render();
+			tick();
+			setInterval(tick, 1000);
+		});
 
 	// ---------- Checkout ----------
 	preorderBtn?.addEventListener('click', async () => {
@@ -839,6 +874,38 @@ const shipping = [
 		line-height: 1;
 		color: var(--fg);
 		font-variant-numeric: tabular-nums;
+	}
+	.price-was {
+		color: var(--muted);
+		font-size: 1.3em;
+		font-variant-numeric: tabular-nums;
+	}
+	.price-was[hidden] {
+		display: none;
+	}
+	.early {
+		margin: -0.4em 0 1.1em;
+		font-size: 0.92em;
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
+	}
+	.early[hidden] {
+		display: none;
+	}
+	.early b {
+		color: var(--fg);
+	}
+	.early-tag {
+		display: inline-block;
+		margin-right: 0.5em;
+		padding: 0.15em 0.65em;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--accent) 18%, transparent);
+		color: var(--accent);
+		font-size: 0.82em;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
 	}
 	.price-note {
 		color: var(--muted);

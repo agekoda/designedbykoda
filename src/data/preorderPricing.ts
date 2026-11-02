@@ -2,17 +2,29 @@
 // shows these and /api/checkout charges them, so the two can never disagree.
 // Prices are fixed on purpose (a stable, round price per currency), not live.
 
-// What the calendar costs, in each currency, in whole units. Change these to
-// change the price everywhere. (A$106 + A$13 Australian shipping = A$119 total;
-// the other currencies are about the same value.)
-export const PRICES: Record<string, number> = {
-	USD: 75,
-	EUR: 64,
-	GBP: 55,
-	AUD: 106,
-	CAD: 103,
-};
-export const BASE_PRICE_USD = PRICES.USD;
+// Launch pricing. For a limited time the calendar is cheaper (the early-bird
+// price), then it goes up to the standard price. The server decides which one
+// applies when someone checks out, so the page can't be used to cheat the timer.
+//
+// EARLY_BIRD_ENDS is when the early-bird price stops. To test the countdown,
+// set it a minute or two from now; to start a real launch, set it to 72 hours
+// after you go live. Use UTC, e.g. '2026-11-05T13:30:00Z' (Perth is UTC+8).
+export const EARLY_BIRD_ENDS = '2026-11-05T13:30:00Z';
+
+// What the calendar costs, in each currency, in whole units.
+export const EARLY_PRICES: Record<string, number> = { USD: 77, EUR: 66, GBP: 57, AUD: 109, CAD: 106 };
+export const STANDARD_PRICES: Record<string, number> = { USD: 83, EUR: 71, GBP: 61, AUD: 119, CAD: 115 };
+export const PRICES = STANDARD_PRICES;
+export const BASE_PRICE_USD = STANDARD_PRICES.USD;
+
+// Shipping is quoted in Australian dollars (below). This is how many units of
+// each currency equal A$1 for shipping, so shipping doesn't move when the product
+// price changes from early-bird to standard.
+export const SHIPPING_FX: Record<string, number> = { AUD: 1, USD: 0.7, EUR: 0.6, GBP: 0.52, CAD: 0.97 };
+
+export function earlyBirdActive(now: number = Date.now()): boolean {
+	return now < Date.parse(EARLY_BIRD_ENDS);
+}
 
 export const CURRENCIES = [
 	{ code: 'USD', symbol: '$', name: 'US Dollar' },
@@ -22,17 +34,12 @@ export const CURRENCIES = [
 	{ code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
 ] as const;
 
-// Optional: a different product price for one country, in one currency, e.g. to
-// build US import duty into the price. Example:  US: { USD: 92 }
-// (If you do that, lower the US shipping below so the duty isn't charged twice.)
-export const PRICE_OVERRIDES: Record<string, Record<string, number>> = {};
-
 // Shipping zones. `aud` is the fixed shipping charge in Australian dollars
 // (postage + about A$1.50 for packing and Stripe's fee, from your Australia Post
 // and Zonos quotes). Other currencies are converted using the prices above.
 // Update these numbers when the quotes change.
 export const ZONES: Record<string, { label: string; aud: number }> = {
-	au: { label: 'Australia', aud: 13 },
+	au: { label: 'Australia', aud: 11 },
 	nz: { label: 'New Zealand', aud: 21 },
 	asia: { label: 'Asia', aud: 24 },
 	ca: { label: 'Canada', aud: 26 },
@@ -87,17 +94,16 @@ export function countryByCode(code: string) {
 	return COUNTRIES.find((c) => c.code === code.toUpperCase());
 }
 
-// Product price in whole units of `currency` for a buyer in `country`.
-export function productPrice(currency: string, country: string): number {
-	return PRICE_OVERRIDES[country]?.[currency] ?? PRICES[currency];
+// Product price in whole units of `currency` right now.
+export function productPrice(currency: string, now: number = Date.now()): number {
+	return (earlyBirdActive(now) ? EARLY_PRICES : STANDARD_PRICES)[currency];
 }
 
-// Shipping in whole units of `currency` (the AUD charge scaled by the price ratio).
+// Shipping in whole units of `currency` (the AUD charge scaled by SHIPPING_FX).
 export function shippingPrice(currency: string, country: string): number {
 	const c = countryByCode(country);
 	if (!c) return 0;
-	const aud = ZONES[c.zone].aud;
-	return Math.round((aud * PRICES[currency]) / PRICES.AUD);
+	return Math.round(ZONES[c.zone].aud * SHIPPING_FX[currency]);
 }
 
 export function zoneLabel(country: string): string {
