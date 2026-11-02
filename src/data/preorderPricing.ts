@@ -3,13 +3,14 @@
 // Prices are fixed on purpose (a stable, round price per currency), not live.
 
 // What the calendar costs, in each currency, in whole units. Change these to
-// change the price everywhere. (Roughly US$77 = A$110 for now.)
+// change the price everywhere. (US$70 is the baseline product cost; the others
+// are about the same value, with A$ kept under 100.)
 export const PRICES: Record<string, number> = {
-	USD: 77,
-	EUR: 66,
-	GBP: 57,
-	AUD: 110,
-	CAD: 106,
+	USD: 70,
+	EUR: 60,
+	GBP: 52,
+	AUD: 99,
+	CAD: 97,
 };
 export const BASE_PRICE_USD = PRICES.USD;
 

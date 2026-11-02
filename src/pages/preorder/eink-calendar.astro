@@ -46,6 +46,31 @@ const shipping = [
 				About the project
 			</a>
 
+			<div class="pickers">
+			<div class="cur" id="ctry">
+				<button
+					type="button"
+					class="cur-btn"
+					id="ctry-btn"
+					aria-haspopup="listbox"
+					aria-expanded="false"
+					aria-label="Ship to country"
+				>
+					<span class="ctry-label">Ship to</span>
+					<span class="cur-code" id="ctry-name">Choose country</span>
+					<svg class="chev" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+				<div class="cur-menu ctry-menu" id="ctry-menu" role="listbox" aria-label="Ship to country" hidden>
+					{COUNTRIES.map((c) => (
+						<button type="button" role="option" class="cur-opt" aria-selected="false" data-code={c.code} data-name={c.name}>
+							<span class="opt-code">{c.code}</span>
+							<span class="opt-name">{c.name}</span>
+							<span class="opt-sym"></span>
+						</button>
+					))}
+				</div>
+			</div>
+
 			<div class="cur" id="cur">
 				<button
 					type="button"
@@ -74,6 +99,7 @@ const shipping = [
 						</button>
 					))}
 				</div>
+			</div>
 			</div>
 		</div>
 
@@ -125,13 +151,6 @@ const shipping = [
 					<span class="price-note" id="price-note">+ shipping</span>
 				</div>
 
-				<div class="ship-to">
-					<label for="country">Ship to</label>
-					<select id="country" aria-describedby="ship-lines">
-						<option value="">Choose your country…</option>
-						{COUNTRIES.map((c) => <option value={c.code}>{c.name}</option>)}
-					</select>
-				</div>
 				<div class="ship-lines" id="ship-lines" aria-live="polite" hidden>
 					<div><span id="ship-label">Shipping</span><span id="ship-amount"></span></div>
 					<div class="ship-total"><span>Total</span><span id="total-amount"></span></div>
@@ -373,7 +392,11 @@ const shipping = [
 	const codeEl = document.getElementById('cur-code') as HTMLElement;
 	const priceDisplay = document.getElementById('price-display') as HTMLElement;
 	const priceNote = document.getElementById('price-note') as HTMLElement;
-	const countrySel = document.getElementById('country') as HTMLSelectElement;
+	const ctryBtn = document.getElementById('ctry-btn') as HTMLButtonElement;
+	const ctryMenu = document.getElementById('ctry-menu') as HTMLDivElement;
+	const ctryName = document.getElementById('ctry-name') as HTMLElement;
+	const ctryOpts = Array.from(ctryMenu.querySelectorAll<HTMLButtonElement>('.cur-opt'));
+	let countryCode = '';
 	const shipLines = document.getElementById('ship-lines') as HTMLElement;
 	const shipLabel = document.getElementById('ship-label') as HTMLElement;
 	const shipAmount = document.getElementById('ship-amount') as HTMLElement;
@@ -397,7 +420,7 @@ const shipping = [
 	function render() {
 		const cur = selected.dataset.code || 'USD';
 		const sym = selected.dataset.symbol || '$';
-		const country = countrySel.value;
+		const country = countryCode;
 		const c = pricing.countries.find((x: any) => x.code === country);
 		priceDisplay.textContent = `${sym}${productPrice(cur, country)}`;
 		if (!c) {
@@ -419,6 +442,7 @@ const shipping = [
 	}
 
 	function openMenu() {
+		if (typeof closeCtry === 'function') closeCtry();
 		menu.hidden = false;
 		btn.setAttribute('aria-expanded', 'true');
 		selected.focus();
@@ -449,28 +473,64 @@ const shipping = [
 		else if (e.key === 'Tab') closeMenu();
 	});
 
+	// Country dropdown: same look and behaviour as the currency one.
+	function openCtry() {
+		ctryMenu.hidden = false;
+		ctryBtn.setAttribute('aria-expanded', 'true');
+		(ctryOpts.find((o) => o.dataset.code === countryCode) || ctryOpts[0]).focus();
+	}
+	function closeCtry(refocus = false) {
+		ctryMenu.hidden = true;
+		ctryBtn.setAttribute('aria-expanded', 'false');
+		if (refocus) ctryBtn.focus();
+	}
+	ctryBtn.addEventListener('click', () => {
+		closeMenu();
+		ctryMenu.hidden ? openCtry() : closeCtry();
+	});
+	btn.addEventListener('click', () => closeCtry());
+	ctryOpts.forEach((o) => o.addEventListener('click', () => { setCountry(o.dataset.code || ''); closeCtry(true); }));
+	document.addEventListener('click', (e) => {
+		if (!ctryMenu.hidden && !(e.target as HTMLElement).closest('#ctry')) closeCtry();
+	});
+	ctryMenu.addEventListener('keydown', (e) => {
+		const i = ctryOpts.indexOf(document.activeElement as HTMLButtonElement);
+		if (e.key === 'ArrowDown') { e.preventDefault(); ctryOpts[(i + 1) % ctryOpts.length].focus(); }
+		else if (e.key === 'ArrowUp') { e.preventDefault(); ctryOpts[(i - 1 + ctryOpts.length) % ctryOpts.length].focus(); }
+		else if (e.key === 'Escape') { e.preventDefault(); closeCtry(true); }
+		else if (e.key === 'Tab') closeCtry();
+		else if (e.key.length === 1) {
+			// type a letter to jump to the next country starting with it
+			const l = e.key.toLowerCase();
+			const next = ctryOpts.slice(i + 1).concat(ctryOpts.slice(0, i + 1)).find((o) => (o.dataset.name || '').toLowerCase().startsWith(l));
+			if (next) next.focus();
+		}
+	});
+
 	// Picking a country also picks that country's usual currency (still changeable).
 	function setCountry(code: string) {
-		countrySel.value = code;
+		countryCode = code;
 		const c = pricing.countries.find((x: any) => x.code === code);
+		ctryName.textContent = c ? c.name : 'Choose country';
+		ctryBtn.classList.toggle('needs', !c);
+		ctryOpts.forEach((o) => o.setAttribute('aria-selected', String(o.dataset.code === code)));
 		const opt = c && opts.find((o) => o.dataset.code === c.cur);
 		if (opt) choose(opt, false);
 		else render();
 	}
-	countrySel.addEventListener('change', () => setCountry(countrySel.value));
 
 	// Start on the visitor's own country when we can tell where they are.
 	fetch('/api/country')
 		.then((r) => r.json())
 		.then((d) => {
-			if (d?.country && !countrySel.value && pricing.countries.some((x: any) => x.code === d.country)) setCountry(d.country);
+			if (d?.country && !countryCode && pricing.countries.some((x: any) => x.code === d.country)) setCountry(d.country);
 		})
 		.catch(() => {});
 
 	// ---------- Checkout ----------
 	preorderBtn?.addEventListener('click', async () => {
 		const currency = selected.dataset.code || 'USD';
-		const country = countrySel.value;
+		const country = countryCode;
 		if (!country) return;
 
 		preorderBtn.disabled = true;
@@ -787,31 +847,30 @@ const shipping = [
 	.price-note[hidden] {
 		display: none;
 	}
-	.ship-to {
-		display: grid;
-		gap: 0.4em;
-		margin-bottom: 1em;
+	.pickers {
+		display: flex;
+		align-items: center;
+		gap: 0.6em;
+		flex-wrap: wrap;
+		justify-content: flex-end;
 	}
-	.ship-to label {
-		font-size: 0.8em;
-		font-weight: 700;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
+	.ctry-label {
+		font-weight: 500;
 		color: var(--muted);
+		letter-spacing: 0.02em;
 	}
-	.ship-to select {
-		font: inherit;
-		color: var(--fg);
-		background: var(--bg-raised);
-		border: 1px solid var(--border);
-		border-radius: 12px;
-		padding: 0.75em 0.9em;
+	.ctry-menu {
+		min-width: 250px;
+		max-height: min(360px, 60vh);
+		overflow-y: auto;
 	}
-	.ship-to select:hover,
-	.ship-to select:focus-visible {
+	.ctry-menu .cur-opt {
+		grid-template-columns: 2.2em 1fr auto;
+	}
+	.cur-btn.needs {
 		border-color: var(--accent);
-		outline: none;
 	}
+
 	.ship-lines {
 		display: grid;
 		gap: 0.35em;
