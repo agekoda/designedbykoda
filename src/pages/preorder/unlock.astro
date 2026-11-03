@@ -1,0 +1,37 @@
+---
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+import { preorderOpen } from '../../data/preorderPricing';
+
+if (preorderOpen()) return Astro.redirect('/preorder/eink-calendar');
+const wrong = Astro.url.searchParams.has('wrong');
+---
+<Layout title="Preorders - designedbykoda" description="Preorders for the E-Ink Calendar open on 20 November.">
+	<div class="lock">
+		<h1>Preorders open 20 November</h1>
+		<p>The E-Ink Calendar preorder isn't open to everyone yet.</p>
+		<a class="back" href="/projects/eink-calendar/">See the project</a>
+		<form method="post" action="/api/preview" autocomplete="off">
+			<label for="pw">Owner preview</label>
+			<div class="row">
+				<input id="pw" name="password" type="password" placeholder="Password" required autocomplete="current-password" />
+				<button type="submit">Unlock</button>
+			</div>
+			{wrong && <p class="err" role="alert">Wrong password.</p>}
+		</form>
+	</div>
+</Layout>
+
+<style>
+	.lock { max-width: 420px; margin: 18vh auto 12vh; padding: 0 16px; text-align: center; }
+	h1 { font-size: 1.6rem; margin: 0 0 8px; }
+	p { opacity: 0.75; margin: 0 0 14px; }
+	.back { display: inline-block; margin-bottom: 36px; text-decoration: underline; }
+	form { text-align: left; }
+	label { display: block; font-size: 0.8rem; opacity: 0.6; margin-bottom: 6px; }
+	.row { display: flex; gap: 8px; }
+	input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; }
+	button { padding: 10px 16px; border-radius: 8px; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+	.err { color: #e5484d; opacity: 1; margin: 8px 0 0; font-size: 0.9rem; }
+	:global(html.has-custom-cursor) .lock, :global(html.has-custom-cursor) .lock * { cursor: none !important; }
+</style>

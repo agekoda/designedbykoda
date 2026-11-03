@@ -1,10 +1,11 @@
 ---
 export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
-import { preorderOpen, EARLY_PRICES, STANDARD_PRICES, EARLY_BIRD_ENDS, SHIPPING_FX, CURRENCIES, COUNTRIES, ZONES, earlyBirdActive } from '../../data/preorderPricing';
+import { canViewPreorder } from '../../lib/preview';
+import { EARLY_PRICES, STANDARD_PRICES, EARLY_BIRD_ENDS, SHIPPING_FX, CURRENCIES, COUNTRIES, ZONES, earlyBirdActive } from '../../data/preorderPricing';
 
-// Not open yet: send people to the project page instead.
-if (!preorderOpen()) return Astro.redirect('/projects/eink-calendar/');
+// Not open yet: only the owner (password cookie) gets in.
+if (!(await canViewPreorder(Astro.cookies, Astro.locals.runtime?.env))) return Astro.redirect('/preorder/unlock');
 
 const pricingJson = JSON.stringify({ early: EARLY_PRICES, standard: STANDARD_PRICES, ends: Date.parse(EARLY_BIRD_ENDS), fx: SHIPPING_FX, zones: ZONES, countries: COUNTRIES });
 const firstPrice = (earlyBirdActive() ? EARLY_PRICES : STANDARD_PRICES).USD;
