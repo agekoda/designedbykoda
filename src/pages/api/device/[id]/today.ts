@@ -7,7 +7,8 @@ import { viewForStyle, LIVE_STYLES, isRefreshSec } from '../../../../data/calend
 import { timelineSleep } from '../../../../lib/eink/layouts/timeline';
 import { getForecast } from '../../../../lib/weather';
 import { renderLayout } from '../../../../lib/eink/layouts';
-import { b64ToBytes } from '../../../../lib/eink/image';
+import { b64ToBytes, FRAME_BYTES } from '../../../../lib/eink/image';
+import { fetchTasks } from '../../../../lib/tasks';
 export const prerender = false;
 
 function getCookielessAuthSecret(request: Request): string | null {
@@ -349,12 +350,23 @@ export async function GET({ params, request, locals }) {
 	// Optional weather: today's high/low for the location chosen in setup.
 	// Never lets a weather problem break the calendar response.
 	let weather: { high: number; low: number } | null = null;
+	let place: { lat: number; lon: number } | null = null; // also used by Moon & Sun
 	try {
 		const loc = await db.prepare('SELECT weather_lat, weather_lon FROM devices WHERE id = ?').bind(deviceId).first();
 		if (loc && loc.weather_lat !== null && loc.weather_lon !== null) {
+			place = { lat: loc.weather_lat, lon: loc.weather_lon };
 			weather = await getForecast(db, loc.weather_lat, loc.weather_lon);
 		}
 	} catch {}
+
+	// To-do: the person's Google Tasks (only fetched when that layout is chosen).
+	let tasks: { title: string; done: boolean; due?: string }[] | null = null;
+	let tasksState: 'ok' | 'needs_permission' | 'error' = 'ok';
+	if (style === 'todo' && proto === '2') {
+		const r = await fetchTasks(accessToken, rightNow.getTime());
+		tasks = r.tasks;
+		tasksState = r.state;
+	}
 
 	// Dark mode (white on black), from schema-darkmode.sql. Its own query so a
 	// missing column never affects anything else.
@@ -393,6 +405,19 @@ export async function GET({ params, request, locals }) {
 			fontChoice = o?.layout_font ?? null;
 			if (o?.bits) cornerImage = b64ToBytes(o.bits);
 		} catch {}
+		// Countdown name + date, and the Photo frame picture (schema-layouts.sql). Only read for those layouts.
+		let countdown: { title: string; date: string } | null = null;
+		let frameImage: Uint8Array | null = null;
+		try {
+			if (style === 'countdown') {
+				const c = await db.prepare('SELECT countdown_title, countdown_date FROM devices WHERE id = ?').bind(deviceId).first();
+				if (c?.countdown_title && c?.countdown_date) countdown = { title: c.countdown_title, date: c.countdown_date };
+			} else if (style === 'frame') {
+				const f = await db.prepare('SELECT frame_bits FROM devices WHERE id = ?').bind(deviceId).first();
+				const bytes = f?.frame_bits ? b64ToBytes(f.frame_bits) : null;
+				if (bytes && bytes.length === FRAME_BYTES) frameImage = bytes;
+			}
+		} catch {}
 		const nowLocal = Math.floor(effNowMs / 1000) + offsetSec;
 		const screen = renderLayout(style, {
 			nowLocal,
@@ -402,6 +427,12 @@ export async function GET({ params, request, locals }) {
 			dark,
 			cornerImage,
 			refreshSec: intervalSec,
+			loc: place,
+			utcOffsetSec: offsetSec,
+			countdown,
+			frameImage,
+			tasks,
+			tasksState,
 		}, fontChoice ?? undefined);
 		return new Response(screen, {
 			status: 200,

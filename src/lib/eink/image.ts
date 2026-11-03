@@ -8,6 +8,11 @@ export const CORNER = { x: 208, y: 4, w: 184, h: 140 } as const;
 export const CORNER_STRIDE = Math.ceil(CORNER.w / 8);
 export const CORNER_BYTES = CORNER_STRIDE * CORNER.h;
 
+// The Photo frame layout: the picture fills the whole 400 x 300 screen.
+export const FRAME = { x: 0, y: 0, w: 400, h: 300 } as const;
+export const FRAME_STRIDE = Math.ceil(FRAME.w / 8);
+export const FRAME_BYTES = FRAME_STRIDE * FRAME.h;
+
 export type Dither = 'floyd' | 'atkinson' | 'ordered' | 'threshold';
 export const DITHERS: { id: Dither; label: string; note: string }[] = [
 	{ id: 'floyd', label: 'Smooth', note: 'Floyd-Steinberg. Best for photos' },

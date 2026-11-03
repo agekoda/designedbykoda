@@ -23,6 +23,22 @@ export interface LayoutCtx {
 	cornerImage?: Uint8Array | null;
 	// How often the calendar wakes up, in seconds (86400 = once a day). Only the Timeline cares.
 	refreshSec?: number;
+	// Where the calendar lives (the weather location), for sunrise / sunset and which way up the Moon is.
+	loc?: { lat: number; lon: number } | null;
+	utcOffsetSec?: number; // seconds to add to UTC to get local time
+	// The Countdown layout: a name and a date (YYYY-MM-DD).
+	countdown?: { title: string; date: string } | null;
+	// The Photo frame layout: a full-screen 1-bit picture (see image.ts, FRAME). 1 = dark dot.
+	frameImage?: Uint8Array | null;
+	// The To-do layout: tasks from Google Tasks, and whether we were allowed to read them.
+	tasks?: TaskItem[] | null;
+	tasksState?: 'ok' | 'needs_permission' | 'error';
+}
+
+export interface TaskItem {
+	title: string;
+	done: boolean;
+	due?: string; // YYYY-MM-DD
 }
 
 export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

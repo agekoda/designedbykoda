@@ -39,3 +39,21 @@ export function firstThatFits(family: Family, role: Role, options: string[], max
 	for (const o of options) if (measure(family, role, o, scale).w <= maxW) return o;
 	return options[options.length - 1];
 }
+
+// Splits text into lines no wider than maxW, breaking at spaces. A single word wider than
+// maxW is kept whole on its own line (the firmware cuts it with ".." if it still doesn't fit).
+export function wrapText(family: Family, role: Role, text: string, maxW: number, scale = 1): string[] {
+	const words = text.split(' ').filter(Boolean);
+	const lines: string[] = [];
+	let cur = '';
+	for (const w of words) {
+		const t = cur ? cur + ' ' + w : w;
+		if (!cur || measure(family, role, t, scale).w <= maxW) cur = t;
+		else {
+			lines.push(cur);
+			cur = w;
+		}
+	}
+	if (cur) lines.push(cur);
+	return lines;
+}

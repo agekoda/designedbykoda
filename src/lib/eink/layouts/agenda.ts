@@ -3,7 +3,8 @@
 import { Draw } from '../draw';
 import { CORNER, CORNER_BYTES } from '../image';
 import { firstThatFits, measure } from '../measure';
-import { batteryText, daysInMonth, dayName, evTimeStr, monthName, monthShort, round0, tmOf, type LayoutCtx } from '../context';
+import { batteryIcon } from '../batteryIcon';
+import { daysInMonth, dayName, evTimeStr, monthName, monthShort, round0, tmOf, type LayoutCtx } from '../context';
 
 export function agenda(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -52,8 +53,7 @@ export function agenda(ctx: LayoutCtx): string {
 	}
 
 	d.line(0, 147, 400, 147);
-	const bat = batteryText(ctx.vbat);
-	if (bat) d.text(5, 140, 's', bat);
+	batteryIcon(d, ctx, 5, 128, 'left');
 
 	// ---- upcoming events, grouped by day ----
 	let yPos = 165;

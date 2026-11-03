@@ -1,7 +1,8 @@
 // Big date: a huge date on the left, the upcoming list on the right.
 import { Draw } from '../draw';
 import { firstThatFits, measure } from '../measure';
-import { batteryText, dayName, dayShort, evTimeStr, monthName, monthShort, round0, tmOf, upcoming, type LayoutCtx } from '../context';
+import { dayName, dayShort, evTimeStr, monthName, monthShort, round0, tmOf, upcoming, type LayoutCtx } from '../context';
+import { batteryIcon } from '../batteryIcon';
 
 export function bigdate(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -19,8 +20,7 @@ export function bigdate(ctx: LayoutCtx): string {
 	} else {
 		d.text(14, 240, 's', '---');
 	}
-	const bat = batteryText(ctx.vbat);
-	if (bat) d.text(14, 286, 's', bat);
+	batteryIcon(d, ctx, 14, 272, 'left');
 
 	d.vline(158, 12, 276);
 

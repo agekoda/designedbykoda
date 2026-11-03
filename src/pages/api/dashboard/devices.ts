@@ -57,6 +57,13 @@ export async function GET({ request, locals }) {
 		}
 	} catch {}
 
+	// Photo frame picture and Countdown, from schema-layouts.sql (separate query, so a missing column changes nothing else).
+	const more = new Map<string, { frameBits: string | null; countdown: { title: string; date: string } | null }>();
+	try {
+		const mr = await db.prepare('SELECT id, frame_bits, countdown_title, countdown_date FROM devices WHERE user_id = ?').bind(userId).all();
+		for (const e of mr.results ?? []) more.set(e.id, { frameBits: e.frame_bits ?? null, countdown: e.countdown_title && e.countdown_date ? { title: e.countdown_title, date: e.countdown_date } : null });
+	} catch {}
+
 	// When it was (last) paired, from schema-paired-at.sql. Falls back to the
 	// row's creation date for devices paired before that column existed.
 	const pairedAt = new Map<string, number>();
@@ -80,6 +87,8 @@ export async function GET({ request, locals }) {
 		font: extra.get(d.id)?.font ?? null,
 		cornerMode: extra.get(d.id)?.cornerMode ?? 'calendar',
 		cornerBits: extra.get(d.id)?.cornerBits ?? null,
+		frameBits: more.get(d.id)?.frameBits ?? null,
+		countdown: more.get(d.id)?.countdown ?? null,
 	}));
 	return json({ devices }, 200);
 }

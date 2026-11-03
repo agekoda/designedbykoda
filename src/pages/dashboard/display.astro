@@ -12,7 +12,7 @@ const userId = db ? await getSessionUserId(Astro.request, db) : null;
 if (!userId) return Astro.redirect('/setup');
 
 const deviceId = Astro.url.searchParams.get('device') ?? '';
-const styles = CALENDAR_STYLES.map((s) => ({ id: s.id, label: s.label, note: s.note, corner: !!s.corner }));
+const styles = CALENDAR_STYLES.map((s) => ({ id: s.id, label: s.label, note: s.note, corner: !!s.corner, frame: !!s.frame }));
 const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 ---
 
@@ -52,6 +52,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 					<button type="button" role="tab" class="tab" data-tab="font">Font</button>
 					<button type="button" role="tab" class="tab" data-tab="display">Display</button>
 					<button type="button" role="tab" class="tab" data-tab="picture" id="tab-picture-btn" hidden>Picture</button>
+					<button type="button" role="tab" class="tab" data-tab="options" id="tab-options-btn" hidden>Options</button>
 				</div>
 
 				<section class="tabpanel" data-panel="layout">
@@ -76,12 +77,27 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 					<p class="muted small hint">Dark mode swaps the colours: white text on a black screen. The pairing and reconnect screens always stay black on white.</p>
 				</section>
 
+				<section class="tabpanel" data-panel="options" hidden>
+					<div id="opt-countdown" hidden>
+						<div class="label sub">What are you counting down to?</div>
+						<input class="txt" id="cd-title" type="text" maxlength="40" placeholder="Japan trip" autocomplete="off" />
+						<div class="label sub" style="margin-top:1.3em">On this date</div>
+						<input class="txt" id="cd-date" type="date" />
+						<p class="muted small hint">Shows how many days are left. The number goes down each morning, and it says "Today!" on the day.</p>
+					</div>
+					<div id="opt-todo" hidden>
+						<p class="muted" id="todo-status"></p>
+						<a class="btn small" id="todo-connect" href="/api/auth/google/start?tasks=1">Connect Google Tasks</a>
+						<p class="muted small hint">Shows your default Google Tasks list: open tasks first (soonest due first), then anything you ticked off in the last day. Tick tasks off in Google Tasks or in the side panel of Google Calendar. The calendar updates each morning.</p>
+					</div>
+				</section>
+
 				<section class="tabpanel" data-panel="picture" hidden>
-					<div class="seg" role="radiogroup" aria-label="Top right of the Agenda">
+					<div class="seg" id="corner-seg" role="radiogroup" aria-label="Top right of the Agenda">
 						<label><input type="radio" name="corner" value="calendar" checked /><span>Mini calendar</span></label>
 						<label><input type="radio" name="corner" value="image" /><span>Picture</span></label>
 					</div>
-					<p class="muted small pic-intro">The Agenda's top right corner can show a picture instead of the mini calendar.</p>
+					<p class="muted small pic-intro" id="pic-intro">The Agenda's top right corner can show a picture instead of the mini calendar.</p>
 
 					<div id="picture-tools" hidden>
 						<div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload a picture">
@@ -93,7 +109,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 							<div class="ed-grid">
 								<div class="ed-left">
 									<div class="ed-box"><canvas id="ed" aria-label="Picture editor. Drag to move the picture."></canvas></div>
-									<p class="muted small">Drag to move it, scroll to zoom. 184 × 140 black and white dots.</p>
+									<p class="muted small" id="ed-note">Drag to move it, scroll to zoom. 184 × 140 black and white dots.</p>
 								</div>
 								<div class="ed-right">
 									<div class="label sub">Dithering style</div>
@@ -141,8 +157,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { defaultFontFor } from '../../lib/eink/layouts';
 	import { Draw } from '../../lib/eink/draw';
 	import { renderDrawList } from '../../lib/eink/preview';
+	import { sampleFrameBytes } from '../../lib/eink/sampleFrame';
 	import {
 		CORNER,
+		FRAME,
 		DEFAULT_IMAGE_SETTINGS,
 		cleanSettings,
 		ditherGray,
@@ -152,7 +170,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	} from '../../lib/eink/image';
 
 	const root = document.querySelector('.cust') as HTMLElement;
-	const styles: { id: string; label: string; note: string; corner: boolean }[] = JSON.parse(root.dataset.styles!);
+	const styles: { id: string; label: string; note: string; corner: boolean; frame: boolean }[] = JSON.parse(root.dataset.styles!);
 	const families: { id: string; label: string }[] = JSON.parse(root.dataset.families!);
 	const dithers: { id: string; label: string; note: string }[] = JSON.parse(root.dataset.dithers!);
 	const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -162,6 +180,16 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const fontsEl = $('fonts');
 	const darkBox = $<HTMLInputElement>('dark');
 	const tabPicBtn = $('tab-picture-btn');
+	const tabOptBtn = $('tab-options-btn');
+	const cornerSeg = $('corner-seg');
+	const picIntro = $('pic-intro');
+	const edNote = $('ed-note');
+	const optCountdown = $('opt-countdown');
+	const optTodo = $('opt-todo');
+	const cdTitle = $<HTMLInputElement>('cd-title');
+	const cdDate = $<HTMLInputElement>('cd-date');
+	const todoStatus = $('todo-status');
+	const todoConnect = $<HTMLAnchorElement>('todo-connect');
 	const pictureTools = $('picture-tools');
 	const drop = $('drop');
 	const fileInput = $<HTMLInputElement>('file');
@@ -192,25 +220,77 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		dark: boolean;
 		refreshSec: number;
 		cornerMode: 'calendar' | 'image';
-		cfg: ImageSettings;
-		src: string | null; // the uploaded photo (small JPEG data URL)
+		cfg: ImageSettings; // the Agenda's picture settings
+		src: string | null; // the Agenda's photo (small JPEG data URL)
+		fcfg: ImageSettings; // the Photo frame's picture settings
+		fsrc: string | null; // the Photo frame's photo
+		countdown: { title: string; date: string };
 	}
+	// The picture editor works on one of two pictures: the Agenda's corner picture, or the Photo frame's full-screen one.
+	type PicKey = 'corner' | 'frame';
+	interface Pic {
+		img: HTMLImageElement | null;
+		bytes: Uint8Array | null;
+		dots: Uint8Array | null;
+		changed: boolean; // differs from what the server has
+	}
+	const pics: Record<PicKey, Pic> = {
+		corner: { img: null, bytes: null, dots: null, changed: false },
+		frame: { img: null, bytes: null, dots: null, changed: false },
+	};
 	let deviceId = root.dataset.device || '';
 	let hasWeather = false;
+	let loc: { lat: number; lon: number } | null = null;
+	let tasksGranted = false;
 	let vbat: number | null = null;
-	let st: State = { style: 'agenda', font: null, dark: false, refreshSec: 86400, cornerMode: 'calendar', cfg: { ...DEFAULT_IMAGE_SETTINGS }, src: null };
+	let st: State = {
+		style: 'agenda',
+		font: null,
+		dark: false,
+		refreshSec: 86400,
+		cornerMode: 'calendar',
+		cfg: { ...DEFAULT_IMAGE_SETTINGS },
+		src: null,
+		fcfg: { ...DEFAULT_IMAGE_SETTINGS },
+		fsrc: null,
+		countdown: { title: '', date: '' },
+	};
 	let base = JSON.stringify(st); // what is saved on the server
-	let pictureChanged = false; // the picture or its settings differ from what the server has
-	let srcImg: HTMLImageElement | null = null;
-	let cornerBytes: Uint8Array | null = null;
-	let cornerDots: Uint8Array | null = null;
 
 	const effFont = () => st.font ?? defaultFontFor(st.style);
 	const supportsCorner = () => !!styles.find((s) => s.id === st.style)?.corner;
+	const isFrame = () => !!styles.find((s) => s.id === st.style)?.frame;
+	const pkey = (): PicKey => (isFrame() ? 'frame' : 'corner');
+	const P = () => pics[pkey()];
+	const dimsOf = (k: PicKey) => (k === 'frame' ? FRAME : CORNER);
+	const cfgOf = (k: PicKey) => (k === 'frame' ? st.fcfg : st.cfg);
+	const cfgNow = () => cfgOf(pkey());
+	const setCfgNow = (c: ImageSettings) => {
+		if (isFrame()) st.fcfg = c;
+		else st.cfg = c;
+	};
+	const setSrcNow = (v: string) => {
+		if (isFrame()) st.fsrc = v;
+		else st.src = v;
+	};
+	const sampleDate = () => new Date(Date.now() + 25 * 86400000).toISOString().slice(0, 10);
+
+	// Everything beyond the plain calendar a layout needs, for the big preview and for the layout cards.
+	function extras(styleId: string, thumb: boolean) {
+		const s = styles.find((x) => x.id === styleId);
+		const cd = st.countdown.title.trim() && st.countdown.date ? st.countdown : thumb ? { title: 'Japan trip', date: sampleDate() } : null;
+		return {
+			cornerImage: s?.corner && st.cornerMode === 'image' ? pics.corner.bytes : null,
+			frameImage: s?.frame ? (pics.frame.bytes ?? (thumb ? sampleFrameBytes() : null)) : null,
+			loc,
+			countdown: styleId === 'countdown' ? cd : null,
+			tasksState: (thumb || tasksGranted ? 'ok' : 'needs_permission') as 'ok' | 'needs_permission',
+		};
+	}
 
 	// ---------------------------------------------------------------- picture pipeline
-	function cropGray(img: HTMLImageElement, s: ImageSettings): Float32Array {
-		const { w, h } = CORNER;
+	function cropGray(img: HTMLImageElement, s: ImageSettings, dims: { w: number; h: number }): Float32Array {
+		const { w, h } = dims;
 		const cover = Math.max(w / img.naturalWidth, h / img.naturalHeight);
 		const scale = cover * s.zoom;
 		const dw = img.naturalWidth * scale;
@@ -235,26 +315,38 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		return g;
 	}
 
-	function recomputePicture() {
-		if (!srcImg) {
-			cornerBytes = null;
-			cornerDots = null;
+	function recompute(k: PicKey) {
+		const p = pics[k];
+		if (!p.img) {
+			p.bytes = null;
+			p.dots = null;
 			return;
 		}
-		const g = cropGray(srcImg, st.cfg);
-		cornerDots = ditherGray(g, CORNER.w, CORNER.h, st.cfg);
-		cornerBytes = packBits(cornerDots, CORNER.w, CORNER.h);
-		// editor canvas: black dots on paper
-		const px = new Uint8Array(cornerDots.length);
-		for (let i = 0; i < px.length; i++) px[i] = cornerDots[i] ? 0 : 1;
-		paint(edCanvas, px, 2, CORNER.w, CORNER.h);
+		const { w, h } = dimsOf(k);
+		const g = cropGray(p.img, cfgOf(k), dimsOf(k));
+		p.dots = ditherGray(g, w, h, cfgOf(k));
+		p.bytes = packBits(p.dots, w, h);
+		if (k === pkey()) paintEditor();
+	}
+	const recomputePicture = () => recompute(pkey());
+
+	// the editor canvas: black dots on paper
+	function paintEditor() {
+		const p = P();
+		const { w, h } = dimsOf(pkey());
+		edCanvas.style.width = isFrame() ? '380px' : '368px';
+		edCanvas.style.aspectRatio = `${w} / ${h}`;
+		if (!p.dots) return;
+		const px = new Uint8Array(p.dots.length);
+		for (let i = 0; i < px.length; i++) px[i] = p.dots[i] ? 0 : 1;
+		paint(edCanvas, px, isFrame() ? 1 : 2, w, h);
 	}
 
-	function loadSource(dataUrl: string): Promise<void> {
+	function loadSource(dataUrl: string, k: PicKey): Promise<void> {
 		return new Promise((resolve, reject) => {
 			const img = new Image();
 			img.onload = () => {
-				srcImg = img;
+				pics[k].img = img;
 				resolve();
 			};
 			img.onerror = () => reject(new Error('load'));
@@ -306,14 +398,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		});
 	}
 
-	function cornerForPreview(): Uint8Array | null {
-		return st.cornerMode === 'image' && supportsCorner() ? cornerBytes : null;
-	}
-
 	async function redraw() {
 		const common = { font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12, refreshSec: st.refreshSec };
 		try {
-			const r = await renderPreview({ ...common, style: st.style, cornerImage: cornerForPreview() });
+			const r = await renderPreview({ ...common, style: st.style, ...extras(st.style, false) });
 			const dpr = window.devicePixelRatio || 1;
 			// whole-number panel pixels (each dot = k x k real screen pixels) so the dithering stays crisp
 			const avail = (screen.parentElement as HTMLElement).clientWidth * dpr;
@@ -325,7 +413,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				for (const s of styles) {
 					const cv = layoutsEl.querySelector<HTMLCanvasElement>(`canvas[data-sid="${s.id}"]`);
 					if (!cv) continue;
-					const t = await renderPreview({ ...common, style: s.id, cornerImage: s.corner && st.cornerMode === 'image' ? cornerBytes : null });
+					const t = await renderPreview({ ...common, style: s.id, ...extras(s.id, true) });
 					paintScreen(cv, t.px, { mode: 'screen', scale: 1 });
 				}
 				const fonts = await loadFonts();
@@ -394,6 +482,16 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			schedule();
 			changed();
 		});
+		cdTitle.addEventListener('input', () => {
+			st.countdown.title = cdTitle.value;
+			schedule();
+			changed();
+		});
+		cdDate.addEventListener('input', () => {
+			st.countdown.date = cdDate.value;
+			schedule();
+			changed();
+		});
 		darkBox.addEventListener('change', () => {
 			st.dark = darkBox.checked;
 			schedule();
@@ -408,7 +506,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			})
 		);
 		ditherEl.addEventListener('change', (e) => {
-			st.cfg.dither = (e.target as HTMLInputElement).value as any;
+			cfgNow().dither = (e.target as HTMLInputElement).value as any;
 			pictureEdited();
 		});
 		const sliders: [string, keyof ImageSettings][] = [
@@ -420,16 +518,16 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		];
 		for (const [id, key] of sliders) {
 			$<HTMLInputElement>('s-' + id).addEventListener('input', (e) => {
-				(st.cfg as any)[key] = parseFloat((e.target as HTMLInputElement).value);
+				(cfgNow() as any)[key] = parseFloat((e.target as HTMLInputElement).value);
 				pictureEdited();
 			});
 		}
 		$<HTMLInputElement>('invert').addEventListener('change', (e) => {
-			st.cfg.invert = (e.target as HTMLInputElement).checked;
+			cfgNow().invert = (e.target as HTMLInputElement).checked;
 			pictureEdited();
 		});
 		$('ed-reset').addEventListener('click', () => {
-			st.cfg = { ...DEFAULT_IMAGE_SETTINGS };
+			setCfgNow({ ...DEFAULT_IMAGE_SETTINGS });
 			syncControls();
 			pictureEdited();
 		});
@@ -463,15 +561,15 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		// drag to move the picture inside its box
 		let drag: { x: number; y: number; px: number; py: number } | null = null;
 		edCanvas.addEventListener('pointerdown', (e) => {
-			if (!srcImg) return;
+			if (!P().img) return;
 			edCanvas.setPointerCapture(e.pointerId);
-			drag = { x: e.clientX, y: e.clientY, px: st.cfg.panX, py: st.cfg.panY };
+			drag = { x: e.clientX, y: e.clientY, px: cfgNow().panX, py: cfgNow().panY };
 		});
 		edCanvas.addEventListener('pointermove', (e) => {
 			if (!drag) return;
-			const k = CORNER.w / edCanvas.getBoundingClientRect().width; // screen px -> dots
-			st.cfg.panX = drag.px + (e.clientX - drag.x) * k;
-			st.cfg.panY = drag.py + (e.clientY - drag.y) * k;
+			const k = dimsOf(pkey()).w / edCanvas.getBoundingClientRect().width; // screen px -> dots
+			cfgNow().panX = drag.px + (e.clientX - drag.x) * k;
+			cfgNow().panY = drag.py + (e.clientY - drag.y) * k;
 			pictureEdited();
 		});
 		const end = () => (drag = null);
@@ -480,9 +578,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		edCanvas.addEventListener(
 			'wheel',
 			(e) => {
-				if (!srcImg) return;
+				if (!P().img) return;
 				e.preventDefault();
-				st.cfg.zoom = Math.max(1, Math.min(4, st.cfg.zoom * (e.deltaY < 0 ? 1.06 : 1 / 1.06)));
+				cfgNow().zoom = Math.max(1, Math.min(4, cfgNow().zoom * (e.deltaY < 0 ? 1.06 : 1 / 1.06)));
 				syncControls();
 				pictureEdited();
 			},
@@ -497,10 +595,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		}
 		try {
 			const src = await prepareSource(f);
-			await loadSource(src);
-			st.src = src;
-			st.cfg = { ...DEFAULT_IMAGE_SETTINGS, dither: st.cfg.dither };
-			st.cornerMode = 'image';
+			await loadSource(src, pkey());
+			setSrcNow(src);
+			setCfgNow({ ...DEFAULT_IMAGE_SETTINGS, dither: cfgNow().dither });
+			if (!isFrame()) st.cornerMode = 'image';
 			syncControls();
 			pictureEdited();
 		} catch {
@@ -509,19 +607,20 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	function pictureEdited() {
-		pictureChanged = true;
+		P().changed = true;
 		syncSliders();
 		recomputePicture();
 		schedule(false);
-		// only the Agenda thumbnail changes when the picture does
-		const cv = layoutsEl.querySelector<HTMLCanvasElement>('canvas[data-sid="agenda"]');
+		// only the Agenda's (or the Photo frame's) thumbnail changes when the picture does
+		const sid = isFrame() ? 'frame' : 'agenda';
+		const cv = layoutsEl.querySelector<HTMLCanvasElement>(`canvas[data-sid="${sid}"]`);
 		if (cv)
-			renderPreview({ style: 'agenda', font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12, cornerImage: st.cornerMode === 'image' ? cornerBytes : null }).then((r) => paintScreen(cv, r.px, { mode: 'screen', scale: 1 }));
+			renderPreview({ style: sid, font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12, ...extras(sid, true) }).then((r) => paintScreen(cv, r.px, { mode: 'screen', scale: 1 }));
 		changed();
 	}
 
 	function syncSliders() {
-		const c = st.cfg;
+		const c = cfgNow();
 		const set = (id: string, v: number, text: string) => {
 			$<HTMLInputElement>('s-' + id).value = String(v);
 			$('o-' + id).textContent = text;
@@ -541,14 +640,34 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		refreshBox.hidden = st.style !== 'timeline';
 		refreshEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = parseInt(i.value, 10) === st.refreshSec));
 		refreshHint.textContent = REFRESH_HINTS[st.refreshSec] ?? '';
-		tabPicBtn.hidden = !supportsCorner();
-		if (!supportsCorner() && activeTab === 'picture') showTab('layout');
+
+		// Picture tab: the Agenda's corner picture, or the Photo frame's whole-screen one
+		tabPicBtn.hidden = !(supportsCorner() || isFrame());
+		if (tabPicBtn.hidden && activeTab === 'picture') showTab('layout');
+		cornerSeg.hidden = isFrame();
+		picIntro.hidden = isFrame();
 		document.querySelectorAll<HTMLInputElement>('input[name="corner"]').forEach((r) => (r.checked = r.value === st.cornerMode));
-		pictureTools.hidden = st.cornerMode !== 'image';
-		editor.hidden = !srcImg;
-		drop.hidden = !!srcImg;
-		ditherEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.cfg.dither));
+		pictureTools.hidden = !(isFrame() || st.cornerMode === 'image');
+		editor.hidden = !P().img;
+		drop.hidden = !!P().img;
+		dropText.textContent = isFrame() ? 'Choose a photo for the whole screen, or drop one here' : 'Choose a picture, or drop one here';
+		edNote.textContent = isFrame() ? 'Drag to move it, scroll to zoom. 400 × 300 black and white dots.' : 'Drag to move it, scroll to zoom. 184 × 140 black and white dots.';
+		ditherEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === cfgNow().dither));
 		syncSliders();
+		paintEditor();
+
+		// Options tab: the Countdown's name and date, or connecting Google Tasks
+		const opt = st.style === 'countdown' ? 'countdown' : st.style === 'todo' ? 'todo' : null;
+		tabOptBtn.hidden = !opt;
+		tabOptBtn.textContent = opt === 'countdown' ? 'Countdown' : opt === 'todo' ? 'Tasks' : 'Options';
+		if (!opt && activeTab === 'options') showTab('layout');
+		optCountdown.hidden = opt !== 'countdown';
+		optTodo.hidden = opt !== 'todo';
+		if (cdTitle.value !== st.countdown.title) cdTitle.value = st.countdown.title;
+		if (cdDate.value !== st.countdown.date) cdDate.value = st.countdown.date;
+		todoStatus.textContent = tasksGranted ? 'Google Tasks is connected.' : 'To show your tasks, allow this calendar to read your Google Tasks.';
+		todoConnect.textContent = tasksGranted ? 'Reconnect Google Tasks' : 'Connect Google Tasks';
+		todoConnect.href = '/api/auth/google/start?tasks=1&return=' + encodeURIComponent('/dashboard/display?device=' + deviceId);
 	}
 
 	// ---------------------------------------------------------------- saving
@@ -558,7 +677,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		saveMsg.classList.remove('is-dirty');
 	}
 	function isDirty() {
-		return JSON.stringify(st) !== base || pictureChanged;
+		return JSON.stringify(st) !== base || pics.corner.changed || pics.frame.changed;
 	}
 	function changed() {
 		const dirty = isDirty();
@@ -571,20 +690,28 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	async function save() {
-		if (st.cornerMode === 'image' && supportsCorner() && !srcImg) {
+		if (st.cornerMode === 'image' && supportsCorner() && !pics.corner.img) {
 			flash('Choose a picture first, or switch back to the mini calendar.', true);
+			return;
+		}
+		if (isFrame() && !pics.frame.img) {
+			flash('Choose a photo first, or pick another layout.', true);
 			return;
 		}
 		saveBtn.disabled = true;
 		flash('Saving…');
-		const body: any = { deviceId, style: st.style, font: st.font, dark: st.dark, refreshSec: st.refreshSec };
+		const body: any = { deviceId, style: st.style, font: st.font, dark: st.dark, refreshSec: st.refreshSec, countdown: st.countdown };
+		const baseState = JSON.parse(base);
 		if (supportsCorner() || st.cornerMode === 'image') {
 			body.corner = { mode: st.cornerMode };
-			if (st.cornerMode === 'image' && srcImg && cornerBytes && (pictureChanged || JSON.parse(base).cornerMode !== 'image')) {
-				body.corner.bits = bytesToB64(cornerBytes);
+			if (st.cornerMode === 'image' && pics.corner.img && pics.corner.bytes && (pics.corner.changed || baseState.cornerMode !== 'image')) {
+				body.corner.bits = bytesToB64(pics.corner.bytes);
 				body.corner.src = st.src;
 				body.corner.cfg = st.cfg;
 			}
+		}
+		if (pics.frame.changed && pics.frame.img && pics.frame.bytes) {
+			body.frame = { bits: bytesToB64(pics.frame.bytes), src: st.fsrc, cfg: st.fcfg };
 		}
 		try {
 			const res = await fetch('/api/dashboard/display', {
@@ -595,7 +722,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			const data = await res.json().catch(() => ({}));
 			if (!res.ok || !data.ok) throw new Error(data.error || 'Could not save.');
 			base = JSON.stringify(st);
-			pictureChanged = false;
+			pics.corner.changed = false;
+			pics.frame.changed = false;
 			flash('Saved. Press the button on your calendar to see it now.');
 			saveBtn.disabled = true;
 			revertBtn.disabled = true;
@@ -608,14 +736,23 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	async function revert() {
 		st = JSON.parse(base);
 		st.cfg = cleanSettings(st.cfg);
-		pictureChanged = false;
-		srcImg = null;
+		st.fcfg = cleanSettings(st.fcfg);
+		pics.corner.changed = false;
+		pics.frame.changed = false;
+		pics.corner.img = null;
+		pics.frame.img = null;
 		if (st.src) {
 			try {
-				await loadSource(st.src);
+				await loadSource(st.src, 'corner');
 			} catch {}
 		}
-		recomputePicture();
+		if (st.fsrc) {
+			try {
+				await loadSource(st.fsrc, 'frame');
+			} catch {}
+		}
+		recompute('corner');
+		recompute('frame');
 		syncControls();
 		schedule();
 		changed();
@@ -695,6 +832,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			const idx = (list.devices || []).findIndex((d: any) => d.id === deviceId);
 			$('dev-title').textContent = info.name || (idx > 0 ? `E-Ink Calendar ${idx + 1}` : 'E-Ink Calendar');
 			hasWeather = !!info.hasWeather;
+			loc = typeof info.lat === 'number' && typeof info.lon === 'number' ? { lat: info.lat, lon: info.lon } : null;
+			tasksGranted = !!info.tasksGranted;
 			vbat = info.batteryMv ? info.batteryMv / 1000 : null;
 			if (!info.migrated) {
 				banner.hidden = false;
@@ -708,15 +847,26 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				cornerMode: info.cornerMode,
 				cfg: cleanSettings(info.cornerCfg),
 				src: info.cornerSrc,
+				fcfg: cleanSettings(info.frameCfg),
+				fsrc: info.frameSrc,
+				countdown: info.countdown ?? { title: '', date: '' },
 			};
 			if (st.src) {
 				try {
-					await loadSource(st.src);
+					await loadSource(st.src, 'corner');
 				} catch {
-					srcImg = null;
+					pics.corner.img = null;
 				}
 			}
-			recomputePicture();
+			if (st.fsrc) {
+				try {
+					await loadSource(st.fsrc, 'frame');
+				} catch {
+					pics.frame.img = null;
+				}
+			}
+			recompute('corner');
+			recompute('frame');
 			base = JSON.stringify(st);
 			syncControls();
 			schedule();
@@ -784,7 +934,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .hint { margin-top: 1em; line-height: 1.45; }
 
 	.cust #picture-tools { margin-top: 1.1em; }
-	.cust #picture-tools[hidden], .cust #editor[hidden], .cust .drop[hidden] { display: none; }
+	.cust #picture-tools[hidden], .cust #editor[hidden], .cust .drop[hidden], .cust .seg[hidden], .cust .pic-intro[hidden] { display: none; }
 	.cust .drop { display: grid; place-items: center; text-align: center; min-height: 140px; padding: 1em; border: 2px dashed var(--border); border-radius: 14px; color: var(--muted); cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; }
 	.cust .drop:hover, .cust .drop.over, .cust .drop:focus-visible { border-color: var(--accent); color: var(--fg); background: rgba(var(--accent-rgb), 0.06); outline: none; }
 	.cust .ed-grid { display: grid; grid-template-columns: 392px minmax(0, 1fr); gap: 1.2em; align-items: start; }
@@ -812,6 +962,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .link { background: none; border: none; padding: 0; font: inherit; font-size: 0.9em; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 	.cust .link:hover { color: var(--fg); }
 
+	.cust .txt { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 12px; padding: 0.7em 0.9em; font: inherit; }
+	.cust .txt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.cust .check { display: inline-flex; align-items: center; gap: 0.6em; color: var(--fg); font-size: 0.92em; }
 	.cust .check .box { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--muted-dim); display: grid; place-items: center; transition: background 0.2s, border-color 0.2s; }
 	.cust .check .box::after { content: ''; width: 5px; height: 10px; border: solid var(--bg); border-width: 0 2.5px 2.5px 0; transform: translateY(-1px) rotate(45deg) scale(0); transition: transform 0.18s; }

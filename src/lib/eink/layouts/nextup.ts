@@ -1,7 +1,8 @@
 // Next up: the very next event in huge type, then the four after it.
 import { Draw, PAPER } from '../draw';
 import { firstThatFits, measure } from '../measure';
-import { batteryText, dayIdx, dayShort, evTimeStr, monthShort, relDayText, round0, tmOf, upcoming, type LayoutCtx } from '../context';
+import { dayIdx, dayShort, evTimeStr, monthShort, relDayText, round0, tmOf, upcoming, type LayoutCtx } from '../context';
+import { batteryIcon, batteryIconWidth } from '../batteryIcon';
 
 export function nextup(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -38,11 +39,10 @@ export function nextup(ctx: LayoutCtx): string {
 
 	// footer
 	d.hline(0, 270, 400);
-	const bat = batteryText(ctx.vbat);
-	const batW = bat ? measure(ctx.family, 's', bat).w : 0;
+	const batW = batteryIconWidth(ctx);
 	const hi = ctx.weather ? round0(ctx.weather.high) : '';
 	const lo = ctx.weather ? round0(ctx.weather.low) : '';
 	d.text(10, 290, 's', ctx.weather ? firstThatFits(ctx.family, 's', [`High ${hi}C   Low ${lo}C`, `High ${hi}C  Low ${lo}C`, `${hi}C / ${lo}C`], 392 - batW - 20 - 10) : '---');
-	if (bat) d.text(392, 290, 's', bat, { align: 'right' });
+	batteryIcon(d, ctx, 392, 276, 'right');
 	return d.toString();
 }

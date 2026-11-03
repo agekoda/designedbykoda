@@ -34,10 +34,16 @@ export async function GET({ request, locals, redirect }) {
 	// openid + email let us identify *who* signed in (via the userinfo
 	// endpoint in the callback); calendar.readonly is the actual sensitive
 	// scope this whole flow exists for.
+	// tasks.readonly is only asked for when the person chooses the To-do layout and presses
+	// "Connect Google Tasks" (?tasks=1), so everyone else's consent screen stays as short as before.
+	const url = new URL(request.url);
+	const wantTasks = url.searchParams.get('tasks') === '1';
 	authUrl.searchParams.set(
 		'scope',
-		'openid email https://www.googleapis.com/auth/calendar.readonly'
+		'openid email https://www.googleapis.com/auth/calendar.readonly' + (wantTasks ? ' https://www.googleapis.com/auth/tasks.readonly' : '')
 	);
+	// keep anything they have already allowed (so signing in again doesn't drop Google Tasks)
+	authUrl.searchParams.set('include_granted_scopes', 'true');
 	authUrl.searchParams.set('access_type', 'offline'); // required to get a refresh token back
 	authUrl.searchParams.set('prompt', 'consent'); // forces a refresh token every time, not just the first
 	authUrl.searchParams.set('state', state);
@@ -48,8 +54,15 @@ export async function GET({ request, locals, redirect }) {
 		`oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Path=/`
 	);
 
-	const url = new URL(request.url);
 	const pairingCode = url.searchParams.get('code');
+	// Where to land afterwards (same-site paths only).
+	const back = url.searchParams.get('return');
+	if (back && back.startsWith('/') && !back.startsWith('//')) {
+		response.headers.append(
+			'Set-Cookie',
+			`post_auth_return=${encodeURIComponent(back)}; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Path=/`
+		);
+	}
 	if (pairingCode) {
 		response.headers.append(
 			'Set-Cookie',

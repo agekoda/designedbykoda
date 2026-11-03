@@ -120,7 +120,7 @@ if (userId && hasDevice && !addingDevice) {
 								Calendar's timezone, so there's nothing to set.
 							</p>
 							<div class="styles" role="radiogroup" aria-label="Calendar layout">
-								{CALENDAR_STYLES.map((st) => (
+								{CALENDAR_STYLES.filter((st) => st.setup !== false).map((st) => (
 									<label class="style-opt">
 										<input type="radio" name="style" value={st.id} checked={st.id === DEFAULT_STYLE} />
 										<span class="style-card">

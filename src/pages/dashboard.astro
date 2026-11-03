@@ -138,7 +138,13 @@ if (!userId) return Astro.redirect('/setup');
 				cornerImage = Uint8Array.from(bin, (c) => c.charCodeAt(0));
 			} catch {}
 		}
-		renderPreview({ style: d.style, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null, cornerImage, refreshSec: d.style === 'timeline' ? d.refreshIntervalSec : 86400 })
+		let frameImage: Uint8Array | null = null;
+		if (d.frameBits && d.style === 'frame') {
+			try {
+				frameImage = Uint8Array.from(atob(d.frameBits), (c) => c.charCodeAt(0));
+			} catch {}
+		}
+		renderPreview({ style: d.style, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null, cornerImage, refreshSec: d.style === 'timeline' ? d.refreshIntervalSec : 86400, loc: d.location ? { lat: d.location.lat, lon: d.location.lon } : null, countdown: d.countdown ?? null, frameImage })
 			.then((r) => paintScreen(canvas, r.px, { mode: 'screen', scale: 2 }))
 			.catch(() => {});
 

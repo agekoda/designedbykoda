@@ -13,6 +13,11 @@ import { bigdate } from './bigdate';
 import { week } from './week';
 import { nextup } from './nextup';
 import { timeline } from './timeline';
+import { moon } from './moon';
+import { quote } from './quote';
+import { countdown } from './countdown';
+import { frame } from './frame';
+import { todo } from './todo';
 
 interface LayoutEntry {
 	render: (ctx: LayoutCtx) => string;
@@ -26,6 +31,11 @@ export const LAYOUTS: Record<string, LayoutEntry> = {
 	week: { render: week, font: 'sans' },
 	nextup: { render: nextup, font: 'sans' },
 	timeline: { render: timeline, font: 'sans' },
+	moon: { render: moon, font: 'sans' },
+	quote: { render: quote, font: 'lora' },
+	countdown: { render: countdown, font: 'sans' },
+	frame: { render: frame, font: 'sans' },
+	todo: { render: todo, font: 'sans' },
 };
 
 // The font a layout uses when nothing else is chosen.

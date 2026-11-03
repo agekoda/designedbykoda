@@ -112,6 +112,16 @@ export async function GET({ request, locals }) {
 			.run();
 	}
 
+	// Did they allow Google Tasks? (Google lists every scope this token covers.) A new token also
+	// invalidates the short-lived access tokens saved on their devices, which only know the old scopes.
+	try {
+		const hasTasks = String(tokens.scope || '').includes('auth/tasks');
+		await db.prepare('UPDATE users SET tasks_granted = ? WHERE id = ?').bind(hasTasks ? 1 : 0, userId).run();
+	} catch {} // column comes from schema-layouts.sql
+	try {
+		await db.prepare('UPDATE devices SET cached_access_token = NULL, cached_token_expiry = 0 WHERE user_id = ?').bind(userId).run();
+	} catch {}
+
 	// Log the user into the dashboard (separate concern from the device's
 	// own credential — this cookie is what keeps *them* signed in here).
 	const sessionId = crypto.randomUUID();
@@ -134,13 +144,18 @@ export async function GET({ request, locals }) {
 	// this, the whole point of the QR code is lost the moment someone
 	// needs to sign in first.
 	const pendingPairCode = getCookie(request, 'pending_pair_code');
-	const redirectLocation = pendingPairCode
-		? `/setup?code=${encodeURIComponent(pendingPairCode)}`
-		: '/setup';
+	const returnTo = getCookie(request, 'post_auth_return');
+	const safeReturn = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null;
+	const redirectLocation = safeReturn
+		? safeReturn
+		: pendingPairCode
+			? `/setup?code=${encodeURIComponent(pendingPairCode)}`
+			: '/setup';
 
 	const headers = new Headers({ Location: redirectLocation });
 	headers.append('Set-Cookie', 'oauth_state=; Max-Age=0; Path=/');
 	headers.append('Set-Cookie', 'pending_pair_code=; Max-Age=0; Path=/');
+	headers.append('Set-Cookie', 'post_auth_return=; Max-Age=0; Path=/');
 	headers.append(
 		'Set-Cookie',
 		`session=${sessionId}; HttpOnly; Secure; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}; Path=/`

@@ -6,10 +6,10 @@
 // price), then it goes up to the standard price. The server decides which one
 // applies when someone checks out, so the page can't be used to cheat the timer.
 //
-// Preorders open at this moment (midnight at the start of 20 November, Perth).
+// Preorders open at this moment (midnight at the start of 30 November, Perth).
 // Until then the preorder page sends visitors to the project page and checkout
 // refuses orders. To open early, set this to a time that has already passed.
-export const PREORDER_OPENS = '2026-11-19T16:00:00Z';
+export const PREORDER_OPENS = '2026-11-29T16:00:00Z';
 export function preorderOpen(now: number = Date.now()): boolean {
 	return now >= Date.parse(PREORDER_OPENS);
 }
@@ -17,7 +17,7 @@ export function preorderOpen(now: number = Date.now()): boolean {
 // EARLY_BIRD_ENDS is when the early-bird price stops. To test the countdown,
 // set it a minute or two from now; to start a real launch, set it to 72 hours
 // after you go live. Use UTC, e.g. '2026-11-05T13:30:00Z' (Perth is UTC+8).
-export const EARLY_BIRD_ENDS = '2026-11-22T16:00:00Z';
+export const EARLY_BIRD_ENDS = '2026-12-02T16:00:00Z';
 
 // What the calendar costs, in each currency, in whole units.
 export const EARLY_PRICES: Record<string, number> = { USD: 77, EUR: 66, GBP: 57, AUD: 109, CAD: 106 };

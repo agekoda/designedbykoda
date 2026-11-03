@@ -6,9 +6,9 @@ import { preorderOpen } from '../../data/preorderPricing';
 if (preorderOpen()) return Astro.redirect('/preorder/eink-calendar');
 const wrong = Astro.url.searchParams.has('wrong');
 ---
-<Layout title="Preorders - designedbykoda" description="Preorders for the E-Ink Calendar open on 20 November.">
+<Layout title="Preorders - designedbykoda" description="Preorders for the E-Ink Calendar open on 30 November.">
 	<div class="lock">
-		<h1>Preorders open 20 November</h1>
+		<h1>Preorders open 30 November</h1>
 		<p>The E-Ink Calendar preorder isn't open to everyone yet.</p>
 		<a class="back" href="/projects/eink-calendar/">See the project</a>
 		<form method="post" action="/api/preview" autocomplete="off">

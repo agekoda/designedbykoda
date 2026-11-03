@@ -3,7 +3,7 @@
 import { renderEink } from './render';
 import { loadFontPack, renderDrawList, SCREEN_W, SCREEN_H, type Rendered } from './preview';
 import { renderLayout } from './layouts';
-import type { CalEvent } from './context';
+import type { CalEvent, TaskItem } from './context';
 
 let fontsPromise: Promise<ReturnType<typeof loadFontPack>> | null = null;
 export function loadFonts() {
@@ -49,6 +49,23 @@ export function sampleDay(nowLocal: number): CalEvent[] {
 	];
 }
 
+// Example tasks for the To-do preview.
+export const SAMPLE_TASKS: TaskItem[] = [
+	{ title: 'Book the dentist', done: false, due: 'overdue' },
+	{ title: 'Reply to Milah', done: false, due: 'today' },
+	{ title: 'Buy a birthday present', done: false, due: 'tomorrow' },
+	{ title: 'Order new e-ink panels', done: false },
+	{ title: 'Water the plants', done: false },
+	{ title: 'Pay the electricity bill', done: true },
+	{ title: 'Back up the photos', done: true },
+];
+// The sample tasks' due dates are written as words, so they stay overdue / today / tomorrow whatever the date is.
+function sampleTasks(nowLocal: number): TaskItem[] {
+	const day = Math.floor(nowLocal / 86400);
+	const iso = (n: number) => new Date(n * 86400000).toISOString().slice(0, 10);
+	return SAMPLE_TASKS.map((t) => (t.due === 'overdue' ? { ...t, due: iso(day - 1) } : t.due === 'today' ? { ...t, due: iso(day) } : t.due === 'tomorrow' ? { ...t, due: iso(day + 1) } : t));
+}
+
 export interface PreviewOptions {
 	style: string;
 	font?: string | null;
@@ -57,6 +74,10 @@ export interface PreviewOptions {
 	vbat?: number | null;
 	cornerImage?: Uint8Array | null;
 	refreshSec?: number;
+	loc?: { lat: number; lon: number } | null; // where the calendar lives (Moon & Sun)
+	countdown?: { title: string; date: string } | null;
+	frameImage?: Uint8Array | null; // Photo frame
+	tasksState?: 'ok' | 'needs_permission'; // To-do: pretend we can / cannot read Google Tasks
 }
 
 export function drawListFor(o: PreviewOptions): string {
@@ -74,6 +95,12 @@ export function drawListFor(o: PreviewOptions): string {
 			dark: o.dark,
 			cornerImage: o.cornerImage ?? null,
 			refreshSec: o.refreshSec ?? 86400,
+			loc: o.loc ?? null,
+			utcOffsetSec: -new Date().getTimezoneOffset() * 60,
+			countdown: o.countdown ?? null,
+			frameImage: o.frameImage ?? null,
+			tasks: o.tasksState === 'needs_permission' ? null : sampleTasks(nowLocal),
+			tasksState: o.tasksState ?? 'ok',
 		},
 		o.font ?? undefined
 	);

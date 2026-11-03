@@ -9,7 +9,8 @@
 // it sleeps until midnight.
 import { Draw, PAPER } from '../draw';
 import { firstThatFits, measure } from '../measure';
-import { batteryText, dayIdx, dayShort, monthShort, round0, tmOf, type CalEvent, type LayoutCtx } from '../context';
+import { dayIdx, dayShort, monthShort, round0, tmOf, type CalEvent, type LayoutCtx } from '../context';
+import { batteryIcon } from '../batteryIcon';
 
 const DAY = 86400;
 const TOLERANCE_H = 10 / 60; // a wake this much early still counts as on time
@@ -120,8 +121,7 @@ export function timeline(ctx: LayoutCtx): string {
 	d.fill(0, 0, 400, 30);
 	d.text(10, 21, 'sb', 'TODAY', { color: PAPER });
 	d.text(392, 21, 's', `${dayShort(now)} ${now.mday} ${monthShort(now)}`, { align: 'right', color: PAPER });
-	const bat = batteryText(ctx.vbat);
-	if (bat) d.text(200, 21, 's', bat, { align: 'center', color: PAPER });
+	batteryIcon(d, ctx, 200, 7, 'center', PAPER);
 
 	const { timed, allDay } = dayEvents(ctx.events, ctx.nowLocal);
 	const w = windowOf(timed) ?? { start: 8, end: 17 };

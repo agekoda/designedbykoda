@@ -3,7 +3,8 @@
 // against the logged-in user, so you can only touch your own devices.
 import { isStyleId, isRefreshSec, DEFAULT_STYLE } from '../../../data/calendarStyles';
 import { isFamily } from '../../../lib/eink/fonts';
-import { b64ToBytes, CORNER_BYTES, cleanSettings } from '../../../lib/eink/image';
+import { b64ToBytes, CORNER_BYTES, FRAME_BYTES, cleanSettings } from '../../../lib/eink/image';
+import { toAscii } from '../../../lib/eink/draw';
 export const prerender = false;
 
 const MAX_SRC = 280_000; // characters in the stored photo (a small JPEG data URL)
@@ -45,6 +46,32 @@ export async function GET({ request, locals }) {
 		cfg = extra.corner_cfg ? JSON.parse(extra.corner_cfg) : null;
 	} catch {}
 
+	// Layout extras from schema-layouts.sql: where the calendar is (Moon & Sun), the Countdown, the
+	// Photo frame picture, and whether Google Tasks is connected (To-do). Missing columns mean "not set".
+	let lat: number | null = null;
+	let lon: number | null = null;
+	let countdown: { title: string; date: string } | null = null;
+	let frameSrc: string | null = null;
+	let frameCfg: unknown = null;
+	let tasksGranted = false;
+	try {
+		const w = await db.prepare('SELECT weather_lat, weather_lon FROM devices WHERE id = ?').bind(deviceId).first();
+		if (w?.weather_lat !== null && w?.weather_lat !== undefined) {
+			lat = w.weather_lat;
+			lon = w.weather_lon;
+		}
+	} catch {}
+	try {
+		const x = await db.prepare('SELECT countdown_title, countdown_date, frame_src, frame_cfg FROM devices WHERE id = ?').bind(deviceId).first();
+		if (x?.countdown_title && x?.countdown_date) countdown = { title: x.countdown_title, date: x.countdown_date };
+		frameSrc = x?.frame_src || null;
+		frameCfg = x?.frame_cfg ? JSON.parse(x.frame_cfg) : null;
+	} catch {}
+	try {
+		const u = await db.prepare('SELECT tasks_granted FROM users WHERE id = ?').bind(userId).first();
+		tasksGranted = u?.tasks_granted === 1;
+	} catch {}
+
 	return json(
 		{
 			migrated,
@@ -57,6 +84,12 @@ export async function GET({ request, locals }) {
 			cornerSrc: extra.corner_src || null,
 			cornerCfg: cfg,
 			hasWeather,
+			lat,
+			lon,
+			countdown,
+			frameSrc,
+			frameCfg,
+			tasksGranted,
 			batteryMv: extra.battery_mv ?? null,
 			batteryAt: extra.battery_at ?? null,
 		},
@@ -127,11 +160,43 @@ export async function POST({ request, locals }) {
 		}
 	}
 
+	// Countdown: a name and a date.
+	const cd = body.countdown;
+	if (cd !== undefined) {
+		const title = typeof cd?.title === 'string' ? toAscii(cd.title, true).slice(0, 40) : '';
+		const date = typeof cd?.date === 'string' ? cd.date : '';
+		if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date + 'T00:00:00Z')))) return json({ error: 'That date is not valid.' }, 400);
+		sets.push('countdown_title = ?', 'countdown_date = ?');
+		vals.push(title || null, date || null);
+	}
+
+	// Photo frame picture (full screen).
+	const fr = body.frame;
+	if (fr !== undefined) {
+		if (fr.bits !== undefined) {
+			const bytes = typeof fr.bits === 'string' ? b64ToBytes(fr.bits) : null;
+			if (!bytes || bytes.length !== FRAME_BYTES) return json({ error: 'That picture is the wrong size.' }, 400);
+			sets.push('frame_bits = ?');
+			vals.push(fr.bits);
+		}
+		if (fr.src !== undefined) {
+			if (typeof fr.src !== 'string' || !fr.src.startsWith('data:image/jpeg;base64,') || fr.src.length > MAX_SRC) {
+				return json({ error: 'That photo is too large to store. Try a smaller one.' }, 400);
+			}
+			sets.push('frame_src = ?');
+			vals.push(fr.src);
+		}
+		if (fr.cfg !== undefined) {
+			sets.push('frame_cfg = ?');
+			vals.push(JSON.stringify(cleanSettings(fr.cfg)));
+		}
+	}
+
 	if (!sets.length) return json({ ok: true }, 200);
 	try {
 		await db.prepare(`UPDATE devices SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`).bind(...vals, deviceId, o.userId).run();
 	} catch {
-		return json({ error: 'Display options are not enabled on the server yet (run schema-display.sql).' }, 500);
+		return json({ error: 'Display options are not enabled on the server yet (run schema-display.sql and schema-layouts.sql).' }, 500);
 	}
 	return json({ ok: true }, 200);
 }

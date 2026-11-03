@@ -2,7 +2,8 @@
 // after this week listed along the bottom.
 import { Draw, PAPER } from '../draw';
 import { measure } from '../measure';
-import { batteryText, dayIdx, dayName, dayShort, evTimeStr, monthName, monthShort, round0, tmFromDayIdx, tmOf, type LayoutCtx } from '../context';
+import { dayIdx, dayName, dayShort, evTimeStr, monthName, monthShort, round0, tmFromDayIdx, tmOf, type LayoutCtx } from '../context';
+import { batteryIcon, batteryIconWidth } from '../batteryIcon';
 
 export function week(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -86,8 +87,7 @@ export function week(ctx: LayoutCtx): string {
 	const fy = top + 7 * rowh + 1;
 	const laterW = measure(ctx.family, 'sb', 'Later').right;
 	const x1 = 8 + laterW + 8; // where the first item starts
-	const bat = batteryText(ctx.vbat);
-	const batW = bat ? measure(ctx.family, 's', bat).w : 0;
+	const batW = batteryIconWidth(ctx);
 	const mid = 190; // the second item starts here
 	let shown = 0;
 	for (const e of ctx.events) {
@@ -105,6 +105,6 @@ export function week(ctx: LayoutCtx): string {
 		}
 		shown++;
 	}
-	if (bat) d.text(392, fy + 30, 's', bat, { align: 'right' });
+	batteryIcon(d, ctx, 392, fy + 18, 'right');
 	return d.toString();
 }
