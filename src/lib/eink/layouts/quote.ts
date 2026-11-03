@@ -15,7 +15,7 @@ export function quote(ctx: LayoutCtx): string {
 	d.text(392, 21, 's', `${dayShort(now)} ${now.mday} ${monthShort(now)}`, { align: 'right', color: PAPER });
 
 	const [text, who] = quoteForDay(dayIdx(ctx.nowLocal));
-	const boxW = 340;
+	const boxW = 350;
 	const boxH = 196; // from y=48 to y=244
 	// the biggest size where the whole quote fits
 	const sizes: { role: 'bb' | 'mb' | 'm'; scale: number; lh: number }[] = [
@@ -27,7 +27,7 @@ export function quote(ctx: LayoutCtx): string {
 	let lines = wrapText(fam, pick.role, text, boxW, pick.scale);
 	for (const s of sizes) {
 		const l = wrapText(fam, s.role, text, boxW, s.scale);
-		if (l.length * s.lh <= boxH && (s.role !== 'bb' || l.length <= 4)) {
+		if (l.length * s.lh <= boxH && (s.role !== 'bb' || l.length <= 5)) {
 			pick = s;
 			lines = l;
 			break;
@@ -36,7 +36,7 @@ export function quote(ctx: LayoutCtx): string {
 	const blockH = lines.length * pick.lh;
 	const top = 48 + Math.floor((boxH - blockH) / 2);
 	d.fill(18, top + 2, 4, blockH - 6);
-	lines.forEach((ln, i) => d.text(40, top + i * pick.lh + pick.lh - 8, pick.role, ln, { maxW: boxW + 10 }));
+	lines.forEach((ln, i) => d.text(40, top + i * pick.lh + pick.lh - 8, pick.role, ln, { maxW: boxW + 2 }));
 
 	d.text(392, 270, 's', '- ' + who, { align: 'right', maxW: 300 });
 	batteryIcon(d, ctx, 10, 258, 'left');

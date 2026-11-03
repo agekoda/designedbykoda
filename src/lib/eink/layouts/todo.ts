@@ -1,6 +1,6 @@
 // To-do: your Google Tasks, open ones first, with a tick box for each.
 import { Draw, PAPER } from '../draw';
-import { measure } from '../measure';
+import { measure, wrapText } from '../measure';
 import { dayIdx, dayShort, monthShort, tmOf, type LayoutCtx, type TaskItem } from '../context';
 import { batteryIcon } from '../batteryIcon';
 import { parseDay } from './countdown';
@@ -19,6 +19,14 @@ function dueLabel(due: string | undefined, today: number): string {
 	return `${dayShort(t)} ${t.mday} ${monthShort(t)}`;
 }
 
+// A centred heading with a note under it, wrapped so it stays on the screen in any font.
+function message(d: Draw, fam: LayoutCtx['family'], title: string, note: string, y: number): void {
+	const head = wrapText(fam, 'mb', title, 360);
+	head.forEach((ln, i) => d.text(200, y + 18 + i * 26, 'mb', ln, { align: 'center' }));
+	const ny = y + 18 + head.length * 26 + 8;
+	wrapText(fam, 's', note, 360).forEach((ln, i) => d.text(200, ny + i * 20, 's', ln, { align: 'center' }));
+}
+
 export function todo(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
 	const fam = ctx.family;
@@ -31,14 +39,11 @@ export function todo(ctx: LayoutCtx): string {
 	batteryIcon(d, ctx, 200, 4, 'center', PAPER);
 
 	if (ctx.tasksState === 'needs_permission') {
-		d.text(200, 118, 'mb', 'Connect Google Tasks', { align: 'center' });
-		d.text(200, 146, 's', 'Open your dashboard, choose Customize,', { align: 'center' });
-		d.text(200, 164, 's', 'then press "Connect Google Tasks".', { align: 'center' });
+		message(d, fam, 'Connect Google Tasks', 'Open your dashboard, choose Customize, then press "Connect Google Tasks".', 100);
 		return d.toString();
 	}
 	if (ctx.tasksState === 'error' || !ctx.tasks) {
-		d.text(200, 130, 'mb', "Couldn't load your tasks", { align: 'center' });
-		d.text(200, 158, 's', 'It will try again at the next update.', { align: 'center' });
+		message(d, fam, "Couldn't load your tasks", 'It will try again at the next update.', 110);
 		return d.toString();
 	}
 
@@ -46,8 +51,9 @@ export function todo(ctx: LayoutCtx): string {
 	const done: TaskItem[] = ctx.tasks.filter((t) => t.done);
 	const list = [...open, ...done];
 	if (!list.length) {
-		d.text(200, 150, 'bb', 'All done!', { align: 'center', scale: 2 });
-		d.text(200, 186, 's', 'Nothing on your list.', { align: 'center' });
+		const big = measure(fam, 'bb', 'All done!', 2).w <= 360;
+		d.text(200, big ? 150 : 140, 'bb', 'All done!', { align: 'center', scale: big ? 2 : 1 });
+		d.text(200, big ? 186 : 176, 's', 'Nothing on your list.', { align: 'center' });
 		return d.toString();
 	}
 

@@ -3,7 +3,7 @@
 import { Draw, PAPER } from '../draw';
 import { measure } from '../measure';
 import { dayIdx, dayName, dayShort, evTimeStr, monthName, monthShort, round0, tmFromDayIdx, tmOf, type LayoutCtx } from '../context';
-import { batteryIcon, batteryIconWidth } from '../batteryIcon';
+import { batteryIcon, batteryIconWidth, BATTERY_H } from '../batteryIcon';
 
 export function week(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -105,6 +105,6 @@ export function week(ctx: LayoutCtx): string {
 		}
 		shown++;
 	}
-	batteryIcon(d, ctx, 392, fy + 18, 'right');
+	batteryIcon(d, ctx, 392, Math.min(fy + 18, 300 - BATTERY_H - 4), 'right');
 	return d.toString();
 }
