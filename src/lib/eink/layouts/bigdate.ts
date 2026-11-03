@@ -20,7 +20,7 @@ export function bigdate(ctx: LayoutCtx): string {
 	} else {
 		d.text(14, 240, 's', '---');
 	}
-	batteryIcon(d, ctx, 14, 272, 'left');
+	batteryIcon(d, ctx, 14, 270, 'left');
 
 	d.vline(158, 12, 276);
 

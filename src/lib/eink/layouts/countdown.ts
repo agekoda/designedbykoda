@@ -19,7 +19,7 @@ export function countdown(ctx: LayoutCtx): string {
 	d.fill(0, 0, 400, 30);
 	d.text(10, 21, 'sb', 'COUNTDOWN', { color: PAPER });
 	d.text(392, 21, 's', `${dayShort(now)} ${now.mday} ${monthShort(now)}`, { align: 'right', color: PAPER });
-	batteryIcon(d, ctx, 200, 7, 'center', PAPER);
+	batteryIcon(d, ctx, 200, 4, 'center', PAPER);
 
 	const c = ctx.countdown;
 	const target = c ? parseDay(c.date) : null;

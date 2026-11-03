@@ -28,7 +28,7 @@ export function todo(ctx: LayoutCtx): string {
 	d.fill(0, 0, 400, 30);
 	d.text(10, 21, 'sb', 'TO-DO', { color: PAPER });
 	d.text(392, 21, 's', `${dayShort(now)} ${now.mday} ${monthShort(now)}`, { align: 'right', color: PAPER });
-	batteryIcon(d, ctx, 200, 7, 'center', PAPER);
+	batteryIcon(d, ctx, 200, 4, 'center', PAPER);
 
 	if (ctx.tasksState === 'needs_permission') {
 		d.text(200, 118, 'mb', 'Connect Google Tasks', { align: 'center' });
@@ -74,7 +74,7 @@ export function todo(ctx: LayoutCtx): string {
 		d.dots(12, y + ROW_H - 1, 380, 4);
 	});
 
-	batteryIcon(d, ctx, 10, 272, 'left');
+	batteryIcon(d, ctx, 10, 270, 'left');
 	const more = list.length - ROWS;
 	const summary = `${open.length} to do` + (more > 0 ? `   +${more} more` : '');
 	d.text(392, 285, 's', summary, { align: 'right' });

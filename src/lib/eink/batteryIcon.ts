@@ -6,7 +6,7 @@ import { batteryPercent } from './battery';
 import { measure } from './measure';
 import type { LayoutCtx } from './context';
 
-export const BATTERY_H = 16;
+export const BATTERY_H = 22;
 const NUB = 3;
 
 function sizeOf(ctx: LayoutCtx): { text: string; body: number; total: number; low: boolean } | null {
@@ -31,11 +31,11 @@ export function batteryIcon(d: Draw, ctx: LayoutCtx, x: number, y: number, align
 	const left = align === 'left' ? x : align === 'right' ? x - s.total : x - s.total / 2;
 	const other: Color = color === INK ? PAPER : INK;
 	if (s.low) {
-		d.fillRound(left, y, s.body, BATTERY_H, 3, color);
+		d.fillRound(left, y, s.body, BATTERY_H, 4, color);
 	} else {
-		d.round(left, y, s.body, BATTERY_H, 3, color);
-		d.round(left + 1, y + 1, s.body - 2, BATTERY_H - 2, 2, color);
+		d.round(left, y, s.body, BATTERY_H, 4, color);
+		d.round(left + 1, y + 1, s.body - 2, BATTERY_H - 2, 3, color);
 	}
-	d.fill(left + s.body, y + 4, NUB, BATTERY_H - 8, color);
-	d.text(left + s.body / 2, y + 12, 's', s.text, { align: 'center', color: s.low ? other : color });
+	d.fill(left + s.body, y + 6, NUB, BATTERY_H - 12, color);
+	d.text(left + s.body / 2, y + 17, 's', s.text, { align: 'center', color: s.low ? other : color });
 }

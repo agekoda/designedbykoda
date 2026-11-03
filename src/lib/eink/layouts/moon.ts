@@ -22,7 +22,7 @@ export function moon(ctx: LayoutCtx): string {
 	d.fill(0, 0, 400, 30);
 	d.text(10, 21, 'sb', 'MOON & SUN', { color: PAPER });
 	d.text(392, 21, 's', `${dayShort(now)} ${now.mday} ${monthShort(now)}`, { align: 'right', color: PAPER });
-	batteryIcon(d, ctx, 200, 7, 'center', PAPER);
+	batteryIcon(d, ctx, 200, 4, 'center', PAPER);
 
 	// The moon as it is at midday on this date.
 	const noonMs = (dayIdx(ctx.nowLocal) * 86400 + 43200 - off) * 1000;

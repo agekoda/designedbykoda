@@ -121,7 +121,7 @@ export function timeline(ctx: LayoutCtx): string {
 	d.fill(0, 0, 400, 30);
 	d.text(10, 21, 'sb', 'TODAY', { color: PAPER });
 	d.text(392, 21, 's', `${dayShort(now)} ${now.mday} ${monthShort(now)}`, { align: 'right', color: PAPER });
-	batteryIcon(d, ctx, 200, 7, 'center', PAPER);
+	batteryIcon(d, ctx, 200, 4, 'center', PAPER);
 
 	const { timed, allDay } = dayEvents(ctx.events, ctx.nowLocal);
 	const w = windowOf(timed) ?? { start: 8, end: 17 };

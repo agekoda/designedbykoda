@@ -43,6 +43,6 @@ export function nextup(ctx: LayoutCtx): string {
 	const hi = ctx.weather ? round0(ctx.weather.high) : '';
 	const lo = ctx.weather ? round0(ctx.weather.low) : '';
 	d.text(10, 290, 's', ctx.weather ? firstThatFits(ctx.family, 's', [`High ${hi}C   Low ${lo}C`, `High ${hi}C  Low ${lo}C`, `${hi}C / ${lo}C`], 392 - batW - 20 - 10) : '---');
-	batteryIcon(d, ctx, 392, 276, 'right');
+	batteryIcon(d, ctx, 392, 274, 'right');
 	return d.toString();
 }

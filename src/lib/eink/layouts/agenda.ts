@@ -53,7 +53,7 @@ export function agenda(ctx: LayoutCtx): string {
 	}
 
 	d.line(0, 147, 400, 147);
-	batteryIcon(d, ctx, 5, 128, 'left');
+	batteryIcon(d, ctx, 5, 123, 'left');
 
 	// ---- upcoming events, grouped by day ----
 	let yPos = 165;
