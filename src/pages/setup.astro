@@ -131,6 +131,11 @@ if (userId && hasDevice && !addingDevice) {
 									</label>
 								))}
 							</div>
+							<p class="more-note">
+								<strong>More layouts are waiting.</strong> Once you're set up, open <em>Customize display</em>
+								on your dashboard for Moon &amp; Sun, Quote of the day, Countdown, a full-screen Photo frame
+								and a To-do list, plus fonts and a corner picture.
+							</p>
 							<p class="msg" id="style-message" aria-live="polite" />
 							<div class="style-actions">
 								<label class="switch">
@@ -401,6 +406,7 @@ if (userId && hasDevice && !addingDevice) {
 		box-sizing: border-box;
 	}
 	.setup-page .step[data-step='style'] .step-text { max-width: 60ch; margin-bottom: 1.2em; }
+	.setup-page .more-note { max-width: 60ch; margin: 1.2em auto 0; text-align: center; font-size: 0.9rem; opacity: 0.75; line-height: 1.5; }
 	.setup-page .step[data-step='style'] .step-title { margin-bottom: 0.3em; }
 	.setup-page .step[data-step='style'] .step-kicker { margin-bottom: 0.4em; }
 	/* Dark mode on its own line, Back / Continue centred under it. */

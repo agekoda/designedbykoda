@@ -1,0 +1,274 @@
+---
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+import { isAdmin, adminSecret } from '../../lib/admin';
+
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+Astro.response.headers.set('Cache-Control', 'no-store');
+
+const env = Astro.locals.runtime?.env ?? {};
+const configured = !!adminSecret(env);
+const unlocked = configured && (await isAdmin(Astro.cookies, env));
+const wrong = Astro.url.searchParams.has('wrong');
+
+interface Order {
+	id: string; created_at: number; email: string; name: string; phone: string;
+	address_json: string | null; country: string; currency: string;
+	amount_total: number; shipping_amount: number; shipped_at: number | null; tracking: string | null;
+	addr: Record<string, string>;
+}
+let orders: Order[] = [];
+let dbError = '';
+if (unlocked) {
+	try {
+		const { results } = await env.DB.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 1000').all();
+		orders = (results ?? []).map((o: any) => {
+			let addr = {};
+			try { addr = o.address_json ? JSON.parse(o.address_json) : {}; } catch {}
+			return { ...o, addr };
+		});
+	} catch {
+		dbError = 'Could not read the orders table. If you have not created it yet, run: npx wrangler d1 execute eink-calendar-db --remote --file=./schema-orders.sql';
+	}
+}
+
+const toShip = orders.filter((o) => !o.shipped_at);
+const shipped = orders.filter((o) => o.shipped_at);
+const byCurrency = new Map<string, number>();
+for (const o of orders) byCurrency.set(o.currency || '?', (byCurrency.get(o.currency || '?') ?? 0) + (o.amount_total ?? 0));
+const money = (cents: number, cur: string) => {
+	try { return new Intl.NumberFormat('en-AU', { style: 'currency', currency: cur }).format(cents / 100); }
+	catch { return `${(cents / 100).toFixed(2)} ${cur}`; }
+};
+const countries = new Map<string, number>();
+for (const o of orders) { const c = o.country || '?'; countries.set(c, (countries.get(c) ?? 0) + 1); }
+const topCountries = [...countries.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+const addressText = (o: Order) =>
+	[o.name, o.addr.line1, o.addr.line2, [o.addr.city, o.addr.state, o.addr.postal_code].filter(Boolean).join(' '), o.addr.country || o.country]
+		.filter(Boolean).join('\n');
+---
+<Layout title="Orders - designedbykoda" description="Owner only.">
+	<div class="admin">
+		{!configured && (
+			<div class="card narrow">
+				<h1>Admin isn't set up</h1>
+				<p>Add a password as a Cloudflare secret, then reload:</p>
+				<pre>npx wrangler secret put ADMIN_PASSWORD</pre>
+			</div>
+		)}
+
+		{configured && !unlocked && (
+			<div class="card narrow">
+				<h1>Owner area</h1>
+				<form method="post" action="/api/admin/login" autocomplete="off">
+					<label for="pw">Password</label>
+					<div class="row">
+						<input id="pw" name="password" type="password" required autocomplete="current-password" autofocus />
+						<button type="submit" class="btn-p">Unlock</button>
+					</div>
+					{wrong && <p class="err" role="alert">Wrong password.</p>}
+				</form>
+			</div>
+		)}
+
+		{unlocked && (
+			<>
+				<div class="head">
+					<div>
+						<div class="kicker">Owner area</div>
+						<h1>Orders</h1>
+					</div>
+					<div class="head-actions">
+						<a class="btn" href="/api/admin/orders" download>Download CSV</a>
+						<form method="post" action="/api/admin/logout"><button type="submit" class="btn">Lock</button></form>
+					</div>
+				</div>
+
+				{dbError && <p class="err">{dbError}</p>}
+
+				<div class="stats">
+					<div class="stat"><span class="n">{orders.length}</span><span class="l">orders</span></div>
+					<div class="stat warn"><span class="n">{toShip.length}</span><span class="l">to ship</span></div>
+					<div class="stat"><span class="n">{shipped.length}</span><span class="l">shipped</span></div>
+					{[...byCurrency.entries()].map(([cur, cents]) => (
+						<div class="stat"><span class="n">{money(cents, cur)}</span><span class="l">paid ({cur})</span></div>
+					))}
+				</div>
+				{topCountries.length > 0 && (
+					<p class="countries">Where they're going: {topCountries.map(([c, n]) => `${c} ${n}`).join(' · ')}</p>
+				)}
+
+				<div class="bar">
+					<div class="tabs" role="tablist">
+						<button class="tab on" data-tab="toship" role="tab">To ship <span>{toShip.length}</span></button>
+						<button class="tab" data-tab="shipped" role="tab">Shipped <span>{shipped.length}</span></button>
+						<button class="tab" data-tab="all" role="tab">All <span>{orders.length}</span></button>
+					</div>
+					<input id="q" type="search" placeholder="Search name, email, country, order id" aria-label="Search orders" />
+				</div>
+
+				<div id="list">
+					{orders.map((o) => (
+						<article class="order" data-id={o.id} data-shipped={o.shipped_at ? '1' : '0'}
+							data-search={`${addressText(o)} ${o.email} ${o.phone} ${o.id} ${o.tracking ?? ''}`.toLowerCase()}>
+							<div class="top">
+								<div class="who">
+									<strong>{o.name || '(no name)'}</strong>
+									<a href={`mailto:${o.email}`}>{o.email}</a>
+									{o.phone && <span>{o.phone}</span>}
+								</div>
+								<div class="amt">
+									<strong>{money(o.amount_total ?? 0, o.currency || 'AUD')}</strong>
+									<span>incl. {money(o.shipping_amount ?? 0, o.currency || 'AUD')} shipping</span>
+								</div>
+							</div>
+							<div class="mid">
+								<pre class="addr">{addressText(o) || '(no address)'}</pre>
+								<div class="meta">
+									<span class="when" data-ts={o.created_at}>{new Date(o.created_at * 1000).toISOString().slice(0, 16).replace('T', ' ')} UTC</span>
+									<span class="oid" title={o.id}>{o.id.slice(0, 18)}…</span>
+									<span class={`pill ${o.shipped_at ? 'ok' : 'todo'}`}>{o.shipped_at ? 'Shipped' : 'To ship'}</span>
+									{o.shipped_at && <span class="when" data-ts={o.shipped_at} data-prefix="Shipped ">Shipped</span>}
+								</div>
+							</div>
+							<div class="actions">
+								<input class="track" type="text" placeholder="Tracking number" value={o.tracking ?? ''} maxlength="120" aria-label="Tracking number" />
+								<button class="btn copy" type="button" data-copy={addressText(o)}>Copy address</button>
+								<button class="btn save" type="button">Save tracking</button>
+								<button class={`btn ${o.shipped_at ? '' : 'btn-p'} ship`} type="button">{o.shipped_at ? 'Mark not shipped' : 'Mark shipped'}</button>
+								<span class="msg" role="status"></span>
+							</div>
+						</article>
+					))}
+					{orders.length === 0 && !dbError && <p class="empty">No orders yet. They show up here the moment a payment goes through.</p>}
+				</div>
+				<p id="none" class="empty" hidden>Nothing matches.</p>
+			</>
+		)}
+	</div>
+</Layout>
+
+<script>
+	const list = document.getElementById('list');
+	if (list) {
+		let tab = 'toship';
+		const q = document.getElementById('q') as HTMLInputElement;
+		const none = document.getElementById('none')!;
+		const orders = [...list.querySelectorAll<HTMLElement>('.order')];
+
+		// dates in the viewer's own time zone
+		document.querySelectorAll<HTMLElement>('.when[data-ts]').forEach((el) => {
+			const d = new Date(Number(el.dataset.ts) * 1000);
+			el.textContent = (el.dataset.prefix ?? '') + d.toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+		});
+
+		const apply = () => {
+			const term = q.value.trim().toLowerCase();
+			let shown = 0;
+			for (const o of orders) {
+				const s = o.dataset.shipped === '1';
+				const okTab = tab === 'all' || (tab === 'shipped' ? s : !s);
+				const ok = okTab && (!term || (o.dataset.search ?? '').includes(term));
+				o.hidden = !ok;
+				if (ok) shown++;
+			}
+			none.hidden = shown > 0 || orders.length === 0;
+		};
+		document.querySelectorAll<HTMLButtonElement>('.tab').forEach((b) =>
+			b.addEventListener('click', () => {
+				tab = b.dataset.tab!;
+				document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === b));
+				apply();
+			})
+		);
+		q.addEventListener('input', apply);
+
+		async function save(o: HTMLElement, shipped: boolean | undefined, msg: string) {
+			const el = o.querySelector<HTMLElement>('.msg')!;
+			el.textContent = 'Saving…';
+			try {
+				const res = await fetch('/api/admin/orders', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ id: o.dataset.id, shipped, tracking: o.querySelector<HTMLInputElement>('.track')!.value }),
+				});
+				const data = await res.json().catch(() => ({}));
+				if (!res.ok || !data.ok) throw new Error(data.error || 'Failed');
+				el.textContent = msg;
+				return data;
+			} catch (e: any) {
+				el.textContent = 'Could not save: ' + (e.message || 'error');
+				return null;
+			}
+		}
+
+		list.addEventListener('click', async (e) => {
+			const t = (e.target as HTMLElement).closest('button');
+			const o = (e.target as HTMLElement).closest<HTMLElement>('.order');
+			if (!t || !o) return;
+			if (t.classList.contains('copy')) {
+				try {
+					await navigator.clipboard.writeText(t.dataset.copy ?? '');
+					o.querySelector('.msg')!.textContent = 'Address copied';
+				} catch {
+					o.querySelector('.msg')!.textContent = 'Could not copy';
+				}
+			} else if (t.classList.contains('save')) {
+				await save(o, undefined, 'Tracking saved');
+			} else if (t.classList.contains('ship')) {
+				const to = o.dataset.shipped !== '1';
+				const data = await save(o, to, to ? 'Marked shipped' : 'Marked not shipped');
+				if (data) location.reload();
+			}
+		});
+		apply();
+	}
+</script>
+
+<style>
+	.admin { max-width: 980px; margin: 0 auto; padding: 3em 16px 5em; }
+	.narrow { max-width: 420px; margin: 12vh auto; }
+	h1 { margin: 0; font-size: 1.8rem; }
+	.kicker { font-size: 0.8rem; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.08em; }
+	.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 22px; }
+	.head-actions { display: flex; gap: 8px; }
+	.head-actions form { margin: 0; }
+	label { display: block; font-size: 0.8rem; opacity: 0.6; margin: 14px 0 6px; }
+	.row { display: flex; gap: 8px; }
+	input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); background: transparent; color: inherit; font: inherit; }
+	.btn, button.btn-p { padding: 9px 14px; border-radius: 8px; border: 1px solid color-mix(in srgb, currentColor 40%, transparent); background: transparent; color: inherit; font: inherit; font-size: 0.9rem; cursor: pointer; text-decoration: none; display: inline-block; }
+	.btn-p { background: var(--accent); color: #fff; border-color: var(--accent); }
+	.err { color: #e5484d; margin: 10px 0 0; font-size: 0.9rem; }
+	pre { margin: 8px 0 0; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, currentColor 8%, transparent); overflow-x: auto; }
+	.stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+	.stat { flex: 1 1 130px; padding: 14px 16px; border-radius: 12px; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); display: flex; flex-direction: column; }
+	.stat .n { font-size: 1.5rem; font-weight: 700; }
+	.stat .l { font-size: 0.8rem; opacity: 0.6; }
+	.stat.warn .n { color: var(--accent); }
+	.countries { font-size: 0.85rem; opacity: 0.65; margin: 8px 0 22px; }
+	.bar { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px; }
+	.tabs { display: flex; gap: 6px; }
+	.tab { padding: 8px 14px; border-radius: 999px; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); background: transparent; color: inherit; font: inherit; font-size: 0.9rem; cursor: pointer; }
+	.tab span { opacity: 0.6; margin-left: 4px; }
+	.tab.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+	#q { flex: 0 1 300px; }
+	.order { border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; }
+	.order[hidden], .empty[hidden] { display: none; }
+	.top { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+	.who, .amt { display: flex; flex-direction: column; gap: 2px; font-size: 0.92rem; }
+	.who span, .amt span { opacity: 0.65; font-size: 0.85rem; }
+	.who a { color: var(--accent); }
+	.amt { text-align: right; }
+	.mid { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 12px 0; align-items: flex-start; }
+	.addr { margin: 0; padding: 0; background: none; font: inherit; font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; }
+	.meta { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; opacity: 0.8; align-items: flex-end; }
+	.pill { padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+	.pill.todo { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+	.pill.ok { background: color-mix(in srgb, #30a46c 22%, transparent); color: #30a46c; }
+	.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+	.track { flex: 1 1 200px; font-size: 0.9rem; padding: 8px 12px; }
+	.msg { font-size: 0.8rem; opacity: 0.7; }
+	.empty { opacity: 0.6; text-align: center; padding: 28px 0; }
+	:global(html.has-custom-cursor) .admin, :global(html.has-custom-cursor) .admin * { cursor: none !important; }
+	@media (max-width: 560px) { .amt { text-align: left; } .meta { align-items: flex-start; } #q { flex: 1 1 100%; } }
+</style>

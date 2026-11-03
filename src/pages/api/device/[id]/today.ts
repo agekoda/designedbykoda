@@ -439,6 +439,13 @@ export async function GET({ params, request, locals }) {
 			headers: {
 				'Content-Type': 'text/plain; charset=utf-8',
 				'Cache-Control': 'no-store',
+				// "1" on the midnight wake (the first half hour of the local day, or a few
+				// minutes before it for a fast timer): the firmware then does the long ghost-removing
+				// refresh whether or not the picture changed.
+				'X-Full': (() => {
+					const s = ((nowLocal % 86400) + 86400) % 86400;
+					return s < 1800 || s >= 86400 - 600 ? '1' : '0';
+				})(),
 				'X-Sleep': String(
 					style === 'timeline'
 						? timelineSleep(nowLocal, trimmedEvents.map((e) => ({ title: e.title, startLocal: e.startLocal, allDay: e.allDay, endLocal: e.endLocal })), intervalSec)

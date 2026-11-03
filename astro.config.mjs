@@ -18,7 +18,7 @@ export default defineConfig({
 		"/eink-calendar": "/projects/eink-calendar/",
 		"/vote": "/poll/eink-styles/",
 	},
-	integrations: [mdx(), sitemap()],
+	integrations: [mdx(), sitemap({ filter: (page) => !page.includes("/admin") })],
 	adapter: cloudflare({
 		// Custom entry so the Worker can also run the status checks on a cron.
 		workerEntryPoint: { path: "src/worker.ts" },
