@@ -10,6 +10,7 @@ export interface CalendarStyle {
 	view: number;
 	corner?: boolean; // has a spot that can show a picture instead of the mini calendar
 	frame?: boolean; // the picture fills the whole screen (Photo frame)
+	builder?: boolean; // the person's own design from the layout builder
 	setup?: boolean; // false = not offered on the setup page, so the first setup stays uncluttered with just the six original layouts (everything else is chosen later in Customize display)
 }
 
@@ -27,6 +28,7 @@ export const CALENDAR_STYLES: CalendarStyle[] = [
 	{ id: 'todo', label: 'To-do', note: 'Your Google Tasks, with tick boxes', image: '/images/polls/eink-styles/todo.png', imageDark: '/images/polls/eink-styles/todo-dark.png', view: 13, setup: false },
 	{ id: 'countdown', label: 'Countdown', note: 'Days until something you are looking forward to', image: '/images/polls/eink-styles/countdown.png', imageDark: '/images/polls/eink-styles/countdown-dark.png', view: 11, setup: false },
 	{ id: 'frame', label: 'Photo frame', note: 'Your own picture, edge to edge', image: '/images/polls/eink-styles/frame.png', imageDark: '/images/polls/eink-styles/frame-dark.png', view: 12, frame: true, setup: false },
+	{ id: 'custom', label: 'Your own design', note: 'Drag, drop and resize widgets in the layout builder', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 14, builder: true, setup: false },
 ];
 
 // Layouts that can wake more than once a day (Timeline moves a "now" bar). Everything else refreshes daily.

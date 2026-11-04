@@ -184,6 +184,11 @@ export class Draw {
 		return this;
 	}
 
+	// How many commands have been added so far (a draw list may hold at most 700).
+	get count(): number {
+		return this.lines.length;
+	}
+
 	toString(): string {
 		const body = this.lines.length ? this.lines.join('\n') + '\n' : '';
 		return `E2\t${this.lines.length}\t${this.dark ? 1 : 0}\n${body}`;

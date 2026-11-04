@@ -33,6 +33,8 @@ export interface LayoutCtx {
 	// The To-do layout: tasks from Google Tasks, and whether we were allowed to read them.
 	tasks?: TaskItem[] | null;
 	tasksState?: 'ok' | 'needs_permission' | 'error';
+	// The layout builder: the widgets of the person's own design (see builder/model.ts).
+	custom?: import('./builder/model').CustomLayout | null;
 }
 
 export interface TaskItem {

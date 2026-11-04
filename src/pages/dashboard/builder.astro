@@ -1,0 +1,1101 @@
+---
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+import { getSessionUserId } from '../../lib/session';
+import { FAMILIES, FAMILY_LABELS } from '../../lib/eink/fonts';
+
+const db = Astro.locals.runtime?.env?.DB;
+const userId = db ? await getSessionUserId(Astro.request, db) : null;
+if (!userId) return Astro.redirect('/setup');
+
+const deviceId = Astro.url.searchParams.get('device') ?? '';
+if (!deviceId) return Astro.redirect('/dashboard');
+const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
+---
+
+<Layout title="Layout builder — designedbykoda" description="Design your own E-Ink Calendar screen by dragging, dropping and resizing widgets.">
+	<div class="bld" data-device={deviceId} data-families={JSON.stringify(families)}>
+		<div class="topbar">
+			<div class="tb-left">
+				<a class="back" id="back" href={`/dashboard/display?device=${encodeURIComponent(deviceId)}`}>← Customize display</a>
+				<div class="bld-title" id="title">Layout builder</div>
+				<select id="device-pick" class="mini" aria-label="Which display" hidden></select>
+			</div>
+			<div class="tb-right">
+				<span class="save-msg" id="save-msg" aria-live="polite"></span>
+				<button type="button" class="btn ghost small" id="undo" disabled title="Undo (Ctrl+Z)">Undo</button>
+				<button type="button" class="btn ghost small" id="redo" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
+				<button type="button" class="btn small" id="save" disabled>Save and use</button>
+			</div>
+		</div>
+
+		<div class="banner" id="banner" hidden></div>
+		<ul class="notes" id="notes" hidden></ul>
+
+		<div class="grid">
+			<!-- widgets you can add -->
+			<aside class="col pal" aria-label="Widgets">
+				<div class="label">Widgets</div>
+				<p class="muted small">Drag one onto the screen, or click it to add it. Then move and resize it.</p>
+				<div id="palette"></div>
+			</aside>
+
+			<!-- the screen -->
+			<main class="col mid">
+				<div class="stage-bar">
+					<label class="check small"><input type="checkbox" id="outlines" checked /><span class="box"></span>Show outlines</label>
+					<label class="sel small">Snap to <select id="grid" class="mini">
+						<option value="0">Nothing</option>
+						<option value="2">2 px</option>
+						<option value="4" selected>4 px</option>
+						<option value="8">8 px</option>
+						<option value="10">10 px</option>
+					</select></label>
+					<span class="muted small" id="budget"></span>
+				</div>
+				<div class="stage" id="stage">
+					<canvas id="screen" width="800" height="600" aria-label="Your screen. Widgets sit on top of it."></canvas>
+					<div class="overlay" id="overlay"></div>
+					<div class="guide gv" id="guide-v" hidden></div>
+					<div class="guide gh" id="guide-h" hidden></div>
+				</div>
+				<p class="muted small keys">
+					Arrow keys nudge the selected widget (Shift = bigger steps), Delete removes it, Ctrl+D duplicates, Ctrl+Z undoes. Hold Alt while dragging to turn snapping off.
+				</p>
+			</main>
+
+			<!-- what's selected / the whole layout -->
+			<aside class="col insp" aria-label="Settings">
+				<div id="inspector"></div>
+			</aside>
+		</div>
+		<div class="dragghost" id="drag-ghost" hidden></div>
+	</div>
+</Layout>
+
+<script>
+	import { WIDGETS, GROUPS, TEMPLATES, makeWidget, clampWidget, sanitizeLayout, withDefaults, newId, SCREEN, MAX_WIDGETS, layoutNeeds, type CustomLayout, type Widget, type OptDef } from '../../lib/eink/builder/model';
+	import { loadFonts, drawListFor, paint, type PreviewOptions } from '../../lib/eink/previewKit';
+	import { renderDrawList } from '../../lib/eink/preview';
+	import { b64ToBytes } from '../../lib/eink/image';
+
+	const root = document.querySelector('.bld') as HTMLElement;
+	const deviceId = root.dataset.device!;
+	const families: { id: string; label: string }[] = JSON.parse(root.dataset.families!);
+	const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+	const canvas = $<HTMLCanvasElement>('screen');
+	const stage = $('stage');
+	const overlay = $('overlay');
+	const guideV = $('guide-v');
+	const guideH = $('guide-h');
+	const inspector = $('inspector');
+	const paletteEl = $('palette');
+	const saveBtn = $<HTMLButtonElement>('save');
+	const undoBtn = $<HTMLButtonElement>('undo');
+	const redoBtn = $<HTMLButtonElement>('redo');
+	const saveMsg = $('save-msg');
+	const banner = $('banner');
+	const notesEl = $('notes');
+	const budgetEl = $('budget');
+	const gridSel = $<HTMLSelectElement>('grid');
+	const outlinesBox = $<HTMLInputElement>('outlines');
+	const ghostEl = $('drag-ghost');
+
+	// ---------------------------------------------------------------- state
+	let layout: CustomLayout = { v: 1, widgets: [] };
+	let font: string | null = null;
+	let dark = false;
+	let sel: string | null = null;
+	let info = { hasWeather: false, loc: null as { lat: number; lon: number } | null, countdown: null as { title: string; date: string } | null, cornerBits: null as string | null, tasksGranted: false, migrated: true };
+	let savedKey = '';
+	let hist: string[] = [];
+	let hi = -1;
+	let fonts: any = null;
+
+	const key = () => JSON.stringify({ l: layout, f: font, d: dark });
+	const ser = () => JSON.stringify(layout);
+	const find = (id: string | null) => layout.widgets.find((w) => w.id === id) ?? null;
+	const name = (w: Widget) => WIDGETS[w.t]?.label ?? w.t;
+
+	function commit() {
+		const s = ser();
+		if (hist[hi] === s) return;
+		hist = hist.slice(0, hi + 1);
+		hist.push(s);
+		if (hist.length > 120) hist.shift();
+		hi = hist.length - 1;
+		refreshChrome();
+	}
+	let commitTimer = 0;
+	function commitSoon() {
+		clearTimeout(commitTimer);
+		commitTimer = window.setTimeout(commit, 500);
+		refreshChrome();
+	}
+	function flushCommit() {
+		if (commitTimer) {
+			clearTimeout(commitTimer);
+			commitTimer = 0;
+			commit();
+		}
+	}
+	function restore(i: number) {
+		flushCommit();
+		if (i < 0 || i >= hist.length) return;
+		hi = i;
+		layout = JSON.parse(hist[hi]);
+		if (sel && !find(sel)) sel = null;
+		everything();
+	}
+
+	// ---------------------------------------------------------------- drawing the preview
+	function previewOpts(l: CustomLayout): PreviewOptions {
+		const d = new Date(Date.now() + 25 * 86400000).toISOString().slice(0, 10);
+		return {
+			style: 'custom',
+			font,
+			dark,
+			hasWeather: info.hasWeather,
+			vbat: 4.0,
+			loc: info.loc,
+			countdown: info.countdown ?? { title: 'Japan trip', date: d },
+			cornerImage: info.cornerBits ? b64ToBytes(info.cornerBits) : null,
+			custom: l,
+		};
+	}
+	let raf = 0;
+	function redraw() {
+		if (raf) return;
+		raf = requestAnimationFrame(() => {
+			raf = 0;
+			if (!fonts) return;
+			const dl = drawListFor(previewOpts(layout));
+			const r = renderDrawList(dl, fonts);
+			paint(canvas, r.px, 2);
+			const n = dl.split('\n').filter(Boolean).length;
+			budgetEl.textContent = n > 560 ? `Getting busy (${n} of 700 drawing steps). Remove something soon.` : '';
+		});
+	}
+
+	// ---------------------------------------------------------------- the boxes you drag
+	const SHORT: Record<string, string> = {
+		text: 'Aa', date_num: '7', weekday: 'Fri', month: 'Nov', date_full: '7 Nov', events: '☰', next_event: '→', event_count: '#3', mini_month: '▦',
+		week_strip: '▥', weather: '°C', moon: '☾', moon_text: '38%', sun_times: '↑↓', sun_arc: '⌒', quote: '“', countdown: '25',
+		tasks: '✓', progress: '▰▱', battery: '▭', picture: '▣', box: '□', line: '—',
+	};
+	const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+	const els = new Map<string, HTMLElement>();
+
+	function place(el: HTMLElement, w: Widget) {
+		el.style.left = (w.x / SCREEN.w) * 100 + '%';
+		el.style.top = (w.y / SCREEN.h) * 100 + '%';
+		el.style.width = (w.w / SCREEN.w) * 100 + '%';
+		el.style.height = (w.h / SCREEN.h) * 100 + '%';
+	}
+	function syncOverlay() {
+		const keep = new Set(layout.widgets.map((w) => w.id));
+		for (const [id, el] of els) if (!keep.has(id)) (el.remove(), els.delete(id));
+		layout.widgets.forEach((w, i) => {
+			let el = els.get(w.id);
+			if (!el) {
+				el = document.createElement('div');
+				el.className = 'wb';
+				el.tabIndex = 0;
+				el.setAttribute('role', 'button');
+				el.dataset.id = w.id;
+				const chip = document.createElement('span');
+				chip.className = 'chip';
+				el.appendChild(chip);
+				if (!WIDGETS[w.t].fixed) {
+					for (const h of HANDLES) {
+						const hd = document.createElement('i');
+						hd.className = 'hd';
+						hd.dataset.h = h;
+						el.appendChild(hd);
+					}
+				}
+				overlay.appendChild(el);
+				els.set(w.id, el);
+			}
+			place(el, w);
+			el.style.zIndex = String(i + 1);
+			el.classList.toggle('on', w.id === sel);
+			el.setAttribute('aria-label', `${name(w)} widget. Arrow keys move it.`);
+			(el.firstChild as HTMLElement).textContent = name(w);
+			el.classList.toggle('ph', w.t === 'picture' && !info.cornerBits);
+		});
+	}
+
+	// ---------------------------------------------------------------- selecting
+	function select(id: string | null) {
+		if (sel === id) return;
+		flushCommit();
+		sel = id;
+		syncOverlay();
+		buildInspector();
+	}
+
+	// ---------------------------------------------------------------- snapping
+	const grid = () => parseInt(gridSel.value, 10) || 0;
+	const T = 4; // how close (in screen dots) an edge has to be to a guide before it snaps
+	function targets(exceptId: string) {
+		const xs = [0, SCREEN.w / 2, SCREEN.w];
+		const ys = [0, SCREEN.h / 2, SCREEN.h];
+		for (const w of layout.widgets) {
+			if (w.id === exceptId) continue;
+			xs.push(w.x, w.x + w.w / 2, w.x + w.w);
+			ys.push(w.y, w.y + w.h / 2, w.y + w.h);
+		}
+		return { xs, ys };
+	}
+	// Moves `pos` so one of its edges (pos + offsets) lines up with a target, or else onto the grid.
+	function snapPos(pos: number, offsets: number[], tg: number[], snap: boolean): { pos: number; guide: number | null } {
+		if (snap) {
+			let best: { d: number; t: number } | null = null;
+			for (const off of offsets) for (const t of tg) {
+				const d = t - (pos + off);
+				if (Math.abs(d) <= T && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, t };
+			}
+			if (best) return { pos: pos + best.d, guide: best.t };
+			const g = grid();
+			if (g) return { pos: Math.round(pos / g) * g, guide: null };
+		}
+		return { pos: Math.round(pos), guide: null };
+	}
+	function showGuides(gx: number | null, gy: number | null) {
+		guideV.hidden = gx === null;
+		guideH.hidden = gy === null;
+		if (gx !== null) guideV.style.left = (gx / SCREEN.w) * 100 + '%';
+		if (gy !== null) guideH.style.top = (gy / SCREEN.h) * 100 + '%';
+	}
+
+	// ---------------------------------------------------------------- dragging and resizing
+	type Drag = { id: string; handle: string | null; sx: number; sy: number; orig: Widget; moved: boolean };
+	let drag: Drag | null = null;
+	const scaleK = () => stage.getBoundingClientRect().width / SCREEN.w;
+
+	overlay.addEventListener('pointerdown', (e) => {
+		const t = e.target as HTMLElement;
+		const wb = t.closest('.wb') as HTMLElement | null;
+		if (!wb) {
+			select(null);
+			return;
+		}
+		const w = find(wb.dataset.id!);
+		if (!w) return;
+		select(w.id);
+		wb.focus({ preventScroll: true });
+		drag = { id: w.id, handle: (t.closest('[data-h]') as HTMLElement | null)?.dataset.h ?? null, sx: e.clientX, sy: e.clientY, orig: { ...w, o: { ...w.o } }, moved: false };
+		overlay.setPointerCapture(e.pointerId);
+		e.preventDefault();
+	});
+	overlay.addEventListener('pointermove', (e) => {
+		if (!drag) return;
+		const w = find(drag.id);
+		if (!w) return;
+		const k = scaleK();
+		const dx = (e.clientX - drag.sx) / k;
+		const dy = (e.clientY - drag.sy) / k;
+		if (!drag.moved && Math.hypot(dx, dy) * k < 3) return;
+		drag.moved = true;
+		const o = drag.orig;
+		const tg = targets(w.id);
+		const snap = !e.altKey;
+		let gx: number | null = null;
+		let gy: number | null = null;
+		if (!drag.handle) {
+			const sx = snapPos(o.x + dx, [0, o.w / 2, o.w], tg.xs, snap);
+			const sy = snapPos(o.y + dy, [0, o.h / 2, o.h], tg.ys, snap);
+			w.x = Math.min(SCREEN.w - w.w, Math.max(0, sx.pos));
+			w.y = Math.min(SCREEN.h - w.h, Math.max(0, sy.pos));
+			gx = sx.guide;
+			gy = sy.guide;
+		} else {
+			const h = drag.handle;
+			const min = WIDGETS[w.t].min;
+			let x1 = o.x;
+			let y1 = o.y;
+			let x2 = o.x + o.w;
+			let y2 = o.y + o.h;
+			if (h.includes('e')) {
+				const s = snapPos(x2 + dx, [0], tg.xs, snap);
+				x2 = s.pos;
+				gx = s.guide;
+			}
+			if (h.includes('w')) {
+				const s = snapPos(x1 + dx, [0], tg.xs, snap);
+				x1 = s.pos;
+				gx = s.guide;
+			}
+			if (h.includes('s')) {
+				const s = snapPos(y2 + dy, [0], tg.ys, snap);
+				y2 = s.pos;
+				gy = s.guide;
+			}
+			if (h.includes('n')) {
+				const s = snapPos(y1 + dy, [0], tg.ys, snap);
+				y1 = s.pos;
+				gy = s.guide;
+			}
+			x1 = Math.max(0, x1);
+			y1 = Math.max(0, y1);
+			x2 = Math.min(SCREEN.w, x2);
+			y2 = Math.min(SCREEN.h, y2);
+			if (x2 - x1 < min.w) h.includes('w') ? (x1 = x2 - min.w) : (x2 = x1 + min.w);
+			if (y2 - y1 < min.h) h.includes('n') ? (y1 = y2 - min.h) : (y2 = y1 + min.h);
+			if (e.shiftKey && h.length === 2) {
+				// keep the shape
+				const r = o.w / o.h;
+				const nw = x2 - x1;
+				const nh = nw / r;
+				if (h.includes('s')) y2 = y1 + nh;
+				else y1 = y2 - nh;
+			}
+			w.x = Math.round(x1);
+			w.y = Math.round(y1);
+			w.w = Math.round(x2 - x1);
+			w.h = Math.round(y2 - y1);
+		}
+		showGuides(gx, gy);
+		const el = els.get(w.id);
+		if (el) place(el, w);
+		syncFields();
+		redraw();
+		refreshChrome();
+	});
+	const endDrag = () => {
+		if (!drag) return;
+		const moved = drag.moved;
+		drag = null;
+		showGuides(null, null);
+		if (moved) commit();
+	};
+	overlay.addEventListener('pointerup', endDrag);
+	overlay.addEventListener('pointercancel', endDrag);
+
+	// ---------------------------------------------------------------- keyboard
+	function nudge(dx: number, dy: number) {
+		const w = find(sel);
+		if (!w) return;
+		w.x = Math.min(SCREEN.w - w.w, Math.max(0, w.x + dx));
+		w.y = Math.min(SCREEN.h - w.h, Math.max(0, w.y + dy));
+		const el = els.get(w.id);
+		if (el) place(el, w);
+		syncFields();
+		redraw();
+		commitSoon();
+	}
+	function typing(t: EventTarget | null) {
+		const el = t as HTMLElement | null;
+		return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+	}
+	document.addEventListener('keydown', (e) => {
+		const mod = e.ctrlKey || e.metaKey;
+		if (mod && e.key.toLowerCase() === 's') {
+			e.preventDefault();
+			save();
+			return;
+		}
+		if (typing(e.target)) return;
+		if (mod && e.key.toLowerCase() === 'z') {
+			e.preventDefault();
+			restore(e.shiftKey ? hi + 1 : hi - 1);
+		} else if (mod && e.key.toLowerCase() === 'y') {
+			e.preventDefault();
+			restore(hi + 1);
+		} else if (mod && e.key.toLowerCase() === 'd') {
+			e.preventDefault();
+			duplicate();
+		} else if (e.key === 'Delete' || e.key === 'Backspace') {
+			if (sel) (e.preventDefault(), remove());
+		} else if (e.key === 'Escape') {
+			select(null);
+		} else if (e.key.startsWith('Arrow') && sel) {
+			e.preventDefault();
+			const step = e.shiftKey ? 8 : 1;
+			nudge(e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0, e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0);
+		} else if (e.key === ']' && sel) reorder(1);
+		else if (e.key === '[' && sel) reorder(-1);
+	});
+
+	// ---------------------------------------------------------------- editing actions
+	function add(type: string, cx?: number, cy?: number) {
+		if (layout.widgets.length >= MAX_WIDGETS) {
+			flash(`That's the most widgets (${MAX_WIDGETS}). Remove one to add another.`, true);
+			return;
+		}
+		const d = WIDGETS[type];
+		// where: the pointer, or a staggered spot near the middle
+		const n = layout.widgets.length;
+		const x = cx !== undefined ? cx - d.w / 2 : (SCREEN.w - d.w) / 2 + ((n * 14) % 70) - 35;
+		const y = cy !== undefined ? cy - d.h / 2 : (SCREEN.h - d.h) / 2 + ((n * 14) % 70) - 35;
+		const g = grid();
+		const w = makeWidget(type, g ? Math.round(x / g) * g : Math.round(x), g ? Math.round(y / g) * g : Math.round(y));
+		layout.widgets.push(clampWidget(w));
+		sel = w.id;
+		commit();
+		everything();
+	}
+	function remove() {
+		const w = find(sel);
+		if (!w) return;
+		layout.widgets = layout.widgets.filter((x) => x.id !== w.id);
+		sel = null;
+		commit();
+		everything();
+	}
+	function duplicate() {
+		const w = find(sel);
+		if (!w || layout.widgets.length >= MAX_WIDGETS) return;
+		const c = clampWidget({ ...w, id: newId(), x: w.x + 12, y: w.y + 12, o: { ...w.o } });
+		layout.widgets.push(c);
+		sel = c.id;
+		commit();
+		everything();
+	}
+	function reorder(dir: number | 'front' | 'back') {
+		const i = layout.widgets.findIndex((w) => w.id === sel);
+		if (i < 0) return;
+		const [w] = layout.widgets.splice(i, 1);
+		const j = dir === 'front' ? layout.widgets.length : dir === 'back' ? 0 : Math.max(0, Math.min(layout.widgets.length, i + dir));
+		layout.widgets.splice(j, 0, w);
+		commit();
+		everything();
+	}
+	function alignTo(how: string) {
+		const w = find(sel);
+		if (!w) return;
+		if (how === 'l') w.x = 0;
+		if (how === 'c') w.x = Math.round((SCREEN.w - w.w) / 2);
+		if (how === 'r') w.x = SCREEN.w - w.w;
+		if (how === 't') w.y = 0;
+		if (how === 'm') w.y = Math.round((SCREEN.h - w.h) / 2);
+		if (how === 'b') w.y = SCREEN.h - w.h;
+		commit();
+		everything();
+	}
+	function setGeom(k: 'x' | 'y' | 'w' | 'h', v: number) {
+		const w = find(sel);
+		if (!w || !Number.isFinite(v)) return;
+		const c = clampWidget({ ...w, [k]: Math.round(v) } as Widget);
+		Object.assign(w, { x: c.x, y: c.y, w: c.w, h: c.h });
+		const el = els.get(w.id);
+		if (el) place(el, w);
+		redraw();
+		commitSoon();
+	}
+	function setOpt(def: OptDef, v: string | boolean) {
+		const w = find(sel);
+		if (!w) return;
+		w.o[def.key] = v;
+		redraw();
+		if (def.kind === 'text') commitSoon();
+		else (commit(), buildInspector());
+	}
+	function applyTemplate(id: string) {
+		const t = TEMPLATES.find((x) => x.id === id);
+		if (!t) return;
+		if (layout.widgets.length && !confirm('Replace your current design with this starting point? You can undo it.')) return;
+		layout = sanitizeLayout(t.build());
+		sel = null;
+		commit();
+		everything();
+	}
+
+	// ---------------------------------------------------------------- the inspector (right-hand side)
+	const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+	const fields: Record<string, HTMLInputElement> = {};
+	function syncFields() {
+		const w = find(sel);
+		if (!w) return;
+		for (const k of ['x', 'y', 'w', 'h'] as const) if (fields[k] && document.activeElement !== fields[k]) fields[k].value = String(w[k]);
+	}
+
+	function buildInspector() {
+		const w = find(sel);
+		for (const k of Object.keys(fields)) delete fields[k];
+		inspector.innerHTML = '';
+		w ? widgetPanel(w) : layoutPanel();
+	}
+
+	function section(title: string): HTMLElement {
+		const s = document.createElement('section');
+		s.className = 'sec';
+		const l = document.createElement('div');
+		l.className = 'label';
+		l.textContent = title;
+		s.appendChild(l);
+		inspector.appendChild(s);
+		return s;
+	}
+	function button(text: string, fn: () => void, cls = 'btn ghost small', title = ''): HTMLButtonElement {
+		const b = document.createElement('button');
+		b.type = 'button';
+		b.className = cls;
+		b.textContent = text;
+		if (title) b.title = title;
+		b.addEventListener('click', fn);
+		return b;
+	}
+
+	function widgetPanel(w: Widget) {
+		const def = WIDGETS[w.t];
+		const head = section(def.label);
+		const p = document.createElement('p');
+		p.className = 'muted small';
+		p.textContent = def.blurb;
+		head.appendChild(p);
+
+		// position and size
+		const pos = section('Position and size');
+		const g = document.createElement('div');
+		g.className = 'geo';
+		for (const [k, label] of [['x', 'X'], ['y', 'Y'], ['w', 'Width'], ['h', 'Height']] as const) {
+			const lab = document.createElement('label');
+			lab.innerHTML = `<span>${label}</span>`;
+			const inp = document.createElement('input');
+			inp.type = 'number';
+			inp.className = 'num';
+			inp.value = String(w[k]);
+			inp.disabled = !!def.fixed && (k === 'w' || k === 'h');
+			inp.addEventListener('input', () => setGeom(k, parseFloat(inp.value)));
+			inp.addEventListener('change', () => (flushCommit(), syncFields()));
+			fields[k] = inp;
+			lab.appendChild(inp);
+			g.appendChild(lab);
+		}
+		pos.appendChild(g);
+		if (def.fixed) {
+			const n = document.createElement('p');
+			n.className = 'muted small';
+			n.textContent = 'This one has a fixed size. You can still move it.';
+			pos.appendChild(n);
+		}
+		const al = document.createElement('div');
+		al.className = 'row';
+		for (const [how, label, tip] of [['l', '⇤', 'Align to the left edge'], ['c', '↔', 'Centre across the screen'], ['r', '⇥', 'Align to the right edge'], ['t', '⤒', 'Align to the top'], ['m', '↕', 'Centre down the screen'], ['b', '⤓', 'Align to the bottom']] as const) {
+			al.appendChild(button(label, () => alignTo(how), 'btn ghost small ico', tip));
+		}
+		pos.appendChild(al);
+
+		// options
+		if (def.opts.length) {
+			const o = withDefaults(w);
+			const sec = section('Options');
+			for (const od of def.opts) {
+				if (od.show && !Object.entries(od.show).every(([k, v]) => o[k] === v)) continue;
+				const row = document.createElement('div');
+				row.className = 'opt';
+				if (od.kind === 'toggle') {
+					const lab = document.createElement('label');
+					lab.className = 'check';
+					const inp = document.createElement('input');
+					inp.type = 'checkbox';
+					inp.checked = o[od.key] === true;
+					inp.addEventListener('change', () => setOpt(od, inp.checked));
+					lab.innerHTML = '';
+					const box = document.createElement('span');
+					box.className = 'box';
+					lab.append(inp, box, document.createTextNode(od.label));
+					row.appendChild(lab);
+				} else if (od.kind === 'choice') {
+					const lab = document.createElement('label');
+					lab.className = 'fld';
+					lab.innerHTML = `<span>${esc(od.label)}</span>`;
+					if (od.choices.length <= 3) {
+						const seg = document.createElement('div');
+						seg.className = 'seg';
+						od.choices.forEach(([v, text]) => {
+							const b = document.createElement('button');
+							b.type = 'button';
+							b.textContent = text;
+							b.className = o[od.key] === v ? 'on' : '';
+							b.addEventListener('click', () => setOpt(od, v));
+							seg.appendChild(b);
+						});
+						lab.appendChild(seg);
+					} else {
+						const s = document.createElement('select');
+						s.className = 'mini wide';
+						od.choices.forEach(([v, text]) => {
+							const op = document.createElement('option');
+							op.value = v;
+							op.textContent = text;
+							op.selected = o[od.key] === v;
+							s.appendChild(op);
+						});
+						s.addEventListener('change', () => setOpt(od, s.value));
+						lab.appendChild(s);
+					}
+					row.appendChild(lab);
+				} else {
+					const lab = document.createElement('label');
+					lab.className = 'fld';
+					lab.innerHTML = `<span>${esc(od.label)}</span>`;
+					const ta = document.createElement('textarea');
+					ta.className = 'txt';
+					ta.rows = od.rows ?? 2;
+					ta.maxLength = od.max;
+					ta.value = String(o[od.key] ?? '');
+					ta.addEventListener('input', () => setOpt(od, ta.value));
+					lab.appendChild(ta);
+					row.appendChild(lab);
+				}
+				sec.appendChild(row);
+			}
+		}
+
+		// layers + actions
+		const act = section('Arrange');
+		const r1 = document.createElement('div');
+		r1.className = 'row';
+		r1.append(button('Bring forward', () => reorder(1), 'btn ghost small', 'Shortcut: ]'), button('Send back', () => reorder(-1), 'btn ghost small', 'Shortcut: ['), button('To front', () => reorder('front')), button('To back', () => reorder('back')));
+		act.appendChild(r1);
+		const r2 = document.createElement('div');
+		r2.className = 'row';
+		r2.append(button('Duplicate', duplicate), button('Delete', remove, 'btn ghost small danger'));
+		act.appendChild(r2);
+		const back = document.createElement('button');
+		back.type = 'button';
+		back.className = 'link';
+		back.textContent = '← Back to the whole layout';
+		back.addEventListener('click', () => select(null));
+		act.appendChild(back);
+	}
+
+	// thumbnail of a starting point
+	const thumbs = new Map<string, HTMLCanvasElement>();
+	function paintThumbs() {
+		if (!fonts) return;
+		for (const [id, c] of thumbs) {
+			const t = TEMPLATES.find((x) => x.id === id)!;
+			const r = renderDrawList(drawListFor(previewOpts(sanitizeLayout(t.build()))), fonts);
+			paint(c, r.px, 1);
+		}
+	}
+
+	function layoutPanel() {
+		const set = section('This display');
+		const fl = document.createElement('label');
+		fl.className = 'fld';
+		fl.innerHTML = '<span>Font</span>';
+		const fs = document.createElement('select');
+		fs.className = 'mini wide';
+		const dflt = document.createElement('option');
+		dflt.value = '';
+		dflt.textContent = 'Classic (default)';
+		fs.appendChild(dflt);
+		for (const f of families) {
+			if (f.id === 'sans') continue;
+			const op = document.createElement('option');
+			op.value = f.id;
+			op.textContent = f.label;
+			fs.appendChild(op);
+		}
+		fs.value = font && font !== 'sans' ? font : '';
+		fs.addEventListener('change', () => {
+			font = fs.value || null;
+			redraw();
+			paintThumbs();
+			refreshChrome();
+		});
+		fl.appendChild(fs);
+		set.appendChild(fl);
+		const dl = document.createElement('label');
+		dl.className = 'check';
+		const di = document.createElement('input');
+		di.type = 'checkbox';
+		di.checked = dark;
+		di.addEventListener('change', () => {
+			dark = di.checked;
+			redraw();
+			paintThumbs();
+			refreshChrome();
+		});
+		const dbx = document.createElement('span');
+		dbx.className = 'box';
+		dl.append(di, dbx, document.createTextNode('Dark mode (white on black)'));
+		set.appendChild(dl);
+
+		const lay = section(`Layers (${layout.widgets.length})`);
+		if (!layout.widgets.length) {
+			const e = document.createElement('p');
+			e.className = 'muted small';
+			e.textContent = 'Nothing here yet. Add widgets from the left, or start from one of these:';
+			lay.appendChild(e);
+		} else {
+			const ul = document.createElement('ul');
+			ul.className = 'layers';
+			[...layout.widgets].reverse().forEach((w) => {
+				const li = document.createElement('li');
+				const b = document.createElement('button');
+				b.type = 'button';
+				b.textContent = name(w);
+				b.addEventListener('click', () => select(w.id));
+				b.addEventListener('mouseenter', () => els.get(w.id)?.classList.add('hl'));
+				b.addEventListener('mouseleave', () => els.get(w.id)?.classList.remove('hl'));
+				li.appendChild(b);
+				ul.appendChild(li);
+			});
+			lay.appendChild(ul);
+		}
+
+		const tpl = section('Start from');
+		const tg = document.createElement('div');
+		tg.className = 'tpls';
+		thumbs.clear();
+		for (const t of TEMPLATES) {
+			const b = document.createElement('button');
+			b.type = 'button';
+			b.className = 'tpl';
+			const c = document.createElement('canvas');
+			c.width = 400;
+			c.height = 300;
+			thumbs.set(t.id, c);
+			b.append(c);
+			const n = document.createElement('span');
+			n.className = 'tn';
+			n.textContent = t.label;
+			const s = document.createElement('span');
+			s.className = 'ts';
+			s.textContent = t.note;
+			b.append(n, s);
+			b.addEventListener('click', () => applyTemplate(t.id));
+			tg.appendChild(b);
+		}
+		tpl.appendChild(tg);
+		paintThumbs();
+		if (layout.widgets.length) {
+			const clr = document.createElement('div');
+			clr.className = 'row';
+			clr.appendChild(
+				button('Clear everything', () => {
+					if (!confirm('Remove every widget? You can undo it.')) return;
+					layout = { v: 1, widgets: [] };
+					sel = null;
+					commit();
+					everything();
+				}, 'btn ghost small danger')
+			);
+			tpl.appendChild(clr);
+		}
+	}
+
+	// ---------------------------------------------------------------- the palette (left-hand side)
+	function buildPalette() {
+		paletteEl.innerHTML = '';
+		for (const g of GROUPS) {
+			const items = Object.entries(WIDGETS).filter(([, d]) => d.group === g);
+			if (!items.length) continue;
+			const h = document.createElement('div');
+			h.className = 'pgroup';
+			h.textContent = g;
+			paletteEl.appendChild(h);
+			const wrap = document.createElement('div');
+			wrap.className = 'pitems';
+			for (const [type, d] of items) {
+				const b = document.createElement('button');
+				b.type = 'button';
+				b.className = 'pitem';
+				b.title = d.blurb;
+				b.innerHTML = `<span class="pic">${esc(SHORT[type] ?? '?')}</span><span class="pn">${esc(d.label)}</span>`;
+				wirePaletteItem(b, type);
+				wrap.appendChild(b);
+			}
+			paletteEl.appendChild(wrap);
+		}
+	}
+	function wirePaletteItem(b: HTMLElement, type: string) {
+		let down: { x: number; y: number } | null = null;
+		let dragging = false;
+		b.addEventListener('pointerdown', (e) => {
+			if (e.button !== 0) return;
+			down = { x: e.clientX, y: e.clientY };
+			dragging = false;
+			b.setPointerCapture(e.pointerId);
+		});
+		b.addEventListener('pointermove', (e) => {
+			if (!down) return;
+			if (!dragging && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) {
+				dragging = true;
+				ghostEl.hidden = false;
+				ghostEl.textContent = WIDGETS[type].label;
+			}
+			if (dragging) {
+				ghostEl.style.left = e.clientX + 12 + 'px';
+				ghostEl.style.top = e.clientY + 12 + 'px';
+				const r = stage.getBoundingClientRect();
+				const over = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+				stage.classList.toggle('drop', over);
+			}
+		});
+		const finish = (e: PointerEvent, cancel = false) => {
+			if (!down) return;
+			const wasDrag = dragging;
+			down = null;
+			dragging = false;
+			ghostEl.hidden = true;
+			stage.classList.remove('drop');
+			if (cancel) return;
+			if (wasDrag) {
+				const r = stage.getBoundingClientRect();
+				if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+					const k = r.width / SCREEN.w;
+					add(type, (e.clientX - r.left) / k, (e.clientY - r.top) / k);
+				}
+			} else add(type);
+		};
+		b.addEventListener('pointerup', (e) => finish(e));
+		b.addEventListener('pointercancel', (e) => finish(e, true));
+		b.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				add(type);
+			}
+		});
+	}
+
+	// ---------------------------------------------------------------- messages, warnings, buttons
+	function flash(text: string, err = false) {
+		saveMsg.textContent = text;
+		saveMsg.classList.toggle('is-error', err);
+		saveMsg.classList.remove('is-dirty');
+	}
+	function isDirty() {
+		return key() !== savedKey || !!commitTimer;
+	}
+	function refreshChrome() {
+		undoBtn.disabled = hi <= 0;
+		redoBtn.disabled = hi >= hist.length - 1;
+		const dirty = isDirty();
+		saveBtn.disabled = !dirty;
+		if (dirty) {
+			saveMsg.textContent = 'Unsaved changes';
+			saveMsg.classList.add('is-dirty');
+			saveMsg.classList.remove('is-error');
+		}
+		const n = layoutNeeds(layout);
+		const types = new Set(layout.widgets.map((w) => w.t));
+		const notes: string[] = [];
+		if (n.tasks && !info.tasksGranted) notes.push('The To-do list needs Google Tasks. Connect it on the <a href="/dashboard/display?device=' + encodeURIComponent(deviceId) + '">Customize display</a> page (choose the To-do layout, then the Tasks tab). Until then your screen will say so.');
+		if (n.countdown && !info.countdown) notes.push('Set what you’re counting down to on the <a href="/dashboard/display?device=' + encodeURIComponent(deviceId) + '">Customize display</a> page (choose Countdown, then Options). The preview uses an example.');
+		if (n.picture && !info.cornerBits) notes.push('Choose your picture on the <a href="/dashboard/display?device=' + encodeURIComponent(deviceId) + '">Customize display</a> page (Agenda, then Picture). Nothing is drawn until you do.');
+		if ((types.has('sun_times') || types.has('moon')) && !info.loc) notes.push('Add your city (weather location) to get sunrise and sunset times and the right way up moon.');
+		if (types.has('weather') && !info.hasWeather) notes.push('Add your city (weather location) to get the weather.');
+		notesEl.hidden = !notes.length;
+		notesEl.innerHTML = notes.map((x) => `<li>${x}</li>`).join('');
+	}
+
+	function everything() {
+		syncOverlay();
+		buildInspector();
+		redraw();
+		refreshChrome();
+	}
+
+	// ---------------------------------------------------------------- loading and saving
+	async function load() {
+		const res = await fetch('/api/dashboard/builder?deviceId=' + encodeURIComponent(deviceId));
+		if (res.status === 401) return void (location.href = '/setup');
+		if (!res.ok) {
+			banner.hidden = false;
+			banner.textContent = 'Could not load this display. Go back to the dashboard and try again.';
+			return;
+		}
+		const d = await res.json();
+		$('title').textContent = d.name ? `${d.name}: layout builder` : 'Layout builder';
+		info = { hasWeather: !!d.hasWeather, loc: d.lat !== null && d.lon !== null ? { lat: d.lat, lon: d.lon } : null, countdown: d.countdown, cornerBits: d.cornerBits, tasksGranted: !!d.tasksGranted, migrated: !!d.migrated };
+		font = d.font;
+		dark = !!d.dark;
+		layout = sanitizeLayout(d.custom);
+		if (!info.migrated) {
+			banner.hidden = false;
+			banner.textContent = 'The layout builder isn’t switched on on the server yet (schema-builder.sql needs running). You can design here, but saving won’t work until then.';
+		}
+		if (d.devices?.length > 1) {
+			const pick = $<HTMLSelectElement>('device-pick');
+			pick.hidden = false;
+			for (const x of d.devices) {
+				const op = document.createElement('option');
+				op.value = x.id;
+				op.textContent = x.name || 'Display';
+				op.selected = x.id === deviceId;
+				pick.appendChild(op);
+			}
+			pick.addEventListener('change', () => {
+				if (isDirty() && !confirm('You have unsaved changes. Leave without saving?')) return void (pick.value = deviceId);
+				location.href = '/dashboard/builder?device=' + encodeURIComponent(pick.value);
+			});
+		}
+		hist = [ser()];
+		hi = 0;
+		savedKey = key();
+		everything();
+		fonts = await loadFonts().catch(() => null);
+		redraw();
+		paintThumbs();
+	}
+
+	async function save() {
+		flushCommit();
+		if (!isDirty() || saveBtn.disabled) return;
+		saveBtn.disabled = true;
+		flash('Saving…');
+		try {
+			const res = await fetch('/api/dashboard/builder', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ deviceId, custom: layout, activate: true, font, dark }),
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(data.error || 'Could not save.');
+			savedKey = key();
+			flash('Saved. Your display picks it up the next time it refreshes.');
+			refreshChrome();
+			saveBtn.disabled = true;
+		} catch (e: any) {
+			flash(e.message || 'Could not save.', true);
+			saveBtn.disabled = false;
+		}
+	}
+
+	saveBtn.addEventListener('click', save);
+	undoBtn.addEventListener('click', () => restore(hi - 1));
+	redoBtn.addEventListener('click', () => restore(hi + 1));
+	outlinesBox.addEventListener('change', () => stage.classList.toggle('no-outlines', !outlinesBox.checked));
+	window.addEventListener('beforeunload', (e) => {
+		if (isDirty()) e.preventDefault();
+	});
+	document.getElementById('back')!.addEventListener('click', (e) => {
+		if (isDirty() && !confirm('You have unsaved changes. Leave without saving?')) e.preventDefault();
+	});
+
+	buildPalette();
+	load();
+</script>
+
+<style is:global>
+	.bld { position: relative; left: 50%; width: min(1560px, 100vw - 2em); transform: translateX(-50%); margin-top: -1.8em; padding: 0.6em 0 3em; }
+	.bld .muted { color: var(--muted); margin: 0; }
+	.bld .small { font-size: 0.88em; }
+	.bld .banner { background: rgba(217, 164, 65, 0.12); border: 1px solid #d9a441; color: var(--fg); border-radius: 12px; padding: 0.8em 1em; margin: 0 0 1em; font-size: 0.92em; }
+	.bld .notes { list-style: none; margin: 0 0 1em; padding: 0.7em 1em; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 12px; font-size: 0.88em; color: var(--muted); display: grid; gap: 0.4em; }
+	.bld .notes a { color: var(--accent); }
+	.bld [hidden] { display: none !important; }
+
+	.bld .topbar { position: sticky; top: 0.6em; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 1em; flex-wrap: wrap; padding: 0.7em 0.8em 0.7em 1.3em; margin-bottom: 1.2em; background: color-mix(in srgb, var(--bg-raised) 90%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--border); border-radius: 18px; }
+	.bld .tb-left { display: flex; align-items: baseline; gap: 1.2em; min-width: 0; flex-wrap: wrap; }
+	.bld .back { color: var(--muted); text-decoration: none; font-size: 0.9em; white-space: nowrap; }
+	.bld .back:hover { color: var(--fg); }
+	.bld .bld-title { font-size: 1.4em; font-weight: 800; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.bld .tb-right { display: flex; align-items: center; gap: 0.5em; margin-left: auto; }
+	.bld .save-msg { font-size: 0.86em; color: var(--muted); margin-right: 0.4em; }
+	.bld .save-msg.is-dirty { color: #d9a441; }
+	.bld .save-msg.is-error { color: #e08a8a; }
+
+	.bld .grid { display: grid; grid-template-columns: 270px minmax(0, 1fr) 320px; gap: 1.2em; align-items: start; }
+	.bld .col { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; padding: 1em; }
+	.bld .col.mid { background: transparent; border: 0; padding: 0; }
+	.bld .pal, .bld .insp { position: sticky; top: 5.2em; max-height: calc(100vh - 6.4em); overflow: auto; }
+	.bld .label { font-size: 0.72em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.7em; }
+
+	/* palette */
+	.bld .pgroup { font-size: 0.74em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 1.1em 0 0.5em; }
+	.bld .pitems { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4em; }
+	.bld .pitem { min-width: 0; display: flex; align-items: center; gap: 0.5em; padding: 0.4em 0.5em; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--fg); font: inherit; font-size: 0.82em; text-align: left; touch-action: none; user-select: none; -webkit-user-select: none; }
+	.bld .pitem:hover { border-color: var(--accent); }
+	.bld .pitem:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.bld .pic { flex: 0 0 auto; width: 2.1em; height: 2.1em; display: grid; place-items: center; border-radius: 7px; background: color-mix(in srgb, var(--fg) 10%, transparent); font-size: 0.78em; font-weight: 800; letter-spacing: -0.02em; }
+	.bld .pn { line-height: 1.15; min-width: 0; overflow-wrap: anywhere; }
+	.bld .dragghost { position: fixed; z-index: 100; pointer-events: none; padding: 0.4em 0.8em; background: var(--accent); color: var(--bg); border-radius: 999px; font-size: 0.85em; font-weight: 700; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
+
+	/* the screen and the boxes on it */
+	.bld .stage-bar { display: flex; align-items: center; gap: 1.4em; flex-wrap: wrap; margin-bottom: 0.7em; }
+	.bld .sel { display: inline-flex; align-items: center; gap: 0.5em; color: var(--muted); }
+	.bld .stage { position: relative; width: 100%; max-width: 880px; margin: 0 auto; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden; background: #dfdbd0; box-shadow: 0 0 0 1px var(--border); touch-action: none; }
+	.bld .stage.drop { box-shadow: 0 0 0 3px var(--accent); }
+	.bld .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+	.bld .overlay { position: absolute; inset: 0; }
+	.bld .wb { position: absolute; box-sizing: border-box; border: 1px dashed rgba(var(--accent-rgb), 0.55); cursor: move; outline: none; touch-action: none; }
+	.bld .stage.no-outlines .wb:not(.on) { border-color: transparent; }
+	.bld .wb:hover, .bld .wb.hl { border-style: solid; border-color: var(--accent); background: rgba(var(--accent-rgb), 0.08); }
+	.bld .wb.on { border: 2px solid var(--accent); background: rgba(var(--accent-rgb), 0.07); }
+	.bld .wb:focus-visible { box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.5); }
+	.bld .wb.ph { background: repeating-linear-gradient(45deg, rgba(var(--accent-rgb), 0.14) 0 6px, transparent 6px 12px); }
+	.bld .chip { position: absolute; left: -1px; bottom: 100%; transform: translateY(1px); padding: 1px 7px; font-size: 11px; line-height: 16px; font-weight: 700; color: var(--bg); background: var(--accent); border-radius: 5px 5px 0 0; white-space: nowrap; pointer-events: none; opacity: 0; }
+	.bld .wb:hover .chip, .bld .wb.on .chip, .bld .wb:focus-visible .chip { opacity: 1; }
+	.bld .wb:not(.on) .hd { display: none; }
+	.bld .hd { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; background: var(--bg); border: 2px solid var(--accent); border-radius: 3px; box-sizing: border-box; touch-action: none; }
+	.bld .hd[data-h='nw'] { left: 0; top: 0; cursor: nwse-resize; }
+	.bld .hd[data-h='n'] { left: 50%; top: 0; cursor: ns-resize; }
+	.bld .hd[data-h='ne'] { left: 100%; top: 0; cursor: nesw-resize; }
+	.bld .hd[data-h='e'] { left: 100%; top: 50%; cursor: ew-resize; }
+	.bld .hd[data-h='se'] { left: 100%; top: 100%; cursor: nwse-resize; }
+	.bld .hd[data-h='s'] { left: 50%; top: 100%; cursor: ns-resize; }
+	.bld .hd[data-h='sw'] { left: 0; top: 100%; cursor: nesw-resize; }
+	.bld .hd[data-h='w'] { left: 0; top: 50%; cursor: ew-resize; }
+	.bld .guide { position: absolute; background: #ff4fa3; pointer-events: none; z-index: 999; }
+	.bld .guide.gv { top: 0; bottom: 0; width: 1px; }
+	.bld .guide.gh { left: 0; right: 0; height: 1px; }
+	.bld .keys { max-width: 880px; margin: 0.8em auto 0; line-height: 1.5; }
+
+	/* the right-hand panel */
+	.bld .sec { margin-bottom: 1.3em; }
+	.bld .sec:last-child { margin-bottom: 0; }
+	.bld .geo { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5em; margin-bottom: 0.6em; }
+	.bld .geo label, .bld .fld { display: grid; gap: 0.25em; font-size: 0.8em; color: var(--muted); }
+	.bld .num, .bld .txt, .bld .mini { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 9px; padding: 0.4em 0.6em; font: inherit; font-size: 0.95em; box-sizing: border-box; }
+	.bld .num { width: 100%; }
+	.bld .num:disabled { opacity: 0.5; }
+	.bld .txt { width: 100%; resize: vertical; }
+	.bld .mini.wide { width: 100%; }
+	.bld .num:focus-visible, .bld .txt:focus-visible, .bld .mini:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+	.bld .opt { margin-bottom: 0.7em; }
+	.bld .row { display: flex; flex-wrap: wrap; gap: 0.4em; margin-top: 0.5em; }
+	.bld .seg { display: flex; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
+	.bld .seg button { flex: 1; background: none; border: 0; border-radius: 999px; padding: 0.35em 0.4em; font: inherit; font-size: 0.95em; color: var(--muted); }
+	.bld .seg button.on { background: var(--fg); color: var(--bg); }
+	.bld .layers { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+	.bld .layers button { width: 100%; text-align: left; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.35em 0.6em; font: inherit; font-size: 0.85em; color: var(--fg); }
+	.bld .layers button:hover { border-color: var(--accent); }
+	.bld .tpls { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6em; }
+	.bld .tpl { display: grid; gap: 0.2em; padding: 0.4em; text-align: left; background: var(--bg); border: 2px solid var(--border); border-radius: 10px; color: var(--fg); font: inherit; }
+	.bld .tpl:hover { border-color: var(--accent); }
+	.bld .tpl canvas { width: 100%; height: auto; border-radius: 5px; background: #dfdbd0; display: block; aspect-ratio: 4 / 3; }
+	.bld .tn { font-size: 0.82em; font-weight: 700; }
+	.bld .ts { font-size: 0.7em; color: var(--muted); line-height: 1.25; }
+
+	.bld .check { display: inline-flex; align-items: center; gap: 0.6em; color: var(--fg); font-size: 0.88em; cursor: pointer; }
+	.bld .check input { position: absolute; opacity: 0; pointer-events: none; }
+	.bld .check .box { flex: 0 0 auto; width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--muted-dim); display: grid; place-items: center; transition: background 0.2s, border-color 0.2s; }
+	.bld .check .box::after { content: ''; width: 4px; height: 9px; border: solid var(--bg); border-width: 0 2.5px 2.5px 0; transform: translateY(-1px) rotate(45deg) scale(0); transition: transform 0.18s; }
+	.bld .check input:checked + .box { background: var(--accent); border-color: var(--accent); }
+	.bld .check input:checked + .box::after { transform: translateY(-1px) rotate(45deg) scale(1); }
+	.bld .check input:focus-visible + .box { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+	.bld .btn { display: inline-block; padding: 0.7em 1.5em; border: 1px solid transparent; border-radius: 999px; background: var(--fg); color: var(--bg); font: inherit; font-weight: 700; font-size: 0.95em; text-decoration: none; }
+	.bld .btn:hover:not(:disabled) { background: var(--accent); color: var(--bg); }
+	.bld .btn:disabled { opacity: 0.4; }
+	.bld .btn.small { padding: 0.5em 1.1em; font-size: 0.86em; }
+	.bld .btn.ghost { background: transparent; color: var(--muted); border-color: var(--border); }
+	.bld .btn.ghost:hover:not(:disabled) { background: transparent; color: var(--fg); border-color: var(--muted); }
+	.bld .btn.ico { padding: 0.45em 0.7em; font-size: 0.95em; line-height: 1; }
+	.bld .btn.danger:hover:not(:disabled) { color: #e08a8a; border-color: #e08a8a; }
+	.bld .link { background: none; border: 0; padding: 0; margin-top: 0.9em; font: inherit; font-size: 0.86em; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; display: block; }
+	.bld .link:hover { color: var(--fg); }
+
+	html.has-custom-cursor .bld, html.has-custom-cursor .bld * { cursor: none !important; }
+
+	@media (max-width: 1180px) {
+		.bld .grid { grid-template-columns: 250px minmax(0, 1fr); }
+		.bld .insp { grid-column: 1 / -1; position: static; max-height: none; }
+	}
+	@media (max-width: 760px) {
+		.bld .grid { grid-template-columns: 1fr; }
+		.bld .pal { position: static; max-height: none; order: 2; }
+		.bld .mid { order: 1; }
+		.bld .insp { order: 3; }
+		.bld .save-msg { display: none; }
+	}
+</style>

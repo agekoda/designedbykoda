@@ -2,6 +2,7 @@
 // name / layout / calendars. Everything is checked against the session's
 // user, so you can only ever see or change your own devices.
 import { isStyleId, DEFAULT_STYLE } from '../../../data/calendarStyles';
+import { sanitizeLayout } from '../../../lib/eink/builder/model';
 export const prerender = false;
 
 function parseIds(raw: unknown): string[] | null {
@@ -64,6 +65,13 @@ export async function GET({ request, locals }) {
 		for (const e of mr.results ?? []) more.set(e.id, { frameBits: e.frame_bits ?? null, countdown: e.countdown_title && e.countdown_date ? { title: e.countdown_title, date: e.countdown_date } : null });
 	} catch {}
 
+	// Each device's own design from the layout builder (schema-builder.sql, its own query for the same reason).
+	const customs = new Map<string, unknown>();
+	try {
+		const cr = await db.prepare('SELECT id, custom_layout FROM devices WHERE user_id = ? AND custom_layout IS NOT NULL').bind(userId).all();
+		for (const e of cr.results ?? []) customs.set(e.id, sanitizeLayout(e.custom_layout));
+	} catch {}
+
 	// When it was (last) paired, from schema-paired-at.sql. Falls back to the
 	// row's creation date for devices paired before that column existed.
 	const pairedAt = new Map<string, number>();
@@ -89,6 +97,7 @@ export async function GET({ request, locals }) {
 		cornerBits: extra.get(d.id)?.cornerBits ?? null,
 		frameBits: more.get(d.id)?.frameBits ?? null,
 		countdown: more.get(d.id)?.countdown ?? null,
+		custom: customs.get(d.id) ?? null,
 	}));
 	return json({ devices }, 200);
 }

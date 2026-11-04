@@ -85,6 +85,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						<input class="txt" id="cd-date" type="date" />
 						<p class="muted small hint">Shows how many days are left. The number goes down each morning, and it says "Today!" on the day.</p>
 					</div>
+					<div id="opt-custom" hidden>
+						<p class="muted" id="custom-status"></p>
+						<a class="btn small" id="custom-open" href="#">Open the layout builder</a>
+						<p class="muted small hint">Drag widgets onto a blank screen, move them around and resize them: dates, events, weather, moon, quotes, countdowns, tasks and more. Pick a starting point if you like, then make it yours.</p>
+					</div>
 					<div id="opt-todo" hidden>
 						<p class="muted" id="todo-status"></p>
 						<a class="btn small" id="todo-connect" href="/api/auth/google/start?tasks=1">Connect Google Tasks</a>
@@ -156,6 +161,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { renderPreview, paint, paintScreen, loadFonts } from '../../lib/eink/previewKit';
 	import { defaultFontFor } from '../../lib/eink/layouts';
 	import { Draw } from '../../lib/eink/draw';
+	import { TEMPLATES, sanitizeLayout } from '../../lib/eink/builder/model';
 	import { renderDrawList } from '../../lib/eink/preview';
 	import { sampleFrameBytes } from '../../lib/eink/sampleFrame';
 	import {
@@ -186,6 +192,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const edNote = $('ed-note');
 	const optCountdown = $('opt-countdown');
 	const optTodo = $('opt-todo');
+	const optCustom = $('opt-custom');
+	const customStatus = $('custom-status');
+	const customOpen = $('custom-open') as HTMLAnchorElement;
 	const cdTitle = $<HTMLInputElement>('cd-title');
 	const cdDate = $<HTMLInputElement>('cd-date');
 	const todoStatus = $('todo-status');
@@ -242,6 +251,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	let hasWeather = false;
 	let loc: { lat: number; lon: number } | null = null;
 	let tasksGranted = false;
+	let customLayout: any = null;
 	let vbat: number | null = null;
 	let st: State = {
 		style: 'agenda',
@@ -284,6 +294,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			frameImage: s?.frame ? (pics.frame.bytes ?? (thumb ? sampleFrameBytes() : null)) : null,
 			loc,
 			countdown: styleId === 'countdown' ? cd : null,
+			custom: styleId === 'custom' ? (thumb && !customLayout?.widgets?.length ? sanitizeLayout(TEMPLATES.find((x) => x.id === 'planner')!.build()) : customLayout) : null,
 			tasksState: (thumb || tasksGranted ? 'ok' : 'needs_permission') as 'ok' | 'needs_permission',
 		};
 	}
@@ -657,12 +668,17 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		paintEditor();
 
 		// Options tab: the Countdown's name and date, or connecting Google Tasks
-		const opt = st.style === 'countdown' ? 'countdown' : st.style === 'todo' ? 'todo' : null;
+		const opt = st.style === 'countdown' ? 'countdown' : st.style === 'todo' ? 'todo' : st.style === 'custom' ? 'custom' : null;
 		tabOptBtn.hidden = !opt;
-		tabOptBtn.textContent = opt === 'countdown' ? 'Countdown' : opt === 'todo' ? 'Tasks' : 'Options';
+		tabOptBtn.textContent = opt === 'countdown' ? 'Countdown' : opt === 'todo' ? 'Tasks' : opt === 'custom' ? 'Builder' : 'Options';
 		if (!opt && activeTab === 'options') showTab('layout');
 		optCountdown.hidden = opt !== 'countdown';
 		optTodo.hidden = opt !== 'todo';
+		optCustom.hidden = opt !== 'custom';
+		const nW = customLayout?.widgets?.length ?? 0;
+		customStatus.textContent = nW ? `Your design has ${nW} widget${nW === 1 ? '' : 's'}.` : 'You haven\u2019t designed a screen yet.';
+		customOpen.textContent = nW ? 'Edit your design' : 'Start designing';
+		customOpen.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId);
 		if (cdTitle.value !== st.countdown.title) cdTitle.value = st.countdown.title;
 		if (cdDate.value !== st.countdown.date) cdDate.value = st.countdown.date;
 		todoStatus.textContent = tasksGranted ? 'Google Tasks is connected.' : 'To show your tasks, allow this calendar to read your Google Tasks.';
@@ -834,6 +850,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			hasWeather = !!info.hasWeather;
 			loc = typeof info.lat === 'number' && typeof info.lon === 'number' ? { lat: info.lat, lon: info.lon } : null;
 			tasksGranted = !!info.tasksGranted;
+			customLayout = info.custom ?? null;
 			vbat = info.batteryMv ? info.batteryMv / 1000 : null;
 			if (!info.migrated) {
 				banner.hidden = false;

@@ -18,6 +18,7 @@ import { quote } from './quote';
 import { countdown } from './countdown';
 import { frame } from './frame';
 import { todo } from './todo';
+import { custom } from './custom';
 
 interface LayoutEntry {
 	render: (ctx: LayoutCtx) => string;
@@ -36,6 +37,7 @@ export const LAYOUTS: Record<string, LayoutEntry> = {
 	countdown: { render: countdown, font: 'sans' },
 	frame: { render: frame, font: 'sans' },
 	todo: { render: todo, font: 'sans' },
+	custom: { render: custom, font: 'sans' },
 };
 
 // The font a layout uses when nothing else is chosen.

@@ -9,6 +9,7 @@ import { getForecast } from '../../../../lib/weather';
 import { renderLayout } from '../../../../lib/eink/layouts';
 import { b64ToBytes, FRAME_BYTES } from '../../../../lib/eink/image';
 import { fetchTasks } from '../../../../lib/tasks';
+import { layoutNeeds, sanitizeLayout, type CustomLayout } from '../../../../lib/eink/builder/model';
 export const prerender = false;
 
 function getCookielessAuthSecret(request: Request): string | null {
@@ -359,10 +360,20 @@ export async function GET({ params, request, locals }) {
 		}
 	} catch {}
 
-	// To-do: the person's Google Tasks (only fetched when that layout is chosen).
+	// Your own design (layout builder, schema-builder.sql). Which widgets it holds decides what else we fetch.
+	let customLayout: CustomLayout | null = null;
+	if (style === 'custom' && proto === '2') {
+		try {
+			const r = await db.prepare('SELECT custom_layout FROM devices WHERE id = ?').bind(deviceId).first();
+			customLayout = r?.custom_layout ? sanitizeLayout(r.custom_layout) : null;
+		} catch {}
+	}
+	const needs = layoutNeeds(customLayout);
+
+	// To-do: the person's Google Tasks (only fetched when that layout, or a to-do widget, is used).
 	let tasks: { title: string; done: boolean; due?: string }[] | null = null;
 	let tasksState: 'ok' | 'needs_permission' | 'error' = 'ok';
-	if (style === 'todo' && proto === '2') {
+	if ((style === 'todo' || needs.tasks) && proto === '2') {
 		const r = await fetchTasks(accessToken, rightNow.getTime());
 		tasks = r.tasks;
 		tasksState = r.state;
@@ -409,7 +420,7 @@ export async function GET({ params, request, locals }) {
 		let countdown: { title: string; date: string } | null = null;
 		let frameImage: Uint8Array | null = null;
 		try {
-			if (style === 'countdown') {
+			if (style === 'countdown' || needs.countdown) {
 				const c = await db.prepare('SELECT countdown_title, countdown_date FROM devices WHERE id = ?').bind(deviceId).first();
 				if (c?.countdown_title && c?.countdown_date) countdown = { title: c.countdown_title, date: c.countdown_date };
 			} else if (style === 'frame') {
@@ -433,6 +444,7 @@ export async function GET({ params, request, locals }) {
 			frameImage,
 			tasks,
 			tasksState,
+			custom: customLayout,
 		}, fontChoice ?? undefined);
 		return new Response(screen, {
 			status: 200,

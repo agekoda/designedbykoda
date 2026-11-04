@@ -5,6 +5,7 @@ import { isStyleId, isRefreshSec, DEFAULT_STYLE } from '../../../data/calendarSt
 import { isFamily } from '../../../lib/eink/fonts';
 import { b64ToBytes, CORNER_BYTES, FRAME_BYTES, cleanSettings } from '../../../lib/eink/image';
 import { toAscii } from '../../../lib/eink/draw';
+import { sanitizeLayout } from '../../../lib/eink/builder/model';
 export const prerender = false;
 
 const MAX_SRC = 280_000; // characters in the stored photo (a small JPEG data URL)
@@ -72,9 +73,16 @@ export async function GET({ request, locals }) {
 		tasksGranted = u?.tasks_granted === 1;
 	} catch {}
 
+	let custom: unknown = null;
+	try {
+		const c = await db.prepare('SELECT custom_layout FROM devices WHERE id = ?').bind(deviceId).first();
+		custom = c?.custom_layout ? sanitizeLayout(JSON.parse(c.custom_layout)) : null;
+	} catch {}
+
 	return json(
 		{
 			migrated,
+			custom,
 			name: dev.name || '',
 			style,
 			dark: dev.dark_mode === 1,
