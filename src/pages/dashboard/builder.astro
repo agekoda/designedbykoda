@@ -25,23 +25,22 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				<span class="save-msg" id="save-msg" aria-live="polite"></span>
 				<button type="button" class="btn ghost small" id="undo" disabled title="Undo (Ctrl+Z)">Undo</button>
 				<button type="button" class="btn ghost small" id="redo" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
-				<button type="button" class="btn small" id="save" disabled>Save and use</button>
+				<button type="button" class="btn ghost small" id="save" disabled>Save</button>
+				<button type="button" class="btn small" id="saveleave">Save and leave</button>
 			</div>
 		</div>
 
-		<div class="banner" id="banner" hidden></div>
-		<ul class="notes" id="notes" hidden></ul>
 
 		<div class="grid">
 			<!-- widgets you can add -->
 			<aside class="col pal" aria-label="Widgets">
 				<div class="label">Widgets</div>
-				<p class="muted small">Drag one onto the screen, or click it to add it. Then move and resize it.</p>
+				<p class="muted small">Drag one onto the screen, or just click it.</p>
 				<div id="palette"></div>
 			</aside>
 
 			<!-- the screen -->
-			<main class="col mid">
+			<div class="col mid">
 				<div class="stage-bar">
 					<label class="check small"><input type="checkbox" id="outlines" checked /><span class="box"></span>Show outlines</label>
 					<label class="sel small">Snap to <select id="grid" class="mini">
@@ -53,19 +52,28 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 					</select></label>
 					<span class="muted small" id="budget"></span>
 				</div>
-				<div class="stage" id="stage">
-					<canvas id="screen" width="800" height="600" aria-label="Your screen. Widgets sit on top of it."></canvas>
-					<div class="overlay" id="overlay"></div>
-					<div class="guide gv" id="guide-v" hidden></div>
-					<div class="guide gh" id="guide-h" hidden></div>
+				<div class="stage-wrap" id="stage-wrap">
+					<div class="stage" id="stage">
+						<canvas id="screen" width="800" height="600" aria-label="Your screen. Widgets sit on top of it."></canvas>
+						<div class="overlay" id="overlay"></div>
+						<div class="guide gv" id="guide-v" hidden></div>
+						<div class="guide gh" id="guide-h" hidden></div>
+						<div class="empty" id="empty" hidden>
+							<div class="empty-card">
+								<div class="empty-t">Start with a template</div>
+								<div class="empty-tpls" id="empty-tpls"></div>
+								<div class="empty-or">or drag any widget from the left onto the screen</div>
+							</div>
+						</div>
+					</div>
 				</div>
-				<p class="muted small keys">
-					Arrow keys nudge the selected widget (Shift = bigger steps), Delete removes it, Ctrl+D duplicates, Ctrl+Z undoes. Hold Alt while dragging to turn snapping off.
-				</p>
-			</main>
+				<p class="muted small keys">Arrow keys nudge (Shift for bigger steps) · Delete removes · Ctrl+D duplicates · Ctrl+Z undoes · hold Alt to drag without snapping</p>
+			</div>
 
 			<!-- what's selected / the whole layout -->
 			<aside class="col insp" aria-label="Settings">
+				<div class="banner" id="banner" hidden></div>
+				<ul class="notes" id="notes" hidden></ul>
 				<div id="inspector"></div>
 			</aside>
 		</div>
@@ -78,8 +86,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { loadFonts, drawListFor, paint, type PreviewOptions } from '../../lib/eink/previewKit';
 	import { renderDrawList } from '../../lib/eink/preview';
 	import { b64ToBytes } from '../../lib/eink/image';
+	import { dropdown, type Dropdown } from '../../lib/dropdown';
 
 	const root = document.querySelector('.bld') as HTMLElement;
+	// Move to <body> so nothing in the page wrapper (animations, transforms) can interfere with covering the window.
+	document.body.appendChild(root);
 	const deviceId = root.dataset.device!;
 	const families: { id: string; label: string }[] = JSON.parse(root.dataset.families!);
 	const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -92,6 +103,14 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const inspector = $('inspector');
 	const paletteEl = $('palette');
 	const saveBtn = $<HTMLButtonElement>('save');
+	const leaveBtn = $<HTMLButtonElement>('saveleave');
+	const stageWrap = $('stage-wrap');
+	const emptyEl = $('empty');
+	const emptyTpls = $('empty-tpls');
+	let dds: Dropdown[] = [];
+	const staticDds: Dropdown[] = [];
+	const mkdd = (s: HTMLSelectElement) => (dds.push(dropdown(s)), s);
+	document.documentElement.classList.add('bld-open');
 	const undoBtn = $<HTMLButtonElement>('undo');
 	const redoBtn = $<HTMLButtonElement>('redo');
 	const saveMsg = $('save-msg');
@@ -177,6 +196,20 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			budgetEl.textContent = n > 560 ? `Getting busy (${n} of 700 drawing steps). Remove something soon.` : '';
 		});
 	}
+
+	// ---------------------------------------------------------------- fit the screen to the window
+	// The screen always takes the biggest 4:3 size that fits in the middle, so it never needs scrolling,
+	// at any browser zoom or window size.
+	function fit() {
+		const w = stageWrap.clientWidth;
+		const h = stageWrap.clientHeight;
+		const k = Math.max(120, Math.min(w, (h * 4) / 3));
+		stage.style.width = Math.floor(k) + 'px';
+		stage.style.height = Math.floor((k * 3) / 4) + 'px';
+	}
+	new ResizeObserver(fit).observe(stageWrap);
+	window.addEventListener('resize', fit);
+	fit();
 
 	// ---------------------------------------------------------------- the boxes you drag
 	const SHORT: Record<string, string> = {
@@ -394,7 +427,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const mod = e.ctrlKey || e.metaKey;
 		if (mod && e.key.toLowerCase() === 's') {
 			e.preventDefault();
-			save();
+			save(false);
 			return;
 		}
 		if (typing(e.target)) return;
@@ -515,6 +548,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	function buildInspector() {
 		const w = find(sel);
 		for (const k of Object.keys(fields)) delete fields[k];
+		dds.filter((d) => !staticDds.includes(d)).forEach((d) => d.destroy());
+		dds = dds.filter((d) => staticDds.includes(d));
 		inspector.innerHTML = '';
 		w ? widgetPanel(w) : layoutPanel();
 	}
@@ -627,6 +662,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						});
 						s.addEventListener('change', () => setOpt(od, s.value));
 						lab.appendChild(s);
+						mkdd(s);
 					}
 					row.appendChild(lab);
 				} else {
@@ -664,15 +700,38 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		act.appendChild(back);
 	}
 
-	// thumbnail of a starting point
-	const thumbs = new Map<string, HTMLCanvasElement>();
+	// thumbnails of the starting points (in the right-hand panel and in the empty-screen card)
+	const thumbList: { id: string; c: HTMLCanvasElement }[] = [];
 	function paintThumbs() {
 		if (!fonts) return;
-		for (const [id, c] of thumbs) {
+		for (let i = thumbList.length - 1; i >= 0; i--) if (!thumbList[i].c.isConnected) thumbList.splice(i, 1);
+		for (const { id, c } of thumbList) {
 			const t = TEMPLATES.find((x) => x.id === id)!;
 			const r = renderDrawList(drawListFor(previewOpts(sanitizeLayout(t.build()))), fonts);
 			paint(c, r.px, 1);
 		}
+	}
+	function templateButton(t: (typeof TEMPLATES)[number]): HTMLButtonElement {
+		const b = document.createElement('button');
+		b.type = 'button';
+		b.className = 'tpl';
+		const c = document.createElement('canvas');
+		c.width = 400;
+		c.height = 300;
+		thumbList.push({ id: t.id, c });
+		const n = document.createElement('span');
+		n.className = 'tn';
+		n.textContent = t.label;
+		const s = document.createElement('span');
+		s.className = 'ts';
+		s.textContent = t.note;
+		b.append(c, n, s);
+		b.addEventListener('click', () => applyTemplate(t.id));
+		return b;
+	}
+	function buildEmpty() {
+		emptyTpls.innerHTML = '';
+		for (const t of TEMPLATES) if (t.id !== 'blank') emptyTpls.appendChild(templateButton(t));
 	}
 
 	function layoutPanel() {
@@ -698,9 +757,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			font = fs.value || null;
 			redraw();
 			paintThumbs();
+			paintPalette();
 			refreshChrome();
 		});
 		fl.appendChild(fs);
+		mkdd(fs);
 		set.appendChild(fl);
 		const dl = document.createElement('label');
 		dl.className = 'check';
@@ -744,26 +805,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const tpl = section('Start from');
 		const tg = document.createElement('div');
 		tg.className = 'tpls';
-		thumbs.clear();
-		for (const t of TEMPLATES) {
-			const b = document.createElement('button');
-			b.type = 'button';
-			b.className = 'tpl';
-			const c = document.createElement('canvas');
-			c.width = 400;
-			c.height = 300;
-			thumbs.set(t.id, c);
-			b.append(c);
-			const n = document.createElement('span');
-			n.className = 'tn';
-			n.textContent = t.label;
-			const s = document.createElement('span');
-			s.className = 'ts';
-			s.textContent = t.note;
-			b.append(n, s);
-			b.addEventListener('click', () => applyTemplate(t.id));
-			tg.appendChild(b);
-		}
+		for (const t of TEMPLATES) if (t.id !== 'blank') tg.appendChild(templateButton(t));
 		tpl.appendChild(tg);
 		paintThumbs();
 		if (layout.widgets.length) {
@@ -783,8 +825,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	// ---------------------------------------------------------------- the palette (left-hand side)
+	const palThumbs: { type: string; c: HTMLCanvasElement }[] = [];
 	function buildPalette() {
 		paletteEl.innerHTML = '';
+		palThumbs.length = 0;
 		for (const g of GROUPS) {
 			const items = Object.entries(WIDGETS).filter(([, d]) => d.group === g);
 			if (!items.length) continue;
@@ -799,11 +843,38 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				b.type = 'button';
 				b.className = 'pitem';
 				b.title = d.blurb;
-				b.innerHTML = `<span class="pic">${esc(SHORT[type] ?? '?')}</span><span class="pn">${esc(d.label)}</span>`;
+				const c = document.createElement('canvas');
+				c.className = 'pthumb';
+				const k = Math.min(132 / d.w, 78 / d.h, 2);
+				c.width = Math.max(8, Math.round(d.w * k));
+				c.height = Math.max(8, Math.round(d.h * k));
+				palThumbs.push({ type, c });
+				const pn = document.createElement('span');
+				pn.className = 'pn';
+				pn.textContent = d.label;
+				const box = document.createElement('span');
+				box.className = 'pbox';
+				box.appendChild(c);
+				b.append(box, pn);
 				wirePaletteItem(b, type);
 				wrap.appendChild(b);
 			}
 			paletteEl.appendChild(wrap);
+		}
+		paintPalette();
+	}
+	// Each card shows the widget itself, drawn by the real renderer at its starting size.
+	function paintPalette() {
+		if (!fonts) return;
+		const tmp = document.createElement('canvas');
+		for (const { type, c } of palThumbs) {
+			const w = makeWidget(type, 0, 0);
+			const r = renderDrawList(drawListFor(previewOpts({ v: 1, widgets: [w] })), fonts);
+			paint(tmp, r.px, 1);
+			const x = c.getContext('2d')!;
+			x.imageSmoothingEnabled = false;
+			x.clearRect(0, 0, c.width, c.height);
+			x.drawImage(tmp, 0, 0, w.w, w.h, 0, 0, c.width, c.height);
 		}
 	}
 	function wirePaletteItem(b: HTMLElement, type: string) {
@@ -888,6 +959,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	function everything() {
+		emptyEl.hidden = layout.widgets.length > 0;
 		syncOverlay();
 		buildInspector();
 		redraw();
@@ -923,8 +995,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				op.selected = x.id === deviceId;
 				pick.appendChild(op);
 			}
+			const pickDd = dropdown(pick);
+			staticDds.push(pickDd);
+			dds.push(pickDd);
 			pick.addEventListener('change', () => {
-				if (isDirty() && !confirm('You have unsaved changes. Leave without saving?')) return void (pick.value = deviceId);
+				if (isDirty() && !confirm('You have unsaved changes. Leave without saving?')) return void ((pick.value = deviceId), pickDd.sync());
 				location.href = '/dashboard/builder?device=' + encodeURIComponent(pick.value);
 			});
 		}
@@ -935,12 +1010,20 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		fonts = await loadFonts().catch(() => null);
 		redraw();
 		paintThumbs();
+		paintPalette();
 	}
 
-	async function save() {
+	let leaving = false;
+	const leave = () => (leaving = true, location.href = `/dashboard/display?device=${encodeURIComponent(deviceId)}`);
+	async function save(thenLeave = false) {
 		flushCommit();
-		if (!isDirty() || saveBtn.disabled) return;
+		if (!isDirty()) {
+			if (thenLeave) leave();
+			return;
+		}
+		if (saveBtn.disabled && !thenLeave) return;
 		saveBtn.disabled = true;
+		leaveBtn.disabled = true;
 		flash('Saving…');
 		try {
 			const res = await fetch('/api/dashboard/builder', {
@@ -954,68 +1037,82 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			flash('Saved. Your display picks it up the next time it refreshes.');
 			refreshChrome();
 			saveBtn.disabled = true;
+			leaveBtn.disabled = false;
+			if (thenLeave) {
+				hist = [];
+				leave();
+			}
 		} catch (e: any) {
 			flash(e.message || 'Could not save.', true);
 			saveBtn.disabled = false;
+			leaveBtn.disabled = false;
 		}
 	}
 
-	saveBtn.addEventListener('click', save);
+	saveBtn.addEventListener('click', () => save(false));
+	leaveBtn.addEventListener('click', () => save(true));
 	undoBtn.addEventListener('click', () => restore(hi - 1));
 	redoBtn.addEventListener('click', () => restore(hi + 1));
 	outlinesBox.addEventListener('change', () => stage.classList.toggle('no-outlines', !outlinesBox.checked));
 	window.addEventListener('beforeunload', (e) => {
-		if (isDirty()) e.preventDefault();
+		if (isDirty() && !leaving) e.preventDefault();
 	});
 	document.getElementById('back')!.addEventListener('click', (e) => {
 		if (isDirty() && !confirm('You have unsaved changes. Leave without saving?')) e.preventDefault();
 	});
 
+	staticDds.push(dropdown(gridSel));
+	dds.push(staticDds[staticDds.length - 1]);
+	buildEmpty();
 	buildPalette();
 	load();
 </script>
 
 <style is:global>
-	.bld { position: relative; left: 50%; width: min(1560px, 100vw - 2em); transform: translateX(-50%); margin-top: -1.8em; padding: 0.6em 0 3em; }
+	html.bld-open, html.bld-open body { overflow: hidden; }
+	/* The builder takes the whole window, so the screen can always be shown big without scrolling. */
+	.bld { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: flex; flex-direction: column; gap: 0.8em; padding: 0.8em 1em 0.9em; min-height: 0; }
 	.bld .muted { color: var(--muted); margin: 0; }
 	.bld .small { font-size: 0.88em; }
-	.bld .banner { background: rgba(217, 164, 65, 0.12); border: 1px solid #d9a441; color: var(--fg); border-radius: 12px; padding: 0.8em 1em; margin: 0 0 1em; font-size: 0.92em; }
-	.bld .notes { list-style: none; margin: 0 0 1em; padding: 0.7em 1em; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 12px; font-size: 0.88em; color: var(--muted); display: grid; gap: 0.4em; }
-	.bld .notes a { color: var(--accent); }
 	.bld [hidden] { display: none !important; }
+	.bld .banner { margin-bottom: 0.8em; background: rgba(217, 164, 65, 0.12); border: 1px solid #d9a441; color: var(--fg); border-radius: 12px; padding: 0.6em 0.9em; font-size: 0.88em; }
+	.bld .notes { list-style: none; margin: 0 0 1em; padding: 0.55em 0.9em; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 12px; font-size: 0.82em; color: var(--muted); display: grid; gap: 0.5em; }
+	.bld .notes a { color: var(--accent); }
 
-	.bld .topbar { position: sticky; top: 0.6em; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 1em; flex-wrap: wrap; padding: 0.7em 0.8em 0.7em 1.3em; margin-bottom: 1.2em; background: color-mix(in srgb, var(--bg-raised) 90%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--border); border-radius: 18px; }
-	.bld .tb-left { display: flex; align-items: baseline; gap: 1.2em; min-width: 0; flex-wrap: wrap; }
+	.bld .topbar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 1em; flex-wrap: wrap; padding: 0.55em 0.7em 0.55em 1.2em; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 18px; }
+	.bld .tb-left { display: flex; align-items: center; gap: 1.2em; min-width: 0; flex-wrap: wrap; }
 	.bld .back { color: var(--muted); text-decoration: none; font-size: 0.9em; white-space: nowrap; }
 	.bld .back:hover { color: var(--fg); }
-	.bld .bld-title { font-size: 1.4em; font-weight: 800; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.bld .bld-title { font-size: 1.25em; font-weight: 800; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.bld .tb-right { display: flex; align-items: center; gap: 0.5em; margin-left: auto; }
-	.bld .save-msg { font-size: 0.86em; color: var(--muted); margin-right: 0.4em; }
+	.bld .save-msg { font-size: 0.84em; color: var(--muted); margin-right: 0.4em; }
 	.bld .save-msg.is-dirty { color: #d9a441; }
 	.bld .save-msg.is-error { color: #e08a8a; }
 
-	.bld .grid { display: grid; grid-template-columns: 270px minmax(0, 1fr) 320px; gap: 1.2em; align-items: start; }
-	.bld .col { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; padding: 1em; }
-	.bld .col.mid { background: transparent; border: 0; padding: 0; }
-	.bld .pal, .bld .insp { position: sticky; top: 5.2em; max-height: calc(100vh - 6.4em); overflow: auto; }
+	.bld .grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr) 300px; gap: 1em; align-items: stretch; }
+	.bld .col { min-height: 0; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; padding: 1em; overflow: auto; overscroll-behavior: contain; }
+	.bld .col.mid { background: transparent; border: 0; padding: 0; overflow: visible; display: flex; flex-direction: column; gap: 0.6em; }
 	.bld .label { font-size: 0.72em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.7em; }
 
-	/* palette */
-	.bld .pgroup { font-size: 0.74em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 1.1em 0 0.5em; }
-	.bld .pitems { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4em; }
-	.bld .pitem { min-width: 0; display: flex; align-items: center; gap: 0.5em; padding: 0.4em 0.5em; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--fg); font: inherit; font-size: 0.82em; text-align: left; touch-action: none; user-select: none; -webkit-user-select: none; }
-	.bld .pitem:hover { border-color: var(--accent); }
+	/* widget palette: every card shows the real widget */
+	.bld .pgroup { font-size: 0.74em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 1.2em 0 0.5em; }
+	.bld .pgroup:first-of-type { margin-top: 0.8em; }
+	.bld .pitems { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5em; }
+	.bld .pitem { min-width: 0; display: grid; grid-template-rows: 88px auto; gap: 0.4em; padding: 0.4em; background: var(--bg); border: 2px solid var(--border); border-radius: 12px; color: var(--fg); font: inherit; text-align: center; touch-action: none; user-select: none; -webkit-user-select: none; transition: border-color 0.15s, transform 0.15s; }
+	.bld .pitem:hover { border-color: var(--accent); transform: translateY(-1px); }
 	.bld .pitem:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-	.bld .pic { flex: 0 0 auto; width: 2.1em; height: 2.1em; display: grid; place-items: center; border-radius: 7px; background: color-mix(in srgb, var(--fg) 10%, transparent); font-size: 0.78em; font-weight: 800; letter-spacing: -0.02em; }
-	.bld .pn { line-height: 1.15; min-width: 0; overflow-wrap: anywhere; }
+	.bld .pbox { display: grid; place-items: center; background: #dfdbd0; border-radius: 7px; overflow: hidden; }
+	.bld .pthumb { display: block; max-width: 100%; max-height: 100%; image-rendering: pixelated; pointer-events: none; }
+	.bld .pn { font-size: 0.84em; font-weight: 700; line-height: 1.15; padding-bottom: 0.15em; overflow-wrap: anywhere; }
 	.bld .dragghost { position: fixed; z-index: 100; pointer-events: none; padding: 0.4em 0.8em; background: var(--accent); color: var(--bg); border-radius: 999px; font-size: 0.85em; font-weight: 700; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
 
 	/* the screen and the boxes on it */
-	.bld .stage-bar { display: flex; align-items: center; gap: 1.4em; flex-wrap: wrap; margin-bottom: 0.7em; }
-	.bld .sel { display: inline-flex; align-items: center; gap: 0.5em; color: var(--muted); }
-	.bld .stage { position: relative; width: 100%; max-width: 880px; margin: 0 auto; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden; background: #dfdbd0; box-shadow: 0 0 0 1px var(--border); touch-action: none; }
+	.bld .stage-bar { flex: none; display: flex; align-items: center; gap: 1.4em; flex-wrap: wrap; }
+	.bld .sel { display: inline-flex; align-items: center; gap: 0.6em; color: var(--muted); }
+	.bld .stage-wrap { flex: 1; min-height: 0; display: grid; place-items: center; }
+	.bld .stage { position: relative; border-radius: 10px; overflow: hidden; background: #dfdbd0; box-shadow: 0 0 0 1px var(--border), 0 18px 50px rgba(0, 0, 0, 0.35); touch-action: none; }
 	.bld .stage.drop { box-shadow: 0 0 0 3px var(--accent); }
-	.bld .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+	.bld .stage > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 	.bld .overlay { position: absolute; inset: 0; }
 	.bld .wb { position: absolute; box-sizing: border-box; border: 1px dashed rgba(var(--accent-rgb), 0.55); cursor: move; outline: none; touch-action: none; }
 	.bld .stage.no-outlines .wb:not(.on) { border-color: transparent; }
@@ -1027,30 +1124,37 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .wb:hover .chip, .bld .wb.on .chip, .bld .wb:focus-visible .chip { opacity: 1; }
 	.bld .wb:not(.on) .hd { display: none; }
 	.bld .hd { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; background: var(--bg); border: 2px solid var(--accent); border-radius: 3px; box-sizing: border-box; touch-action: none; }
-	.bld .hd[data-h='nw'] { left: 0; top: 0; cursor: nwse-resize; }
-	.bld .hd[data-h='n'] { left: 50%; top: 0; cursor: ns-resize; }
-	.bld .hd[data-h='ne'] { left: 100%; top: 0; cursor: nesw-resize; }
-	.bld .hd[data-h='e'] { left: 100%; top: 50%; cursor: ew-resize; }
-	.bld .hd[data-h='se'] { left: 100%; top: 100%; cursor: nwse-resize; }
-	.bld .hd[data-h='s'] { left: 50%; top: 100%; cursor: ns-resize; }
-	.bld .hd[data-h='sw'] { left: 0; top: 100%; cursor: nesw-resize; }
-	.bld .hd[data-h='w'] { left: 0; top: 50%; cursor: ew-resize; }
+	.bld .hd[data-h='nw'] { left: 0; top: 0; }
+	.bld .hd[data-h='n'] { left: 50%; top: 0; }
+	.bld .hd[data-h='ne'] { left: 100%; top: 0; }
+	.bld .hd[data-h='e'] { left: 100%; top: 50%; }
+	.bld .hd[data-h='se'] { left: 100%; top: 100%; }
+	.bld .hd[data-h='s'] { left: 50%; top: 100%; }
+	.bld .hd[data-h='sw'] { left: 0; top: 100%; }
+	.bld .hd[data-h='w'] { left: 0; top: 50%; }
 	.bld .guide { position: absolute; background: #ff4fa3; pointer-events: none; z-index: 999; }
 	.bld .guide.gv { top: 0; bottom: 0; width: 1px; }
 	.bld .guide.gh { left: 0; right: 0; height: 1px; }
-	.bld .keys { max-width: 880px; margin: 0.8em auto 0; line-height: 1.5; }
+	.bld .keys { flex: none; text-align: center; line-height: 1.4; font-size: 0.78em; }
+
+	/* a blank screen offers templates right on it */
+	.bld .empty { position: absolute; inset: 0; z-index: 2000; display: grid; place-items: center; background: rgba(223, 219, 208, 0.9); pointer-events: none; }
+	.bld .empty-card { pointer-events: auto; width: min(94%, 640px); padding: 1em 1.1em 0.9em; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; text-align: center; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); }
+	.bld .empty-t { font-weight: 800; margin-bottom: 0.7em; }
+	.bld .empty-tpls { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5em; }
+	.bld .empty-tpls .ts { display: none; }
+	.bld .empty-or { margin-top: 0.8em; font-size: 0.82em; color: var(--muted); }
 
 	/* the right-hand panel */
 	.bld .sec { margin-bottom: 1.3em; }
 	.bld .sec:last-child { margin-bottom: 0; }
 	.bld .geo { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5em; margin-bottom: 0.6em; }
-	.bld .geo label, .bld .fld { display: grid; gap: 0.25em; font-size: 0.8em; color: var(--muted); }
-	.bld .num, .bld .txt, .bld .mini { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 9px; padding: 0.4em 0.6em; font: inherit; font-size: 0.95em; box-sizing: border-box; }
+	.bld .geo label, .bld .fld { display: grid; gap: 0.3em; font-size: 0.8em; color: var(--muted); }
+	.bld .num, .bld .txt { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 12px; padding: 0.5em 0.7em; font: inherit; font-size: 0.95em; box-sizing: border-box; }
 	.bld .num { width: 100%; }
 	.bld .num:disabled { opacity: 0.5; }
 	.bld .txt { width: 100%; resize: vertical; }
-	.bld .mini.wide { width: 100%; }
-	.bld .num:focus-visible, .bld .txt:focus-visible, .bld .mini:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+	.bld .num:focus-visible, .bld .txt:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 	.bld .opt { margin-bottom: 0.7em; }
 	.bld .row { display: flex; flex-wrap: wrap; gap: 0.4em; margin-top: 0.5em; }
 	.bld .seg { display: flex; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
@@ -1060,7 +1164,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .layers button { width: 100%; text-align: left; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.35em 0.6em; font: inherit; font-size: 0.85em; color: var(--fg); }
 	.bld .layers button:hover { border-color: var(--accent); }
 	.bld .tpls { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6em; }
-	.bld .tpl { display: grid; gap: 0.2em; padding: 0.4em; text-align: left; background: var(--bg); border: 2px solid var(--border); border-radius: 10px; color: var(--fg); font: inherit; }
+	.bld .tpl { display: grid; gap: 0.2em; padding: 0.4em; text-align: left; background: var(--bg); border: 2px solid var(--border); border-radius: 10px; color: var(--fg); font: inherit; transition: border-color 0.15s; }
 	.bld .tpl:hover { border-color: var(--accent); }
 	.bld .tpl canvas { width: 100%; height: auto; border-radius: 5px; background: #dfdbd0; display: block; aspect-ratio: 4 / 3; }
 	.bld .tn { font-size: 0.82em; font-weight: 700; }
@@ -1088,14 +1192,17 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	html.has-custom-cursor .bld, html.has-custom-cursor .bld * { cursor: none !important; }
 
 	@media (max-width: 1180px) {
-		.bld .grid { grid-template-columns: 250px minmax(0, 1fr); }
-		.bld .insp { grid-column: 1 / -1; position: static; max-height: none; }
+		.bld .grid { grid-template-columns: 250px minmax(0, 1fr) 270px; }
+		.bld .pitems { grid-template-columns: 1fr; }
+		.bld .empty-tpls { grid-template-columns: repeat(3, 1fr); }
 	}
-	@media (max-width: 760px) {
+	@media (max-width: 860px) {
+		.bld { position: static; overflow: visible; }
+		html.bld-open, html.bld-open body { overflow: auto; }
 		.bld .grid { grid-template-columns: 1fr; }
-		.bld .pal { position: static; max-height: none; order: 2; }
-		.bld .mid { order: 1; }
-		.bld .insp { order: 3; }
+		.bld .col { overflow: visible; }
+		.bld .mid { order: -1; }
+		.bld .stage-wrap { min-height: 60vw; }
 		.bld .save-msg { display: none; }
 	}
 </style>

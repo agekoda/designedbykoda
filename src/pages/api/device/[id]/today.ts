@@ -368,7 +368,7 @@ export async function GET({ params, request, locals }) {
 			customLayout = r?.custom_layout ? sanitizeLayout(r.custom_layout) : null;
 		} catch {}
 	}
-	const needs = layoutNeeds(customLayout);
+	const needs = style === 'planner' ? { tasks: true, countdown: false, picture: false } : layoutNeeds(customLayout);
 
 	// To-do: the person's Google Tasks (only fetched when that layout, or a to-do widget, is used).
 	let tasks: { title: string; done: boolean; due?: string }[] | null = null;

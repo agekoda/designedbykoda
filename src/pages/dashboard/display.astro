@@ -12,7 +12,7 @@ const userId = db ? await getSessionUserId(Astro.request, db) : null;
 if (!userId) return Astro.redirect('/setup');
 
 const deviceId = Astro.url.searchParams.get('device') ?? '';
-const styles = CALENDAR_STYLES.map((s) => ({ id: s.id, label: s.label, note: s.note, corner: !!s.corner, frame: !!s.frame }));
+const styles = CALENDAR_STYLES.map((s) => ({ id: s.id, label: s.label, note: s.note, corner: !!s.corner, frame: !!s.frame, builder: !!s.builder }));
 const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 ---
 
@@ -56,7 +56,16 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				</div>
 
 				<section class="tabpanel" data-panel="layout">
+					<div class="modes" id="modes" role="radiogroup" aria-label="How do you want to set up the screen?">
+						<button type="button" class="mode" data-mode="preset" role="radio"><span class="mode-t">Ready-made layouts</span><span class="mode-n">Pick one and you are done</span></button>
+						<button type="button" class="mode" data-mode="custom" role="radio"><span class="mode-t">Design your own</span><span class="mode-n">Drag, drop and resize widgets</span></button>
+					</div>
 					<div class="layouts" id="layouts" role="radiogroup" aria-label="Layout"></div>
+					<div class="custom-box" id="custom-box" hidden>
+						<p class="muted" id="custom-status"></p>
+						<a class="btn" id="custom-open" href="#">Open the layout builder</a>
+						<p class="muted small hint">Start from a template or a blank screen, then add dates, events, weather, the moon, quotes, countdowns, tasks and more. Move them anywhere and resize them. The preview on the left shows your design as it is now.</p>
+					</div>
 				</section>
 
 				<section class="tabpanel" data-panel="font" hidden>
@@ -84,11 +93,6 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						<div class="label sub" style="margin-top:1.3em">On this date</div>
 						<input class="txt" id="cd-date" type="date" />
 						<p class="muted small hint">Shows how many days are left. The number goes down each morning, and it says "Today!" on the day.</p>
-					</div>
-					<div id="opt-custom" hidden>
-						<p class="muted" id="custom-status"></p>
-						<a class="btn small" id="custom-open" href="#">Open the layout builder</a>
-						<p class="muted small hint">Drag widgets onto a blank screen, move them around and resize them: dates, events, weather, moon, quotes, countdowns, tasks and more. Pick a starting point if you like, then make it yours.</p>
 					</div>
 					<div id="opt-todo" hidden>
 						<p class="muted" id="todo-status"></p>
@@ -176,7 +180,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	} from '../../lib/eink/image';
 
 	const root = document.querySelector('.cust') as HTMLElement;
-	const styles: { id: string; label: string; note: string; corner: boolean; frame: boolean }[] = JSON.parse(root.dataset.styles!);
+	const styles: { id: string; label: string; note: string; corner: boolean; frame: boolean; builder: boolean }[] = JSON.parse(root.dataset.styles!);
 	const families: { id: string; label: string }[] = JSON.parse(root.dataset.families!);
 	const dithers: { id: string; label: string; note: string }[] = JSON.parse(root.dataset.dithers!);
 	const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -192,7 +196,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const edNote = $('ed-note');
 	const optCountdown = $('opt-countdown');
 	const optTodo = $('opt-todo');
-	const optCustom = $('opt-custom');
+	const customBox = $('custom-box');
+	const modesEl = $('modes');
 	const customStatus = $('custom-status');
 	const customOpen = $('custom-open') as HTMLAnchorElement;
 	const cdTitle = $<HTMLInputElement>('cd-title');
@@ -252,6 +257,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	let loc: { lat: number; lon: number } | null = null;
 	let tasksGranted = false;
 	let customLayout: any = null;
+	let lastPreset = 'agenda';
 	let vbat: number | null = null;
 	let st: State = {
 		style: 'agenda',
@@ -294,7 +300,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			frameImage: s?.frame ? (pics.frame.bytes ?? (thumb ? sampleFrameBytes() : null)) : null,
 			loc,
 			countdown: styleId === 'countdown' ? cd : null,
-			custom: styleId === 'custom' ? (thumb && !customLayout?.widgets?.length ? sanitizeLayout(TEMPLATES.find((x) => x.id === 'planner')!.build()) : customLayout) : null,
+			custom: styleId === 'custom' ? (thumb && !customLayout?.widgets?.length ? sanitizeLayout(TEMPLATES.find((x) => x.id === 'sky')!.build()) : customLayout) : null,
 			tasksState: (thumb || tasksGranted ? 'ok' : 'needs_permission') as 'ok' | 'needs_permission',
 		};
 	}
@@ -459,6 +465,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	// ---------------------------------------------------------------- controls
 	function buildControls() {
 		layoutsEl.innerHTML = styles
+			.filter((s) => !s.builder)
 			.map(
 				(s) => `<label class="lay"><input type="radio" name="layout" value="${s.id}" /><span class="lay-card"><canvas data-sid="${s.id}" width="400" height="300"></canvas><span class="lay-name">${s.label}</span><span class="lay-note">${s.note}</span></span></label>`
 			)
@@ -481,6 +488,16 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			.map((d) => `<label title="${d.note}"><input type="radio" name="dither" value="${d.id}" /><span>${d.label}</span></label>`)
 			.join('');
 
+		modesEl.addEventListener('click', (e) => {
+			const m = (e.target as HTMLElement).closest<HTMLElement>('.mode');
+			if (!m) return;
+			const to = m.dataset.mode === 'custom' ? 'custom' : lastPreset === 'custom' ? 'agenda' : lastPreset;
+			if (to === st.style) return;
+			st.style = to;
+			syncControls();
+			schedule();
+			changed();
+		});
 		layoutsEl.addEventListener('change', (e) => {
 			st.style = (e.target as HTMLInputElement).value;
 			syncControls();
@@ -668,13 +685,21 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		paintEditor();
 
 		// Options tab: the Countdown's name and date, or connecting Google Tasks
-		const opt = st.style === 'countdown' ? 'countdown' : st.style === 'todo' ? 'todo' : st.style === 'custom' ? 'custom' : null;
+		const opt = st.style === 'countdown' ? 'countdown' : (st.style === 'todo' || st.style === 'planner') ? 'todo' : null;
 		tabOptBtn.hidden = !opt;
-		tabOptBtn.textContent = opt === 'countdown' ? 'Countdown' : opt === 'todo' ? 'Tasks' : opt === 'custom' ? 'Builder' : 'Options';
+		tabOptBtn.textContent = opt === 'countdown' ? 'Countdown' : opt === 'todo' ? 'Tasks' : 'Options';
 		if (!opt && activeTab === 'options') showTab('layout');
 		optCountdown.hidden = opt !== 'countdown';
 		optTodo.hidden = opt !== 'todo';
-		optCustom.hidden = opt !== 'custom';
+		const isCustom = st.style === 'custom';
+		customBox.hidden = !isCustom;
+		layoutsEl.hidden = isCustom;
+		modesEl.querySelectorAll<HTMLElement>('.mode').forEach((m) => {
+			const on = (m.dataset.mode === 'custom') === isCustom;
+			m.classList.toggle('on', on);
+			m.setAttribute('aria-checked', String(on));
+		});
+		if (!isCustom) lastPreset = st.style;
 		const nW = customLayout?.widgets?.length ?? 0;
 		customStatus.textContent = nW ? `Your design has ${nW} widget${nW === 1 ? '' : 's'}.` : 'You haven\u2019t designed a screen yet.';
 		customOpen.textContent = nW ? 'Edit your design' : 'Start designing';
@@ -930,6 +955,15 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust input[type='radio'], .cust .switch input, .cust .check input { position: absolute; opacity: 0; pointer-events: none; }
 
 	/* layout + font cards: big enough to read */
+	.cust .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6em; margin-bottom: 1.1em; }
+	.cust .mode { display: grid; gap: 0.2em; text-align: left; padding: 0.8em 1em; background: var(--bg); border: 2px solid var(--border); border-radius: 14px; color: var(--fg); font: inherit; transition: border-color 0.2s, background 0.2s; }
+	.cust .mode:hover { border-color: var(--muted); }
+	.cust .mode.on { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
+	.cust .mode-t { font-weight: 800; }
+	.cust .mode-n { font-size: 0.8em; color: var(--muted); }
+	.cust .custom-box { padding: 0.4em 0.2em; }
+	.cust .custom-box .btn { display: inline-block; margin: 0.3em 0 0.4em; }
+	.cust .layouts[hidden], .cust .custom-box[hidden] { display: none; }
 	.cust .layouts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8em; }
 	.cust .fonts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8em; }
 	.cust .lay-card, .cust .fnt-card { display: grid; gap: 0.5em; padding: 0.5em; border: 2px solid var(--border); border-radius: 12px; background: var(--bg); transition: border-color 0.2s, background 0.2s; cursor: pointer; }

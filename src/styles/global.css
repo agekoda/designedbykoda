@@ -521,3 +521,18 @@ html.has-custom-cursor .lightbox-overlay model-viewer {
 .nav-pill.is-visible {
 	opacity: 1;
 }
+/* ---------- Dropdowns (same look as the pre-order currency / country pickers) ---------- */
+.dd { position: relative; display: inline-block; }
+.dd-wide { display: block; }
+.dd-btn { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 0.6em; font: inherit; font-size: 0.85em; font-weight: 600; letter-spacing: 0.02em; color: var(--fg); background: var(--bg-raised); border: 1px solid var(--border); border-radius: 999px; padding: 0.5em 0.8em 0.5em 1.1em; text-align: left; transition: border-color 0.15s, background 0.15s; }
+.dd-btn:hover, .dd-btn[aria-expanded='true'] { border-color: var(--accent); }
+.dd-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-chev { flex: 0 0 auto; width: 14px; height: 14px; color: var(--muted); transition: transform 0.2s; }
+.dd-btn[aria-expanded='true'] .dd-chev { transform: rotate(180deg); }
+.dd-menu { position: fixed; z-index: 500; overflow-y: auto; padding: 6px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow, 0 12px 32px rgba(0, 0, 0, 0.35)); animation: dd-in 0.14s ease-out; }
+.dd-menu[hidden] { display: none; }
+@keyframes dd-in { from { opacity: 0; transform: translateY(-4px); } }
+.dd-opt { display: block; width: 100%; font: inherit; font-size: 0.88em; text-align: left; color: var(--muted); background: none; border: none; border-radius: 9px; padding: 0.55em 0.8em; white-space: nowrap; transition: background 0.12s, color 0.12s; }
+.dd-opt:hover, .dd-opt:focus-visible { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--fg); outline: none; }
+.dd-opt[aria-selected='true'] { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--fg); }
+html.has-custom-cursor .dd, html.has-custom-cursor .dd *, html.has-custom-cursor .dd-menu, html.has-custom-cursor .dd-menu * { cursor: none !important; }
