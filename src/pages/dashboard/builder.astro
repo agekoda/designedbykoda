@@ -582,38 +582,6 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		p.textContent = def.blurb;
 		head.appendChild(p);
 
-		// position and size
-		const pos = section('Position and size');
-		const g = document.createElement('div');
-		g.className = 'geo';
-		for (const [k, label] of [['x', 'X'], ['y', 'Y'], ['w', 'Width'], ['h', 'Height']] as const) {
-			const lab = document.createElement('label');
-			lab.innerHTML = `<span>${label}</span>`;
-			const inp = document.createElement('input');
-			inp.type = 'number';
-			inp.className = 'num';
-			inp.value = String(w[k]);
-			inp.disabled = !!def.fixed && (k === 'w' || k === 'h');
-			inp.addEventListener('input', () => setGeom(k, parseFloat(inp.value)));
-			inp.addEventListener('change', () => (flushCommit(), syncFields()));
-			fields[k] = inp;
-			lab.appendChild(inp);
-			g.appendChild(lab);
-		}
-		pos.appendChild(g);
-		if (def.fixed) {
-			const n = document.createElement('p');
-			n.className = 'muted small';
-			n.textContent = 'This one has a fixed size. You can still move it.';
-			pos.appendChild(n);
-		}
-		const al = document.createElement('div');
-		al.className = 'row';
-		for (const [how, label, tip] of [['l', '⇤', 'Align to the left edge'], ['c', '↔', 'Centre across the screen'], ['r', '⇥', 'Align to the right edge'], ['t', '⤒', 'Align to the top'], ['m', '↕', 'Centre down the screen'], ['b', '⤓', 'Align to the bottom']] as const) {
-			al.appendChild(button(label, () => alignTo(how), 'btn ghost small ico', tip));
-		}
-		pos.appendChild(al);
-
 		// options
 		if (def.opts.length) {
 			const o = withDefaults(w);
@@ -681,6 +649,56 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				sec.appendChild(row);
 			}
 		}
+
+		// position and size
+		const pos = section('Position and size');
+		const g = document.createElement('div');
+		g.className = 'geo';
+		for (const [k, label] of [['x', 'X'], ['y', 'Y'], ['w', 'Width'], ['h', 'Height']] as const) {
+			const lab = document.createElement('label');
+			lab.innerHTML = `<span>${label}</span>`;
+			const inp = document.createElement('input');
+			inp.type = 'number';
+			inp.className = 'num';
+			inp.value = String(w[k]);
+			inp.disabled = !!def.fixed && (k === 'w' || k === 'h');
+			inp.addEventListener('input', () => setGeom(k, parseFloat(inp.value)));
+			inp.addEventListener('change', () => (flushCommit(), syncFields()));
+			fields[k] = inp;
+			lab.appendChild(inp);
+			g.appendChild(lab);
+		}
+		pos.appendChild(g);
+		if (def.fixed) {
+			const n = document.createElement('p');
+			n.className = 'muted small';
+			n.textContent = 'This one has a fixed size. You can still move it.';
+			pos.appendChild(n);
+		}
+		const ALIGN: [string, string, string, string][] = [
+			['l', 'Left', 'Line up with the left edge of the screen', '<path d="M3 3v18" /><rect x="7" y="6" width="13" height="4" rx="1" /><rect x="7" y="14" width="8" height="4" rx="1" />'],
+			['c', 'Centre', 'Centre across the screen', '<path d="M12 3v18" /><rect x="5" y="6" width="14" height="4" rx="1" /><rect x="8" y="14" width="8" height="4" rx="1" />'],
+			['r', 'Right', 'Line up with the right edge of the screen', '<path d="M21 3v18" /><rect x="4" y="6" width="13" height="4" rx="1" /><rect x="9" y="14" width="8" height="4" rx="1" />'],
+			['t', 'Top', 'Line up with the top of the screen', '<path d="M3 3h18" /><rect x="6" y="7" width="4" height="13" rx="1" /><rect x="14" y="7" width="4" height="8" rx="1" />'],
+			['m', 'Middle', 'Centre down the screen', '<path d="M3 12h18" /><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="8" width="4" height="8" rx="1" />'],
+			['b', 'Bottom', 'Line up with the bottom of the screen', '<path d="M3 21h18" /><rect x="6" y="4" width="4" height="13" rx="1" /><rect x="14" y="9" width="4" height="8" rx="1" />'],
+		];
+		const alLabel = document.createElement('div');
+		alLabel.className = 'sublabel';
+		alLabel.textContent = 'Place on the screen';
+		pos.appendChild(alLabel);
+		const al = document.createElement('div');
+		al.className = 'aligns';
+		for (const [how, label, tip, svg] of ALIGN) {
+			const b = document.createElement('button');
+			b.type = 'button';
+			b.className = 'al';
+			b.title = tip;
+			b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${svg}</svg><span>${label}</span>`;
+			b.addEventListener('click', () => alignTo(how));
+			al.appendChild(b);
+		}
+		pos.appendChild(al);
 
 		// layers + actions
 		const act = section('Arrange');
@@ -1156,6 +1174,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .txt { width: 100%; resize: vertical; }
 	.bld .num:focus-visible, .bld .txt:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 	.bld .opt { margin-bottom: 0.7em; }
+	.bld .sublabel { font-size: 0.8em; color: var(--muted); margin: 0.9em 0 0.4em; }
+	.bld .aligns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4em; }
+	.bld .al { display: grid; justify-items: center; gap: 0.25em; padding: 0.55em 0.2em 0.45em; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--muted); font: inherit; font-size: 0.78em; font-weight: 600; transition: border-color 0.15s, color 0.15s; }
+	.bld .al svg { width: 24px; height: 24px; }
+	.bld .al:hover, .bld .al:focus-visible { border-color: var(--accent); color: var(--fg); outline: none; }
 	.bld .row { display: flex; flex-wrap: wrap; gap: 0.4em; margin-top: 0.5em; }
 	.bld .seg { display: flex; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
 	.bld .seg button { flex: 1; background: none; border: 0; border-radius: 999px; padding: 0.35em 0.4em; font: inherit; font-size: 0.95em; color: var(--muted); }
