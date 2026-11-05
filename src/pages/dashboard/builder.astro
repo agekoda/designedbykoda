@@ -85,7 +85,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { WIDGETS, GROUPS, TEMPLATES, makeWidget, clampWidget, sanitizeLayout, withDefaults, newId, SCREEN, MAX_WIDGETS, layoutNeeds, type CustomLayout, type Widget, type OptDef } from '../../lib/eink/builder/model';
 	import { loadFonts, drawListFor, paint, type PreviewOptions } from '../../lib/eink/previewKit';
 	import { renderDrawList } from '../../lib/eink/preview';
-	import { b64ToBytes } from '../../lib/eink/image';
+	import { b64ToBytes, bytesToB64, CORNER, DEFAULT_IMAGE_SETTINGS, DITHERS, ditherGray, packBits, type ImageSettings } from '../../lib/eink/image';
 	import { dropdown, type Dropdown } from '../../lib/dropdown';
 
 	const root = document.querySelector('.bld') as HTMLElement;
@@ -214,7 +214,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	// ---------------------------------------------------------------- the boxes you drag
 	const SHORT: Record<string, string> = {
 		text: 'Aa', date_num: '7', weekday: 'Fri', month: 'Nov', date_full: '7 Nov', events: '☰', next_event: '→', event_count: '#3', mini_month: '▦',
-		week_strip: '▥', weather: '°C', moon: '☾', moon_text: '38%', sun_times: '↑↓', sun_arc: '⌒', quote: '“', countdown: '25',
+		week_strip: '▥', weather: '°C', weather_icon: '☀', weather_summary: 'Rain', forecast: '▤', moon: '☾', moon_text: '38%', sun_times: '↑↓', sun_arc: '⌒', quote: '“', countdown: '25',
 		tasks: '✓', progress: '▰▱', battery: '▭', picture: '▣', box: '□', line: '—',
 	};
 	const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -574,6 +574,310 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		return b;
 	}
 
+
+	// ---------------------------------------------------------------- settings that live on the display, not in the layout
+	// The countdown's name and date and the picture are saved to the display straight away
+	// (the same place the Customize display page keeps them), so there is nothing to hunt for.
+	async function postDisplay(body: Record<string, unknown>): Promise<string | null> {
+		try {
+			const res = await fetch('/api/dashboard/display', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceId, ...body }) });
+			if (res.ok) return null;
+			const d = await res.json().catch(() => ({}));
+			return d.error || 'Could not save.';
+		} catch {
+			return 'Could not save. Check your connection.';
+		}
+	}
+	const msgEl = (text = '') => {
+		const p = document.createElement('p');
+		p.className = 'muted small';
+		p.textContent = text;
+		return p;
+	};
+
+	function countdownPanel() {
+		const sec = section('What to count down to');
+		const cur = info.countdown;
+		let [y0, m0, d0] = (cur?.date ?? '').split('-');
+		const nameLab = document.createElement('label');
+		nameLab.className = 'fld';
+		nameLab.innerHTML = '<span>Name</span>';
+		const name = document.createElement('input');
+		name.type = 'text';
+		name.className = 'num';
+		name.maxLength = 40;
+		name.placeholder = 'Japan trip';
+		name.value = cur?.title ?? '';
+		nameLab.appendChild(name);
+		sec.appendChild(nameLab);
+		const dateLab = document.createElement('div');
+		dateLab.className = 'fld';
+		dateLab.innerHTML = '<span>Date</span>';
+		const row = document.createElement('div');
+		row.className = 'datepick';
+		const mk = (ph: string, opts: [string, string][], val: string) => {
+			const s = document.createElement('select');
+			s.className = 'mini wide';
+			const none = document.createElement('option');
+			none.value = '';
+			none.textContent = ph;
+			s.appendChild(none);
+			for (const [v, t] of opts) {
+				const o = document.createElement('option');
+				o.value = v;
+				o.textContent = t;
+				s.appendChild(o);
+			}
+			s.value = opts.some((o) => o[0] === val) ? val : '';
+			row.appendChild(s);
+			mkdd(s);
+			return s;
+		};
+		const pad = (n: number) => String(n).padStart(2, '0');
+		const thisYear = new Date().getFullYear();
+		const dayS = mk('Day', Array.from({ length: 31 }, (_, i) => [pad(i + 1), String(i + 1)] as [string, string]), d0 ?? '');
+		const monS = mk('Month', ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((t, i) => [pad(i + 1), t] as [string, string]), m0 ?? '');
+		const yrS = mk('Year', Array.from({ length: 12 }, (_, i) => [String(thisYear + i - 1), String(thisYear + i - 1)] as [string, string]), y0 ?? '');
+		dateLab.appendChild(row);
+		sec.appendChild(dateLab);
+		const msg = msgEl('Shown on every Countdown widget on this display.');
+		sec.appendChild(msg);
+		let timer = 0;
+		const commit = () => {
+			const title = name.value.trim();
+			let date = '';
+			if (dayS.value && monS.value && yrS.value) {
+				const last = new Date(Date.UTC(+yrS.value, +monS.value, 0)).getUTCDate();
+				date = `${yrS.value}-${monS.value}-${pad(Math.min(+dayS.value, last))}`;
+			}
+			info.countdown = title && date ? { title, date } : null;
+			redraw();
+			refreshChrome();
+			clearTimeout(timer);
+			timer = window.setTimeout(async () => {
+				msg.textContent = 'Saving…';
+				const err = await postDisplay({ countdown: { title, date } });
+				msg.textContent = err ?? (title && date ? 'Saved.' : 'Add a name and a date.');
+			}, 500);
+		};
+		name.addEventListener('input', commit);
+		[dayS, monS, yrS].forEach((s) => s.addEventListener('change', commit));
+	}
+
+	// ---- picture ----
+	const pic = { img: null as HTMLImageElement | null, cfg: { ...DEFAULT_IMAGE_SETTINGS } as ImageSettings, src: null as string | null, timer: 0 };
+	async function readPhoto(file: File): Promise<{ img: HTMLImageElement; src: string }> {
+		const url = URL.createObjectURL(file);
+		try {
+			const img = new Image();
+			await new Promise<void>((res, rej) => {
+				img.onload = () => res();
+				img.onerror = () => rej(new Error('decode'));
+				img.src = url;
+			});
+			let max = 900;
+			for (let attempt = 0; attempt < 5; attempt++) {
+				const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+				const c = document.createElement('canvas');
+				c.width = Math.max(1, Math.round(img.naturalWidth * k));
+				c.height = Math.max(1, Math.round(img.naturalHeight * k));
+				const ctx = c.getContext('2d')!;
+				ctx.fillStyle = '#fff';
+				ctx.fillRect(0, 0, c.width, c.height);
+				ctx.imageSmoothingQuality = 'high';
+				ctx.drawImage(img, 0, 0, c.width, c.height);
+				const out = c.toDataURL('image/jpeg', 0.86 - attempt * 0.08);
+				if (out.length < 250_000) {
+					const small = new Image();
+					await new Promise<void>((res, rej) => {
+						small.onload = () => res();
+						small.onerror = () => rej(new Error('decode'));
+						small.src = out;
+					});
+					return { img: small, src: out };
+				}
+				max = Math.round(max * 0.8);
+			}
+			throw new Error('big');
+		} finally {
+			URL.revokeObjectURL(url);
+		}
+	}
+	function cropGray(img: HTMLImageElement, s: ImageSettings): Float32Array {
+		const { w, h } = CORNER;
+		const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight) * s.zoom;
+		const dw = img.naturalWidth * scale;
+		const dh = img.naturalHeight * scale;
+		const maxX = Math.max(0, (dw - w) / 2);
+		const maxY = Math.max(0, (dh - h) / 2);
+		s.panX = Math.max(-maxX, Math.min(maxX, s.panX));
+		s.panY = Math.max(-maxY, Math.min(maxY, s.panY));
+		const c = document.createElement('canvas');
+		c.width = w;
+		c.height = h;
+		const ctx = c.getContext('2d', { willReadFrequently: true })!;
+		ctx.fillStyle = '#fff';
+		ctx.fillRect(0, 0, w, h);
+		ctx.imageSmoothingQuality = 'high';
+		ctx.drawImage(img, (w - dw) / 2 + s.panX, (h - dh) / 2 + s.panY, dw, dh);
+		const d = ctx.getImageData(0, 0, w, h).data;
+		const g = new Float32Array(w * h);
+		for (let i = 0; i < g.length; i++) g[i] = d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114;
+		return g;
+	}
+	function paintBits(c: HTMLCanvasElement, bits: string | null) {
+		const { w, h } = CORNER;
+		c.width = w;
+		c.height = h;
+		const g = c.getContext('2d')!;
+		g.fillStyle = '#f4f1ea';
+		g.fillRect(0, 0, w, h);
+		const bytes = bits ? b64ToBytes(bits) : null;
+		if (!bytes) return;
+		const stride = Math.ceil(w / 8);
+		const im = g.createImageData(w, h);
+		for (let y = 0; y < h; y++)
+			for (let x = 0; x < w; x++) {
+				const ink = bytes[y * stride + (x >> 3)] & (0x80 >> (x & 7));
+				const o = (y * w + x) * 4;
+				im.data[o] = im.data[o + 1] = im.data[o + 2] = ink ? 20 : 244;
+				im.data[o + 3] = 255;
+			}
+		g.putImageData(im, 0, 0);
+	}
+
+	function picturePanel() {
+		const sec = section('Your picture');
+		const thumb = document.createElement('canvas');
+		thumb.className = 'picthumb';
+		paintBits(thumb, info.cornerBits);
+		sec.appendChild(thumb);
+		const msg = msgEl(info.cornerBits ? 'This is the picture on your display.' : 'No picture yet. Choose one and it appears here and on the screen.');
+		const file = document.createElement('input');
+		file.type = 'file';
+		file.accept = 'image/*';
+		file.hidden = true;
+		const btns = document.createElement('div');
+		btns.className = 'btnrow';
+		const choose = button(info.cornerBits ? 'Change picture' : 'Choose a picture', () => file.click(), 'btn small');
+		btns.append(choose, file);
+		const controls = document.createElement('div');
+		controls.className = 'piccontrols';
+		controls.hidden = !pic.img;
+		if (info.cornerBits) {
+			btns.appendChild(
+				button('Remove', async () => {
+					msg.textContent = 'Removing…';
+					const err = await postDisplay({ corner: { mode: 'calendar' } });
+					if (err) return void (msg.textContent = err);
+					info.cornerBits = null;
+					pic.img = null;
+					buildInspector();
+					redraw();
+					refreshChrome();
+				})
+			);
+		}
+		sec.append(btns, msg, controls);
+
+		let saveT = 0;
+		let first = true;
+		const apply = (save = true) => {
+			if (!pic.img) return;
+			const { w, h } = CORNER;
+			const dots = ditherGray(cropGray(pic.img, pic.cfg), w, h, pic.cfg);
+			info.cornerBits = bytesToB64(packBits(dots, w, h));
+			paintBits(thumb, info.cornerBits);
+			redraw();
+			refreshChrome();
+			if (!save) return;
+			clearTimeout(saveT);
+			saveT = window.setTimeout(async () => {
+				msg.textContent = 'Saving…';
+				const corner: Record<string, unknown> = { mode: 'image', bits: info.cornerBits, cfg: pic.cfg };
+				if (first && pic.src) corner.src = pic.src;
+				const err = await postDisplay({ corner });
+				if (!err) first = false;
+				msg.textContent = err ?? 'Saved. Drag the picture to move it.';
+			}, 600);
+		};
+		const slider = (label: string, min: number, max: number, step: number, get: () => number, set: (v: number) => void) => {
+			const lab = document.createElement('label');
+			lab.className = 'fld';
+			lab.innerHTML = `<span>${label}</span>`;
+			const r = document.createElement('input');
+			r.type = 'range';
+			r.min = String(min);
+			r.max = String(max);
+			r.step = String(step);
+			r.value = String(get());
+			r.addEventListener('input', () => (set(parseFloat(r.value)), apply()));
+			lab.appendChild(r);
+			controls.appendChild(lab);
+			return r;
+		};
+		const buildControls = () => {
+			controls.innerHTML = '';
+			controls.hidden = false;
+			slider('Zoom', 1, 3, 0.05, () => pic.cfg.zoom, (v) => (pic.cfg.zoom = v));
+			slider('Brightness', -100, 100, 1, () => pic.cfg.brightness, (v) => (pic.cfg.brightness = v));
+			slider('Contrast', -100, 100, 1, () => pic.cfg.contrast, (v) => (pic.cfg.contrast = v));
+			const lab = document.createElement('label');
+			lab.className = 'fld';
+			lab.innerHTML = '<span>Style</span>';
+			const s = document.createElement('select');
+			s.className = 'mini wide';
+			for (const d of DITHERS) {
+				const o = document.createElement('option');
+				o.value = d.id;
+				o.textContent = `${d.label}: ${d.note}`;
+				o.selected = pic.cfg.dither === d.id;
+				s.appendChild(o);
+			}
+			s.addEventListener('change', () => ((pic.cfg.dither = s.value as ImageSettings['dither']), apply()));
+			lab.appendChild(s);
+			controls.appendChild(lab);
+			mkdd(s);
+		};
+		if (pic.img) buildControls();
+
+		// drag the picture inside its box
+		let drag: { x: number; y: number; px: number; py: number } | null = null;
+		thumb.addEventListener('pointerdown', (e) => {
+			if (!pic.img) return;
+			thumb.setPointerCapture(e.pointerId);
+			drag = { x: e.clientX, y: e.clientY, px: pic.cfg.panX, py: pic.cfg.panY };
+		});
+		thumb.addEventListener('pointermove', (e) => {
+			if (!drag) return;
+			const k = CORNER.w / thumb.clientWidth;
+			pic.cfg.panX = drag.px + (e.clientX - drag.x) * k;
+			pic.cfg.panY = drag.py + (e.clientY - drag.y) * k;
+			apply();
+		});
+		const end = () => (drag = null);
+		thumb.addEventListener('pointerup', end);
+		thumb.addEventListener('pointercancel', end);
+		file.addEventListener('change', async () => {
+			const f = file.files?.[0];
+			file.value = '';
+			if (!f) return;
+			if (!f.type.startsWith('image/')) return void (msg.textContent = 'That is not an image.');
+			try {
+				msg.textContent = 'Reading the picture…';
+				const r = await readPhoto(f);
+				pic.img = r.img;
+				pic.src = r.src;
+				pic.cfg = { ...DEFAULT_IMAGE_SETTINGS, dither: pic.cfg.dither };
+				first = true;
+				buildControls();
+				apply();
+			} catch {
+				msg.textContent = "Couldn't read that picture. Try a JPEG or PNG.";
+			}
+		});
+	}
+
 	function widgetPanel(w: Widget) {
 		const def = WIDGETS[w.t];
 		const head = section(def.label);
@@ -581,6 +885,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		p.className = 'muted small';
 		p.textContent = def.blurb;
 		head.appendChild(p);
+
+		if (w.t === 'countdown') countdownPanel();
+		if (w.t === 'picture') picturePanel();
 
 		// options
 		if (def.opts.length) {
@@ -968,8 +1275,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const types = new Set(layout.widgets.map((w) => w.t));
 		const notes: string[] = [];
 		if (n.tasks && !info.tasksGranted) notes.push('The To-do list needs Google Tasks. Connect it on the <a href="/dashboard/display?device=' + encodeURIComponent(deviceId) + '">Customize display</a> page (choose the To-do layout, then the Tasks tab). Until then your screen will say so.');
-		if (n.countdown && !info.countdown) notes.push('Set what you’re counting down to on the <a href="/dashboard/display?device=' + encodeURIComponent(deviceId) + '">Customize display</a> page (choose Countdown, then Options). The preview uses an example.');
-		if (n.picture && !info.cornerBits) notes.push('Choose your picture on the <a href="/dashboard/display?device=' + encodeURIComponent(deviceId) + '">Customize display</a> page (Agenda, then Picture). Nothing is drawn until you do.');
+		if (n.countdown && !info.countdown) notes.push('Click the Countdown widget and fill in its name and date on the right. Until then the preview shows an example.');
+		if (n.picture && !info.cornerBits) notes.push('Click the Picture widget and choose your picture on the right. Nothing is drawn on the display until you do.');
 		if ((types.has('sun_times') || types.has('moon')) && !info.loc) notes.push('Add your city (weather location) to get sunrise and sunset times and the right way up moon.');
 		if (types.has('weather') && !info.hasWeather) notes.push('Add your city (weather location) to get the weather.');
 		notesEl.hidden = !notes.length;
@@ -1171,6 +1478,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .num, .bld .txt { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 12px; padding: 0.5em 0.7em; font: inherit; font-size: 0.95em; box-sizing: border-box; }
 	.bld .num { width: 100%; }
 	.bld .num:disabled { opacity: 0.5; }
+	.bld .datepick { display: grid; grid-template-columns: 1fr 1.3fr 1.2fr; gap: 6px; }
+	.bld .picthumb { width: 100%; aspect-ratio: 184 / 140; border: 1px solid var(--border); border-radius: 10px; image-rendering: pixelated; touch-action: none; display: block; margin-bottom: 8px; }
+	.bld .btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+	.bld .piccontrols { display: grid; gap: 8px; margin-top: 8px; }
+	.bld input[type=range] { width: 100%; }
 	.bld .txt { width: 100%; resize: vertical; }
 	.bld .num:focus-visible, .bld .txt:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 	.bld .opt { margin-bottom: 0.7em; }

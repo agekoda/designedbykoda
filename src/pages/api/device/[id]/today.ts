@@ -5,7 +5,7 @@
 // its own), and returning a small, pre-formatted payload.
 import { viewForStyle, LIVE_STYLES, isRefreshSec } from '../../../../data/calendarStyles';
 import { timelineSleep } from '../../../../lib/eink/layouts/timeline';
-import { getForecast } from '../../../../lib/weather';
+import { getForecast, type Forecast } from '../../../../lib/weather';
 import { renderLayout } from '../../../../lib/eink/layouts';
 import { b64ToBytes, FRAME_BYTES } from '../../../../lib/eink/image';
 import { fetchTasks } from '../../../../lib/tasks';
@@ -350,7 +350,7 @@ export async function GET({ params, request, locals }) {
 
 	// Optional weather: today's high/low for the location chosen in setup.
 	// Never lets a weather problem break the calendar response.
-	let weather: { high: number; low: number } | null = null;
+	let weather: Forecast | null = null;
 	let place: { lat: number; lon: number } | null = null; // also used by Moon & Sun
 	try {
 		const loc = await db.prepare('SELECT weather_lat, weather_lon FROM devices WHERE id = ?').bind(deviceId).first();

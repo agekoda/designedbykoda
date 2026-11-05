@@ -9,6 +9,7 @@ import { VMETRICS } from '../vmetrics';
 import { CORNER, CORNER_BYTES } from '../image';
 import { batteryIcon } from '../batteryIcon';
 import { moonBits } from '../moonImage';
+import { weatherBits, wxKind, wxLabel } from '../weatherIcon';
 import { moonInfo, sunTimes } from '../astro';
 import { quoteForDay } from '../../../data/quotes';
 import {
@@ -284,6 +285,82 @@ function weatherWidget(env: Env, w: Widget, o: Opts) {
 	textWidget(env, w, o, key ? text : short);
 }
 
+function wxIcon(env: Env, x: number, y: number, size: number, code: number) {
+	env.d.bitmapBytes(Math.round(x), Math.round(y), size, size, weatherBits(wxKind(code), size));
+}
+
+function weatherIconWidget(env: Env, w: Widget) {
+	const code = env.ctx.weather?.code;
+	if (code === undefined) return textWidget(env, w, { size: 's', align: 'center' }, env.ctx.weather ? '---' : 'No weather');
+	const size = Math.max(16, Math.min(Math.floor(Math.min(w.w, w.h)), 128));
+	wxIcon(env, w.x + (w.w - size) / 2, w.y + (w.h - size) / 2, size, code);
+}
+
+function weatherSummaryWidget(env: Env, w: Widget, o: Opts) {
+	const wx = env.ctx.weather;
+	if (!wx || wx.code === undefined) return textWidget(env, w, o, '---');
+	const bits: string[] = [];
+	if (o.rain === true && wx.rain !== null && wx.rain !== undefined) bits.push(`Rain ${wx.rain}%`);
+	if (o.wind === true && wx.wind !== null && wx.wind !== undefined) bits.push(`Wind ${wx.wind} km/h`);
+	const sub = bits.join('   ');
+	const { inner, color } = chrome(env, w, o);
+	const small = FACES.s;
+	const sv = vm(env, small);
+	const subH = sub ? sv.asc + sv.desc + 4 : 0;
+	const fit = fitText(env, wxLabel(wx.code), inner.w, Math.max(10, inner.h - subH), facesFor(o.size), o.bold === true);
+	if (!sub) return drawLines(env, inner, fit.lines, fit.face, o.align, o.valign ?? 'middle', color);
+	const nv = blockH(env, fit.face, fit.lines.length);
+	const total = nv + subH;
+	const top = o.valign === 'top' ? inner.y : o.valign === 'bottom' ? inner.y + inner.h - total : inner.y + Math.max(0, (inner.h - total) / 2);
+	drawLines(env, { x: inner.x, y: top, w: inner.w, h: nv }, fit.lines, fit.face, o.align, 'top', color);
+	const sfit = fitText(env, sub, inner.w, sv.asc + sv.desc, ['s'], false);
+	drawLines(env, { x: inner.x, y: top + nv + 4, w: inner.w, h: sv.asc + sv.desc }, sfit.lines.slice(0, 1), small, o.align, 'top', color);
+}
+
+function forecastWidget(env: Env, w: Widget, o: Opts) {
+	const all = env.ctx.weather?.days;
+	if (!all || !all.length) return textWidget(env, w, { size: 's', align: 'center' }, env.ctx.weather ? '---' : 'No weather');
+	const { inner, color } = chrome(env, w, o);
+	const start = o.from === 'tomorrow' ? 1 : 0;
+	const n = Math.max(1, Math.min(Number(o.days) || 5, all.length - start));
+	const days = all.slice(start, start + n);
+	const small = FACES.s;
+	const sv = vm(env, small);
+	const hiOnly = o.temps === 'high';
+	const name = (i: number) => (start + i === 0 ? 'Today' : DAY_NAMES[new Date(days[i].date + 'T00:00:00Z').getUTCDay()].slice(0, 3));
+	const temp = (i: number) => (hiOnly ? `${round0(days[i].high)}` : `${round0(days[i].high)}/${round0(days[i].low)}`);
+	if (inner.w >= inner.h * 1.15) {
+		// columns: name on top, picture in the middle, temperatures underneath
+		const cw = inner.w / n;
+		const textH = sv.asc + sv.desc;
+		const iconSize = Math.floor(Math.min(cw - 8, inner.h - 2 * textH - 8, 80));
+		days.forEach((_, i) => {
+			const cx = inner.x + cw * i + cw / 2;
+			d_text(env, cx, inner.y + sv.asc, name(i), 'center', color, cw - 4);
+			if (iconSize >= 16) wxIcon(env, cx - iconSize / 2, inner.y + textH + 4 + (inner.h - 2 * textH - 8 - iconSize) / 2, iconSize, days[i].code);
+			d_text(env, cx, inner.y + inner.h - sv.desc, temp(i), 'center', color, cw - 4);
+		});
+	} else {
+		// rows: name on the left, picture in the middle, temperatures on the right
+		const rh = inner.h / n;
+		const wide = (f: (i: number) => string) => Math.max(...days.map((_, i) => measure(env.fam, 's', f(i), 1).w)) + 4;
+		const nameW = wide(name);
+		const tempW = wide(temp);
+		const free = inner.w - nameW - tempW;
+		const iconSize = Math.floor(Math.min(rh - 4, 44, free - 6));
+		days.forEach((_, i) => {
+			const cy = inner.y + rh * i + rh / 2;
+			const ty = cy + (sv.asc - sv.desc) / 2;
+			d_text(env, inner.x + 2, ty, name(i), 'left', color, nameW);
+			if (iconSize >= 16) wxIcon(env, inner.x + nameW + (free - iconSize) / 2, cy - iconSize / 2, iconSize, days[i].code);
+			d_text(env, inner.x + inner.w - 2, ty, temp(i), 'right', color, tempW);
+		});
+	}
+}
+function d_text(env: Env, x: number, y: number, s: string, align: Align, color: Color, maxW: number) {
+	env.d.text(x, y, 's', s, { align, color, maxW });
+}
+
 function moonWidget(env: Env, w: Widget) {
 	const { ctx } = env;
 	const off = ctx.utcOffsetSec ?? 0;
@@ -394,7 +471,7 @@ function countdownWidget(env: Env, w: Widget, o: Opts) {
 	const c = env.ctx.countdown;
 	const target = c ? parseDay(c.date) : null;
 	if (!c || !c.title.trim() || target === null) {
-		const fit = fitText(env, 'Set up a countdown in Customize display', inner.w, inner.h, ['s'], false);
+		const fit = fitText(env, 'Set a name and date for this countdown', inner.w, inner.h, ['s'], false);
 		return drawLines(env, inner, fit.lines, fit.face, 'center', 'middle', color);
 	}
 	const days = target - dayIdx(env.ctx.nowLocal);
@@ -566,6 +643,12 @@ function drawWidget(env: Env, w: Widget) {
 			return weekStrip(env, w, o);
 		case 'weather':
 			return weatherWidget(env, w, o);
+		case 'weather_icon':
+			return weatherIconWidget(env, w);
+		case 'weather_summary':
+			return weatherSummaryWidget(env, w, o);
+		case 'forecast':
+			return forecastWidget(env, w, o);
 		case 'moon':
 			return moonWidget(env, w);
 		case 'moon_text':

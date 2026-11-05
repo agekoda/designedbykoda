@@ -12,10 +12,20 @@ export interface CalEvent {
 	endLocal?: number; // local wall-clock end (all-day events: the midnight after the last day)
 }
 
+// One day of the weather forecast (Open-Meteo weather code, temperatures in C, rain chance %, wind km/h).
+export interface WxDay {
+	date: string; // YYYY-MM-DD, the location's local date
+	code: number;
+	high: number;
+	low: number;
+	rain: number | null;
+	wind: number | null;
+}
+
 export interface LayoutCtx {
 	nowLocal: number; // local wall-clock seconds
 	events: CalEvent[]; // soonest first
-	weather: { high: number; low: number } | null;
+	weather: { high: number; low: number; code?: number; rain?: number | null; wind?: number | null; days?: WxDay[] } | null;
 	vbat: number | null; // volts, as reported by the device
 	dark: boolean;
 	family: Family; // which font family this layout draws with

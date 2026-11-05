@@ -67,6 +67,21 @@ function sampleTasks(nowLocal: number): TaskItem[] {
 	return SAMPLE_TASKS.map((t) => (t.due === 'overdue' ? { ...t, due: iso(day - 1) } : t.due === 'today' ? { ...t, due: iso(day) } : t.due === 'tomorrow' ? { ...t, due: iso(day + 1) } : t));
 }
 
+// Made-up forecast for previews: a mix of conditions so every icon gets seen.
+function sampleWeather(nowLocal: number) {
+	const day = Math.floor(nowLocal / 86400);
+	const iso = (n: number) => new Date(n * 86400000).toISOString().slice(0, 10);
+	const mk = [
+		[2, 21, 12, 20, 14],
+		[61, 18, 11, 70, 22],
+		[0, 24, 13, 0, 9],
+		[3, 20, 12, 15, 17],
+		[95, 17, 10, 80, 30],
+	];
+	const days = mk.map(([code, high, low, rain, wind], i) => ({ date: iso(day + i), code, high, low, rain, wind }));
+	return { high: 21, low: 12, code: 2, rain: 20, wind: 14, days };
+}
+
 export interface PreviewOptions {
 	style: string;
 	font?: string | null;
@@ -92,7 +107,7 @@ export function drawListFor(o: PreviewOptions): string {
 		{
 			nowLocal,
 			events: timeline ? sampleDay(nowLocal) : sampleEvents(nowLocal),
-			weather: o.hasWeather ? { high: 21, low: 12 } : null,
+			weather: o.hasWeather ? sampleWeather(nowLocal) : null,
 			vbat: o.vbat ?? null,
 			dark: o.dark,
 			cornerImage: o.cornerImage ?? null,
