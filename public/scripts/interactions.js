@@ -144,23 +144,13 @@
 	let cursorY = mouseY;
 	const trail = 0.4; // lower = laggier/smoother trailing, higher = tighter/snappier
 
-	// Only run the animation loop while the dot is catching up to the mouse,
-	// instead of every frame forever.
-	let running = false;
+	// No smoothing: the dot is placed exactly where the mouse is on every
+	// mouse event, so it can never lag behind or look like it runs at a lower
+	// frame rate than the page.
 	window.addEventListener('mousemove', (e) => {
-		mouseX = e.clientX;
-		mouseY = e.clientY;
-		if (!running) { running = true; requestAnimationFrame(tick); }
+		cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`;
 	}, { passive: true });
-
-	function tick() {
-		cursorX += (mouseX - cursorX) * trail;
-		cursorY += (mouseY - cursorY) * trail;
-		cursor.style.transform = `translate3d(${cursorX}px, ${cursorY}px, 0) translate(-50%, -50%)`;
-		if (Math.abs(mouseX - cursorX) > 0.1 || Math.abs(mouseY - cursorY) > 0.1) requestAnimationFrame(tick);
-		else running = false;
-	}
-	requestAnimationFrame(tick);
+	cursor.style.transform = `translate(${mouseX}px, ${mouseY}px) translate(-50%, -50%)`;
 
 	// Grow the cursor over anything clickable.
 	const hoverTargets = 'a, button, [role="button"], input, textarea, .card';
