@@ -31,6 +31,7 @@ export interface LayoutCtx {
 	family: Family; // which font family this layout draws with
 	// Optional 1-bit picture (see image.ts) for layouts that have a picture spot. 1 = dark dot.
 	cornerImage?: Uint8Array | null;
+	cornerSize?: { w: number; h: number } | null; // size of cornerImage when it isn't the classic corner box
 	// How often the calendar wakes up, in seconds (86400 = once a day). Only the Timeline cares.
 	refreshSec?: number;
 	// Where the calendar lives (the weather location), for sunrise / sunset and which way up the Moon is.

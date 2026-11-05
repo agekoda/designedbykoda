@@ -3,7 +3,7 @@
 // against the logged-in user, so you can only touch your own devices.
 import { isStyleId, isRefreshSec, DEFAULT_STYLE } from '../../../data/calendarStyles';
 import { isFamily } from '../../../lib/eink/fonts';
-import { b64ToBytes, CORNER_BYTES, FRAME_BYTES, cleanSettings } from '../../../lib/eink/image';
+import { b64ToBytes, decodePic, FRAME_BYTES, cleanSettings } from '../../../lib/eink/image';
 import { toAscii } from '../../../lib/eink/draw';
 import { sanitizeLayout } from '../../../lib/eink/builder/model';
 export const prerender = false;
@@ -149,8 +149,7 @@ export async function POST({ request, locals }) {
 		if (c.mode === 'image') {
 			// bits / src / cfg are only sent when the picture itself changed
 			if (c.bits !== undefined) {
-				const bytes = typeof c.bits === 'string' ? b64ToBytes(c.bits) : null;
-				if (!bytes || bytes.length !== CORNER_BYTES) return json({ error: 'That picture is the wrong size.' }, 400);
+				if (!decodePic(c.bits)) return json({ error: 'That picture is the wrong size.' }, 400);
 				sets.push('corner_bits = ?');
 				vals.push(c.bits);
 			}

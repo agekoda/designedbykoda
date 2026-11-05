@@ -3,6 +3,7 @@
 // user, so you can only ever see or change your own devices.
 import { isStyleId, DEFAULT_STYLE } from '../../../data/calendarStyles';
 import { sanitizeLayout } from '../../../lib/eink/builder/model';
+import { cornerPlain } from '../../../lib/eink/image';
 export const prerender = false;
 
 function parseIds(raw: unknown): string[] | null {
@@ -54,7 +55,7 @@ export async function GET({ request, locals }) {
 	try {
 		const er = await db.prepare("SELECT id, battery_mv, battery_at, layout_font, corner_mode, CASE WHEN corner_mode = 'image' THEN corner_bits END AS corner_bits FROM devices WHERE user_id = ?").bind(userId).all();
 		for (const e of er.results ?? []) {
-			extra.set(e.id, { batteryMv: e.battery_mv ?? null, batteryAt: e.battery_at ?? null, font: e.layout_font ?? null, cornerMode: e.corner_mode === 'image' ? 'image' : 'calendar', cornerBits: e.corner_mode === 'image' ? e.corner_bits ?? null : null });
+			extra.set(e.id, { batteryMv: e.battery_mv ?? null, batteryAt: e.battery_at ?? null, font: e.layout_font ?? null, cornerMode: e.corner_mode === 'image' ? 'image' : 'calendar', cornerBits: e.corner_mode === 'image' ? cornerPlain(e.corner_bits) : null });
 		}
 	} catch {}
 

@@ -7,7 +7,7 @@ import { viewForStyle, LIVE_STYLES, isRefreshSec } from '../../../../data/calend
 import { timelineSleep } from '../../../../lib/eink/layouts/timeline';
 import { getForecast, type Forecast } from '../../../../lib/weather';
 import { renderLayout } from '../../../../lib/eink/layouts';
-import { b64ToBytes, FRAME_BYTES } from '../../../../lib/eink/image';
+import { b64ToBytes, decodePic, FRAME_BYTES } from '../../../../lib/eink/image';
 import { fetchTasks } from '../../../../lib/tasks';
 import { layoutNeeds, sanitizeLayout, type CustomLayout } from '../../../../lib/eink/builder/model';
 export const prerender = false;
@@ -408,13 +408,18 @@ export async function GET({ params, request, locals }) {
 		// and a missing column just means "defaults".
 		let fontChoice: string | null = null;
 		let cornerImage: Uint8Array | null = null;
+		let cornerSize: { w: number; h: number } | null = null;
 		try {
 			const o = await db
 				.prepare("SELECT layout_font, CASE WHEN corner_mode = 'image' THEN corner_bits END AS bits FROM devices WHERE id = ?")
 				.bind(deviceId)
 				.first();
 			fontChoice = o?.layout_font ?? null;
-			if (o?.bits) cornerImage = b64ToBytes(o.bits);
+			const pc = decodePic(o?.bits);
+			if (pc) {
+				cornerImage = pc.bytes;
+				cornerSize = { w: pc.w, h: pc.h };
+			}
 		} catch {}
 		// Countdown name + date, and the Photo frame picture (schema-layouts.sql). Only read for those layouts.
 		let countdown: { title: string; date: string } | null = null;
@@ -437,6 +442,7 @@ export async function GET({ params, request, locals }) {
 			vbat,
 			dark,
 			cornerImage,
+			cornerSize,
 			refreshSec: intervalSec,
 			loc: place,
 			utcOffsetSec: offsetSec,

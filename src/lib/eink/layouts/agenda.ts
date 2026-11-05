@@ -1,7 +1,7 @@
 // Agenda: today's date and weather on the left, a mini month on the right,
 // then the next events grouped by day underneath.
 import { Draw } from '../draw';
-import { CORNER, CORNER_BYTES } from '../image';
+import { CORNER, fitBits } from '../image';
 import { firstThatFits, measure } from '../measure';
 import { batteryIcon } from '../batteryIcon';
 import { daysInMonth, dayName, evTimeStr, monthName, monthShort, round0, tmOf, type LayoutCtx } from '../context';
@@ -24,9 +24,11 @@ export function agenda(ctx: LayoutCtx): string {
 	d.text(80, 118, 's', firstThatFits(ctx.family, 's', [`${monthName(now)} ${now.year}`, `${monthShort(now)} ${now.year}`], 188), { align: 'box', maxW: 40 });
 
 	// ---- top right: a picture if one was set up, otherwise the mini month ----
-	if (ctx.cornerImage && ctx.cornerImage.length === CORNER_BYTES) {
+	const sw = ctx.cornerSize?.w ?? CORNER.w;
+	const sh = ctx.cornerSize?.h ?? CORNER.h;
+	if (ctx.cornerImage && ctx.cornerImage.length === Math.ceil(sw / 8) * sh) {
 		// Stored as dark dots; on a dark screen the ink is white, so flip it to keep the picture the right way round.
-		let bytes = ctx.cornerImage;
+		let bytes = fitBits(ctx.cornerImage, sw, sh, CORNER.w, CORNER.h);
 		if (ctx.dark) bytes = bytes.map((b) => ~b & 0xff);
 		d.bitmapBytes(CORNER.x, CORNER.y, CORNER.w, CORNER.h, bytes);
 	} else {

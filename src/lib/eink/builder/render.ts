@@ -6,7 +6,7 @@ import { Draw, PAPER, INK, type Align, type Color } from '../draw';
 import { fontId, type Family, type Role } from '../fonts';
 import { measure, wrapText } from '../measure';
 import { VMETRICS } from '../vmetrics';
-import { CORNER, CORNER_BYTES } from '../image';
+import { CORNER, fitBits } from '../image';
 import { batteryIcon } from '../batteryIcon';
 import { moonBits } from '../moonImage';
 import { weatherBits, wxKind, wxLabel } from '../weatherIcon';
@@ -600,35 +600,14 @@ function lineWidget(env: Env, w: Widget, o: Opts) {
 
 function pictureWidget(env: Env, w: Widget) {
 	const img = env.ctx.cornerImage;
-	if (!img || img.length !== CORNER_BYTES) return;
-	let bytes = img;
-	let bw = CORNER.w;
-	let bh = CORNER.h;
-	if (w.w !== CORNER.w || w.h !== CORNER.h) {
-		// Fill the box (crop the overflow, centred), sampling the stored dots so it stays crisp at any size.
-		const sStride = Math.ceil(CORNER.w / 8);
-		const k = Math.max(w.w / CORNER.w, w.h / CORNER.h);
-		const ox = (CORNER.w - w.w / k) / 2;
-		const oy = (CORNER.h - w.h / k) / 2;
-		const oStride = Math.ceil(w.w / 8);
-		const out = new Uint8Array(oStride * w.h);
-		for (let y = 0; y < w.h; y++) {
-			const y0 = Math.min(CORNER.h - 1, Math.floor(oy + y / k));
-			const y1 = Math.min(CORNER.h, Math.max(y0 + 1, Math.ceil(oy + (y + 1) / k)));
-			for (let x = 0; x < w.w; x++) {
-				const x0 = Math.min(CORNER.w - 1, Math.floor(ox + x / k));
-				const x1 = Math.min(CORNER.w, Math.max(x0 + 1, Math.ceil(ox + (x + 1) / k)));
-				let ink = 0;
-				for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) if (img[yy * sStride + (xx >> 3)] & (0x80 >> (xx & 7))) ink++;
-				if (ink * 2 >= (y1 - y0) * (x1 - x0)) out[y * oStride + (x >> 3)] |= 0x80 >> (x & 7);
-			}
-		}
-		bytes = out;
-		bw = w.w;
-		bh = w.h;
-	}
+	if (!img) return;
+	const sw = env.ctx.cornerSize?.w ?? CORNER.w;
+	const sh = env.ctx.cornerSize?.h ?? CORNER.h;
+	if (img.length !== Math.ceil(sw / 8) * sh) return;
+	// Stored at the size it was made for; if the box has since changed, fill it from the stored dots.
+	let bytes = fitBits(img, sw, sh, w.w, w.h);
 	if (env.ctx.dark) bytes = bytes.map((b) => ~b & 0xff);
-	env.d.bitmapBytes(w.x, w.y, bw, bh, bytes);
+	env.d.bitmapBytes(w.x, w.y, w.w, w.h, bytes);
 }
 
 function batteryWidget(env: Env, w: Widget, o: Opts) {

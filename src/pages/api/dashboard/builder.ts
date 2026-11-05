@@ -1,6 +1,7 @@
 // The layout builder's API: read and save a device's own design ("Your own design").
 // Everything is checked against the logged-in user, so you can only touch your own devices.
 import { isFamily } from '../../../lib/eink/fonts';
+import { cleanSettings } from '../../../lib/eink/image';
 import { MAX_JSON, sanitizeLayout } from '../../../lib/eink/builder/model';
 export const prerender = false;
 
@@ -34,10 +35,16 @@ export async function GET({ request, locals }) {
 
 	let font: string | null = null;
 	let cornerBits: string | null = null;
+	let cornerSrc: string | null = null;
+	let cornerCfg: unknown = null;
 	try {
-		const x = await db.prepare("SELECT layout_font, CASE WHEN corner_mode = 'image' THEN corner_bits END AS bits FROM devices WHERE id = ?").bind(deviceId).first();
+		const x = await db.prepare("SELECT layout_font, CASE WHEN corner_mode = 'image' THEN corner_bits END AS bits, CASE WHEN corner_mode = 'image' THEN corner_src END AS src, CASE WHEN corner_mode = 'image' THEN corner_cfg END AS cfg FROM devices WHERE id = ?").bind(deviceId).first();
 		font = isFamily(x?.layout_font) ? x.layout_font : null;
 		cornerBits = x?.bits || null;
+		cornerSrc = x?.src || null;
+		try {
+			cornerCfg = x?.cfg ? cleanSettings(JSON.parse(x.cfg)) : null;
+		} catch {}
 	} catch {}
 
 	let lat: number | null = null;
@@ -76,6 +83,8 @@ export async function GET({ request, locals }) {
 		font,
 		custom,
 		cornerBits,
+		cornerSrc,
+		cornerCfg,
 		lat,
 		lon,
 		hasWeather: lat !== null,

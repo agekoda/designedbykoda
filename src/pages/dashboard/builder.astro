@@ -85,7 +85,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { WIDGETS, GROUPS, TEMPLATES, makeWidget, clampWidget, sanitizeLayout, withDefaults, newId, SCREEN, MAX_WIDGETS, layoutNeeds, type CustomLayout, type Widget, type OptDef } from '../../lib/eink/builder/model';
 	import { loadFonts, drawListFor, paint, type PreviewOptions } from '../../lib/eink/previewKit';
 	import { renderDrawList } from '../../lib/eink/preview';
-	import { b64ToBytes, bytesToB64, CORNER, DEFAULT_IMAGE_SETTINGS, DITHERS, ditherGray, packBits, type ImageSettings } from '../../lib/eink/image';
+	import { bytesToB64, decodePic, encodePic, DEFAULT_IMAGE_SETTINGS, DITHERS, ditherGray, packBits, type ImageSettings } from '../../lib/eink/image';
 	import { dropdown, type Dropdown } from '../../lib/dropdown';
 
 	const root = document.querySelector('.bld') as HTMLElement;
@@ -126,7 +126,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	let font: string | null = null;
 	let dark = false;
 	let sel: string | null = null;
-	let info = { hasWeather: false, loc: null as { lat: number; lon: number } | null, countdown: null as { title: string; date: string } | null, cornerBits: null as string | null, tasksGranted: false, migrated: true };
+	let info = { hasWeather: false, loc: null as { lat: number; lon: number } | null, countdown: null as { title: string; date: string } | null, cornerBits: null as string | null, cornerSrc: null as string | null, cornerCfg: null as ImageSettings | null, tasksGranted: false, migrated: true };
 	let savedKey = '';
 	let hist: string[] = [];
 	let hi = -1;
@@ -179,16 +179,19 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			vbat: 4.0,
 			loc: info.loc,
 			countdown: info.countdown ?? { title: 'Japan trip', date: d },
-			cornerImage: info.cornerBits ? b64ToBytes(info.cornerBits) : null,
+			cornerImage: decodePic(info.cornerBits)?.bytes ?? null,
+			cornerSize: ((p) => (p ? { w: p.w, h: p.h } : null))(decodePic(info.cornerBits)),
 			custom: l,
 		};
 	}
+	let picHook: (() => void) | null = null;
 	let raf = 0;
 	function redraw() {
 		if (raf) return;
 		raf = requestAnimationFrame(() => {
 			raf = 0;
 			if (!fonts) return;
+			picHook?.();
 			const dl = drawListFor(previewOpts(layout));
 			const r = renderDrawList(dl, fonts);
 			paint(canvas, r.px, 2);
@@ -546,6 +549,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	function buildInspector() {
+		picHook = null;
 		const w = find(sel);
 		for (const k of Object.keys(fields)) delete fields[k];
 		dds.filter((d) => !staticDds.includes(d)).forEach((d) => d.destroy());
@@ -680,8 +684,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			URL.revokeObjectURL(url);
 		}
 	}
-	function cropGray(img: HTMLImageElement, s: ImageSettings): Float32Array {
-		const { w, h } = CORNER;
+	function cropGray(img: HTMLImageElement, s: ImageSettings, w: number, h: number): Float32Array {
 		const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight) * s.zoom;
 		const dw = img.naturalWidth * scale;
 		const dh = img.naturalHeight * scale;
@@ -703,19 +706,20 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		return g;
 	}
 	function paintBits(c: HTMLCanvasElement, bits: string | null) {
-		const { w, h } = CORNER;
+		const pc = decodePic(bits);
+		const w = pc?.w ?? 184;
+		const h = pc?.h ?? 140;
 		c.width = w;
 		c.height = h;
 		const g = c.getContext('2d')!;
 		g.fillStyle = '#f4f1ea';
 		g.fillRect(0, 0, w, h);
-		const bytes = bits ? b64ToBytes(bits) : null;
-		if (!bytes) return;
+		if (!pc) return;
 		const stride = Math.ceil(w / 8);
 		const im = g.createImageData(w, h);
 		for (let y = 0; y < h; y++)
 			for (let x = 0; x < w; x++) {
-				const ink = bytes[y * stride + (x >> 3)] & (0x80 >> (x & 7));
+				const ink = pc.bytes[y * stride + (x >> 3)] & (0x80 >> (x & 7));
 				const o = (y * w + x) * 4;
 				im.data[o] = im.data[o + 1] = im.data[o + 2] = ink ? 20 : 244;
 				im.data[o + 3] = 255;
@@ -723,7 +727,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		g.putImageData(im, 0, 0);
 	}
 
-	function picturePanel() {
+	function picturePanel(wg: Widget) {
 		const sec = section('Your picture');
 		const thumb = document.createElement('canvas');
 		thumb.className = 'picthumb';
@@ -761,9 +765,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		let first = true;
 		const apply = (save = true) => {
 			if (!pic.img) return;
-			const { w, h } = CORNER;
-			const dots = ditherGray(cropGray(pic.img, pic.cfg), w, h, pic.cfg);
-			info.cornerBits = bytesToB64(packBits(dots, w, h));
+			const { w, h } = wg;
+			const dots = ditherGray(cropGray(pic.img, pic.cfg, w, h), w, h, pic.cfg);
+			info.cornerBits = encodePic(packBits(dots, w, h), w, h);
 			paintBits(thumb, info.cornerBits);
 			redraw();
 			refreshChrome();
@@ -817,6 +821,28 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			mkdd(s);
 		};
 		if (pic.img) buildControls();
+		else if (info.cornerSrc) {
+			// bring back the original photo so the controls work after a refresh
+			const im = new Image();
+			im.onload = () => {
+				if (pic.img || sel !== wg.id) return;
+				pic.img = im;
+				pic.src = info.cornerSrc;
+				pic.cfg = { ...DEFAULT_IMAGE_SETTINGS, ...(info.cornerCfg ?? {}) };
+				first = false;
+				buildControls();
+			};
+			im.src = info.cornerSrc;
+		}
+		// when the widget is resized, make the dots again at the new size
+		let resizeT = 0;
+		picHook = () => {
+			if (sel !== wg.id || !pic.img) return;
+			const cur = decodePic(info.cornerBits);
+			if (cur && cur.w === wg.w && cur.h === wg.h) return;
+			clearTimeout(resizeT);
+			resizeT = window.setTimeout(() => apply(), 250);
+		};
 
 		// drag the picture inside its box
 		let drag: { x: number; y: number; px: number; py: number } | null = null;
@@ -827,7 +853,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		});
 		thumb.addEventListener('pointermove', (e) => {
 			if (!drag) return;
-			const k = CORNER.w / thumb.clientWidth;
+			const k = wg.w / thumb.clientWidth;
 			pic.cfg.panX = drag.px + (e.clientX - drag.x) * k;
 			pic.cfg.panY = drag.py + (e.clientY - drag.y) * k;
 			apply();
@@ -864,7 +890,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		head.appendChild(p);
 
 		if (w.t === 'countdown') countdownPanel();
-		if (w.t === 'picture') picturePanel();
+		if (w.t === 'picture') picturePanel(w);
 
 		// options
 		if (def.opts.length) {
@@ -1279,7 +1305,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		}
 		const d = await res.json();
 		$('title').textContent = d.name ? `${d.name}: layout builder` : 'Layout builder';
-		info = { hasWeather: !!d.hasWeather, loc: d.lat !== null && d.lon !== null ? { lat: d.lat, lon: d.lon } : null, countdown: d.countdown, cornerBits: d.cornerBits, tasksGranted: !!d.tasksGranted, migrated: !!d.migrated };
+		info = { hasWeather: !!d.hasWeather, loc: d.lat !== null && d.lon !== null ? { lat: d.lat, lon: d.lon } : null, countdown: d.countdown, cornerBits: d.cornerBits, cornerSrc: d.cornerSrc ?? null, cornerCfg: d.cornerCfg ?? null, tasksGranted: !!d.tasksGranted, migrated: !!d.migrated };
 		font = d.font;
 		dark = !!d.dark;
 		layout = sanitizeLayout(d.custom);
@@ -1457,7 +1483,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .num:disabled { opacity: 0.5; }
 	.bld .datein { color-scheme: dark; cursor: pointer; }
 	.bld .datepick { display: grid; grid-template-columns: 1fr 1.3fr 1.2fr; gap: 6px; }
-	.bld .picthumb { width: 100%; aspect-ratio: 184 / 140; border: 1px solid var(--border); border-radius: 10px; image-rendering: pixelated; touch-action: none; display: block; margin-bottom: 8px; }
+	.bld .picthumb { width: 100%; height: auto; max-height: 260px; object-fit: contain; border: 1px solid var(--border); border-radius: 10px; image-rendering: pixelated; touch-action: none; display: block; margin-bottom: 8px; }
 	.bld .btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 	.bld .piccontrols { display: grid; gap: 8px; margin-top: 8px; }
 	.bld input[type=range] { width: 100%; }

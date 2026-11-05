@@ -139,3 +139,68 @@ export function b64ToBytes(s: string): Uint8Array | null {
 		return null;
 	}
 }
+
+
+// ---- stored pictures of any size ----
+// The Picture widget in the layout builder stores its dots at the size of the widget, up to the full
+// screen. A picture that isn't the classic corner size is saved as "WxH:" + base64; a plain base64
+// string is always the classic corner size, so older saved pictures keep working unchanged.
+export const PIC_MAX = { w: 400, h: 300 } as const;
+
+export interface Pic {
+	w: number;
+	h: number;
+	bytes: Uint8Array;
+}
+
+export function encodePic(bytes: Uint8Array, w: number, h: number): string {
+	const b64 = bytesToB64(bytes);
+	return w === CORNER.w && h === CORNER.h ? b64 : `${w}x${h}:${b64}`;
+}
+
+export function decodePic(s: unknown): Pic | null {
+	if (typeof s !== 'string' || !s) return null;
+	let w: number = CORNER.w;
+	let h: number = CORNER.h;
+	let b64 = s;
+	const m = /^(\d{1,3})x(\d{1,3}):/.exec(s);
+	if (m) {
+		w = +m[1];
+		h = +m[2];
+		b64 = s.slice(m[0].length);
+	}
+	if (w < 1 || h < 1 || w > PIC_MAX.w || h > PIC_MAX.h) return null;
+	const bytes = b64ToBytes(b64);
+	if (!bytes || bytes.length !== Math.ceil(w / 8) * h) return null;
+	return { w, h, bytes };
+}
+
+// Fills a tw x th box with a stored picture (crops the overflow, centred), averaging the dots it covers.
+export function fitBits(src: Uint8Array, sw: number, sh: number, tw: number, th: number): Uint8Array {
+	if (sw === tw && sh === th) return src;
+	const sStride = Math.ceil(sw / 8);
+	const oStride = Math.ceil(tw / 8);
+	const k = Math.max(tw / sw, th / sh);
+	const ox = (sw - tw / k) / 2;
+	const oy = (sh - th / k) / 2;
+	const out = new Uint8Array(oStride * th);
+	for (let y = 0; y < th; y++) {
+		const y0 = Math.min(sh - 1, Math.floor(oy + y / k));
+		const y1 = Math.min(sh, Math.max(y0 + 1, Math.ceil(oy + (y + 1) / k)));
+		for (let x = 0; x < tw; x++) {
+			const x0 = Math.min(sw - 1, Math.floor(ox + x / k));
+			const x1 = Math.min(sw, Math.max(x0 + 1, Math.ceil(ox + (x + 1) / k)));
+			let ink = 0;
+			for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) if (src[yy * sStride + (xx >> 3)] & (0x80 >> (xx & 7))) ink++;
+			if (ink * 2 >= (y1 - y0) * (x1 - x0)) out[y * oStride + (x >> 3)] |= 0x80 >> (x & 7);
+		}
+	}
+	return out;
+}
+
+// For the places that only know the classic corner size (Customize display, the dashboard preview).
+export function cornerPlain(s: unknown): string | null {
+	const p = decodePic(s);
+	if (!p) return null;
+	return p.w === CORNER.w && p.h === CORNER.h ? bytesToB64(p.bytes) : bytesToB64(fitBits(p.bytes, p.w, p.h, CORNER.w, CORNER.h));
+}

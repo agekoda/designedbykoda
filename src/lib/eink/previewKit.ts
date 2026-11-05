@@ -89,6 +89,7 @@ export interface PreviewOptions {
 	hasWeather: boolean;
 	vbat?: number | null;
 	cornerImage?: Uint8Array | null;
+	cornerSize?: { w: number; h: number } | null;
 	refreshSec?: number;
 	loc?: { lat: number; lon: number } | null; // where the calendar lives (Moon & Sun)
 	countdown?: { title: string; date: string } | null;
@@ -111,6 +112,7 @@ export function drawListFor(o: PreviewOptions): string {
 			vbat: o.vbat ?? null,
 			dark: o.dark,
 			cornerImage: o.cornerImage ?? null,
+			cornerSize: o.cornerSize ?? null,
 			refreshSec: o.refreshSec ?? 86400,
 			loc: o.loc ?? null,
 			utcOffsetSec: -new Date().getTimezoneOffset() * 60,
