@@ -277,7 +277,8 @@ hr {
 .bg-fx .glow {
 	position: absolute;
 	border-radius: 50%;
-	filter: blur(70px);
+	/* no filter: blur() here. The radial gradient already fades to transparent;
+	   a 70px blur on four large layers was repainting constantly on laptops/phones. */
 }
 .bg-fx .glow-blue {
 	width: 500px;
@@ -479,8 +480,11 @@ html.has-custom-cursor .lightbox-overlay model-viewer {
 	width: 14px;
 	height: 14px;
 	border-radius: 50%;
-	background: #fff;
-	mix-blend-mode: difference;
+	/* Solid colour that flips with the theme. mix-blend-mode: difference was
+	   forcing the whole page to re-composite on every mouse move. */
+	background: var(--fg);
+	box-shadow: 0 0 0 1.5px var(--bg);
+	will-change: transform;
 	pointer-events: none;
 	z-index: 10001;
 	transform: translate(-50%, -50%);

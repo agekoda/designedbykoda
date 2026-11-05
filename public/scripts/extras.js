@@ -332,12 +332,17 @@
 
 		// glow parallax
 		const glows = $$('.bg-fx .glow');
-		addEventListener('pointermove', (e) => {
-			const nx = e.clientX / innerWidth - 0.5, ny = e.clientY / innerHeight - 0.5;
+		let gx = 0, gy = 0, gRaf = 0;
+		function moveGlows() {
+			gRaf = 0;
 			glows.forEach((g, i) => {
 				const k = (i % 2 ? -1 : 1) * (30 + i * 14);
-				g.style.translate = `${nx * k}px ${ny * k}px`;
+				g.style.translate = `${gx * k}px ${gy * k}px`;
 			});
+		}
+		addEventListener('pointermove', (e) => {
+			gx = e.clientX / innerWidth - 0.5; gy = e.clientY / innerHeight - 0.5;
+			if (!gRaf) gRaf = requestAnimationFrame(moveGlows); // at most once per frame
 		}, { passive: true });
 	}
 

@@ -144,16 +144,21 @@
 	let cursorY = mouseY;
 	const trail = 0.4; // lower = laggier/smoother trailing, higher = tighter/snappier
 
+	// Only run the animation loop while the dot is catching up to the mouse,
+	// instead of every frame forever.
+	let running = false;
 	window.addEventListener('mousemove', (e) => {
 		mouseX = e.clientX;
 		mouseY = e.clientY;
-	});
+		if (!running) { running = true; requestAnimationFrame(tick); }
+	}, { passive: true });
 
 	function tick() {
 		cursorX += (mouseX - cursorX) * trail;
 		cursorY += (mouseY - cursorY) * trail;
-		cursor.style.transform = `translate(${cursorX}px, ${cursorY}px) translate(-50%, -50%)`;
-		requestAnimationFrame(tick);
+		cursor.style.transform = `translate3d(${cursorX}px, ${cursorY}px, 0) translate(-50%, -50%)`;
+		if (Math.abs(mouseX - cursorX) > 0.1 || Math.abs(mouseY - cursorY) > 0.1) requestAnimationFrame(tick);
+		else running = false;
 	}
 	requestAnimationFrame(tick);
 
