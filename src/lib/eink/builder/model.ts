@@ -330,8 +330,7 @@ export const WIDGETS: Record<string, WidgetDef> = {
 		blurb: 'Your own photo, turned into black and white dots',
 		w: 184,
 		h: 140,
-		min: { w: 184, h: 140 },
-		fixed: true,
+		min: { w: 40, h: 30 },
 		opts: [],
 	},
 	box: {

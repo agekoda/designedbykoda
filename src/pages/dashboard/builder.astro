@@ -598,7 +598,6 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	function countdownPanel() {
 		const sec = section('What to count down to');
 		const cur = info.countdown;
-		let [y0, m0, d0] = (cur?.date ?? '').split('-');
 		const nameLab = document.createElement('label');
 		nameLab.className = 'fld';
 		nameLab.innerHTML = '<span>Name</span>';
@@ -613,43 +612,20 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const dateLab = document.createElement('div');
 		dateLab.className = 'fld';
 		dateLab.innerHTML = '<span>Date</span>';
-		const row = document.createElement('div');
-		row.className = 'datepick';
-		const mk = (ph: string, opts: [string, string][], val: string) => {
-			const s = document.createElement('select');
-			s.className = 'mini wide';
-			const none = document.createElement('option');
-			none.value = '';
-			none.textContent = ph;
-			s.appendChild(none);
-			for (const [v, t] of opts) {
-				const o = document.createElement('option');
-				o.value = v;
-				o.textContent = t;
-				s.appendChild(o);
-			}
-			s.value = opts.some((o) => o[0] === val) ? val : '';
-			row.appendChild(s);
-			mkdd(s);
-			return s;
-		};
-		const pad = (n: number) => String(n).padStart(2, '0');
-		const thisYear = new Date().getFullYear();
-		const dayS = mk('Day', Array.from({ length: 31 }, (_, i) => [pad(i + 1), String(i + 1)] as [string, string]), d0 ?? '');
-		const monS = mk('Month', ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((t, i) => [pad(i + 1), t] as [string, string]), m0 ?? '');
-		const yrS = mk('Year', Array.from({ length: 12 }, (_, i) => [String(thisYear + i - 1), String(thisYear + i - 1)] as [string, string]), y0 ?? '');
-		dateLab.appendChild(row);
+		const dateIn = document.createElement('input');
+		dateIn.type = 'date';
+		dateIn.className = 'num datein';
+		dateIn.min = '2000-01-01';
+		dateIn.max = '2100-12-31';
+		dateIn.value = cur?.date ?? '';
+		dateLab.appendChild(dateIn);
 		sec.appendChild(dateLab);
 		const msg = msgEl('Shown on every Countdown widget on this display.');
 		sec.appendChild(msg);
 		let timer = 0;
 		const commit = () => {
 			const title = name.value.trim();
-			let date = '';
-			if (dayS.value && monS.value && yrS.value) {
-				const last = new Date(Date.UTC(+yrS.value, +monS.value, 0)).getUTCDate();
-				date = `${yrS.value}-${monS.value}-${pad(Math.min(+dayS.value, last))}`;
-			}
+			const date = /^\d{4}-\d{2}-\d{2}$/.test(dateIn.value) ? dateIn.value : '';
 			info.countdown = title && date ? { title, date } : null;
 			redraw();
 			refreshChrome();
@@ -661,7 +637,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			}, 500);
 		};
 		name.addEventListener('input', commit);
-		[dayS, monS, yrS].forEach((s) => s.addEventListener('change', commit));
+		dateIn.addEventListener('change', commit);
+		dateIn.addEventListener('input', commit);
 	}
 
 	// ---- picture ----
@@ -830,7 +807,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			for (const d of DITHERS) {
 				const o = document.createElement('option');
 				o.value = d.id;
-				o.textContent = `${d.label}: ${d.note}`;
+				o.textContent = d.label;
 				o.selected = pic.cfg.dither === d.id;
 				s.appendChild(o);
 			}
@@ -1478,6 +1455,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .num, .bld .txt { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 12px; padding: 0.5em 0.7em; font: inherit; font-size: 0.95em; box-sizing: border-box; }
 	.bld .num { width: 100%; }
 	.bld .num:disabled { opacity: 0.5; }
+	.bld .datein { color-scheme: dark; cursor: pointer; }
 	.bld .datepick { display: grid; grid-template-columns: 1fr 1.3fr 1.2fr; gap: 6px; }
 	.bld .picthumb { width: 100%; aspect-ratio: 184 / 140; border: 1px solid var(--border); border-radius: 10px; image-rendering: pixelated; touch-action: none; display: block; margin-bottom: 8px; }
 	.bld .btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }

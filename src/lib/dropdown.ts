@@ -106,9 +106,12 @@ export function dropdown(select: HTMLSelectElement): Dropdown {
 		if (!menu.hidden && !wrap.contains(e.target as Node)) close();
 	};
 	const leave = () => !menu.hidden && close();
+	const leaveScroll = (e: Event) => {
+		if (!menu.hidden && !menu.contains(e.target as Node)) close();
+	};
 	document.addEventListener('pointerdown', away);
 	window.addEventListener('resize', leave);
-	window.addEventListener('scroll', leave, true);
+	window.addEventListener('scroll', leaveScroll, true);
 	build();
 	sync();
 	return {
@@ -116,7 +119,7 @@ export function dropdown(select: HTMLSelectElement): Dropdown {
 		destroy() {
 			document.removeEventListener('pointerdown', away);
 			window.removeEventListener('resize', leave);
-			window.removeEventListener('scroll', leave, true);
+			window.removeEventListener('scroll', leaveScroll, true);
 			wrap.remove();
 			select.hidden = false;
 		},
