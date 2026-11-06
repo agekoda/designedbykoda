@@ -4,6 +4,8 @@ import { Draw, PAPER } from '../draw';
 import { measure } from '../measure';
 import { dayIdx, dayName, dayShort, evTimeStr, monthName, monthShort, round0, tmFromDayIdx, tmOf, type LayoutCtx } from '../context';
 import { batteryIcon, batteryIconWidth, BATTERY_H } from '../batteryIcon';
+import { dayMonth } from '../context';
+import { isJa } from '../i18n';
 
 export function week(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -21,7 +23,9 @@ export function week(ctx: LayoutCtx): string {
 	// Title on the left, weather on the right. Try the roomy wording first and
 	// shorten whichever side is needed until they no longer touch.
 	const range = st.mon === en.mon ? `${st.mday} - ${en.mday}` : `${st.mday} ${monthShort(st)} - ${en.mday}`;
-	const titles = [`${range} ${monthName(en)} ${en.year}`, `${range} ${monthShort(en)} ${en.year}`, `${range} ${monthShort(en)}`];
+	const titles = isJa()
+		? [`${dayMonth(st)}〜${dayMonth(en)}`, `${st.mon + 1}/${st.mday}〜${en.mon + 1}/${en.mday}`, `${en.mon + 1}月`]
+		: [`${range} ${monthName(en)} ${en.year}`, `${range} ${monthShort(en)} ${en.year}`, `${range} ${monthShort(en)}`];
 	const hi = ctx.weather ? round0(ctx.weather.high) : '';
 	const lo = ctx.weather ? round0(ctx.weather.low) : '';
 	const wx = ctx.weather ? [`High ${hi}C  Low ${lo}C`, `${hi}C / ${lo}C`, `${hi}C`] : ['---'];

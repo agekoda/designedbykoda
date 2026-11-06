@@ -3,6 +3,7 @@ import { Draw } from '../draw';
 import { firstThatFits, measure } from '../measure';
 import { dayName, dayShort, evTimeStr, monthName, monthShort, round0, tmOf, upcoming, type LayoutCtx } from '../context';
 import { batteryIcon } from '../batteryIcon';
+import { monthYear, dateShort, dayMonth } from '../context';
 
 export function bigdate(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -12,7 +13,7 @@ export function bigdate(ctx: LayoutCtx): string {
 	const big = measure(ctx.family, 'bb', String(now.mday), 3).w <= 150 ? 3 : 2;
 	d.text(78, 118, 'bb', String(now.mday), { align: 'center', scale: big });
 	d.text(78, 152, 'mb', dayName(now), { align: 'center' });
-	d.text(78, 174, 's', firstThatFits(ctx.family, 's', [`${monthName(now)} ${now.year}`, `${monthShort(now)} ${now.year}`], 146), { align: 'center' });
+	d.text(78, 174, 's', firstThatFits(ctx.family, 's', [monthYear(now), monthYear(now, true)], 146), { align: 'center' });
 
 	if (ctx.weather) {
 		d.text(14, 240, 's', `High ${round0(ctx.weather.high)}C`);
@@ -35,10 +36,10 @@ export function bigdate(ctx: LayoutCtx): string {
 		const y0 = 54 + i * 41;
 		const t = tmOf(e.startLocal);
 		d.text(174, y0, 's', e.title, { maxW: 216 });
-		const when = `${dayShort(t)} ${t.mday} ${monthShort(t)}`;
+		const when = dateShort(t);
 		const timeText = evTimeStr(e);
 		const timeW = measure(ctx.family, 'sb', timeText).w;
-		d.text(174, y0 + 17, 's', firstThatFits(ctx.family, 's', [when, `${t.mday} ${monthShort(t)}`], 216 - timeW - 10));
+		d.text(174, y0 + 17, 's', firstThatFits(ctx.family, 's', [when, dayMonth(t)], 216 - timeW - 10));
 		d.text(390, y0 + 17, 'sb', timeText, { align: 'right' });
 		if (i < 5 && upcoming(ctx, i + 1)) d.dots(174, y0 + 27, 216, 4);
 	}

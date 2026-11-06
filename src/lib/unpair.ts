@@ -26,6 +26,7 @@ export async function releaseDevice(db: any, deviceId: string, userId: string): 
 	// Separate statements so a column that doesn't exist yet can't block the rest.
 	for (const sql of [
 		'UPDATE devices SET paired_at = NULL WHERE id = ?',
+		'UPDATE devices SET language = NULL WHERE id = ?',
 		'UPDATE devices SET refresh_interval_sec = 86400 WHERE id = ?',
 		'UPDATE devices SET layout_font = NULL, corner_mode = NULL, corner_bits = NULL, corner_src = NULL, corner_cfg = NULL WHERE id = ?',
 	]) {

@@ -3,6 +3,7 @@
 import { Draw, PAPER } from '../draw';
 import { firstThatFits, measure } from '../measure';
 import { daysInMonth, dayShort, evTimeStr, monthName, monthShort, round0, tmOf, upcoming, type LayoutCtx } from '../context';
+import { monthYear, dayAbbr } from '../context';
 
 export function month(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -10,7 +11,7 @@ export function month(ctx: LayoutCtx): string {
 
 	// header bar
 	d.fill(0, 0, 400, 32);
-	const titles = [`${monthName(now)} ${now.year}`, `${monthShort(now)} ${now.year}`];
+	const titles = [monthYear(now), monthYear(now, true)];
 	const hi = ctx.weather ? round0(ctx.weather.high) : '';
 	const lo = ctx.weather ? round0(ctx.weather.low) : '';
 	const wx = ctx.weather ? [`High ${hi}C  Low ${lo}C`, `${hi}C / ${lo}C`, `${hi}C`] : ['---'];
@@ -34,7 +35,7 @@ export function month(ctx: LayoutCtx): string {
 	const colw = 57;
 	const top = 50;
 	const cellh = 36;
-	['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach((n, i) => d.text(i * colw + Math.floor(colw / 2), 46, 'sb', n, { align: 'center' }));
+	[1, 2, 3, 4, 5, 6, 0].map(dayAbbr).forEach((n, i) => d.text(i * colw + Math.floor(colw / 2), 46, 'sb', n, { align: 'center' }));
 
 	const firstWday = (((now.wday - (now.mday - 1)) % 7) + 7) % 7;
 	const offset = (firstWday + 6) % 7;

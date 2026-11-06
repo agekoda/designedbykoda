@@ -4,6 +4,8 @@ import { measure, wrapText } from '../measure';
 import { dayIdx, dayShort, monthShort, tmOf, type LayoutCtx, type TaskItem } from '../context';
 import { batteryIcon } from '../batteryIcon';
 import { parseDay } from './countdown';
+import { dateShort } from '../context';
+import { tr } from '../i18n';
 
 const ROWS = 8;
 const ROW_H = 28;
@@ -12,11 +14,11 @@ const TOP = 36;
 function dueLabel(due: string | undefined, today: number): string {
 	const n = due ? parseDay(due) : null;
 	if (n === null) return '';
-	if (n < today) return 'Overdue';
-	if (n === today) return 'Today';
-	if (n === today + 1) return 'Tomorrow';
+	if (n < today) return tr('Overdue');
+	if (n === today) return tr('Today');
+	if (n === today + 1) return tr('Tomorrow');
 	const t = tmOf(n * 86400 + 43200);
-	return `${dayShort(t)} ${t.mday} ${monthShort(t)}`;
+	return dateShort(t);
 }
 
 // A centred heading with a note under it, wrapped so it stays on the screen in any font.
@@ -35,7 +37,7 @@ export function todo(ctx: LayoutCtx): string {
 
 	d.fill(0, 0, 400, 30);
 	d.text(10, 21, 'sb', 'TO-DO', { color: PAPER });
-	d.text(392, 21, 's', `${dayShort(now)} ${now.mday} ${monthShort(now)}`, { align: 'right', color: PAPER });
+	d.text(392, 21, 's', dateShort(now), { align: 'right', color: PAPER });
 	batteryIcon(d, ctx, 200, 4, 'center', PAPER);
 
 	if (ctx.tasksState === 'needs_permission') {

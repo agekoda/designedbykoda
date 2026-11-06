@@ -3,6 +3,7 @@ import { Draw, PAPER } from '../draw';
 import { firstThatFits, measure } from '../measure';
 import { dayIdx, dayShort, evTimeStr, monthShort, relDayText, round0, tmOf, upcoming, type LayoutCtx } from '../context';
 import { batteryIcon, batteryIconWidth } from '../batteryIcon';
+import { dateShort } from '../context';
 
 export function nextup(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -11,7 +12,7 @@ export function nextup(ctx: LayoutCtx): string {
 	// header bar
 	d.fill(0, 0, 400, 30);
 	d.text(10, 21, 'sb', 'NEXT UP', { color: PAPER });
-	d.text(392, 21, 's', `${dayShort(now)} ${now.mday} ${monthShort(now)}`, { align: 'right', color: PAPER });
+	d.text(392, 21, 's', dateShort(now), { align: 'right', color: PAPER });
 
 	const today = dayIdx(ctx.nowLocal);
 	const first = upcoming(ctx, 0);
@@ -19,7 +20,7 @@ export function nextup(ctx: LayoutCtx): string {
 		const t = tmOf(first.startLocal);
 		d.text(10, 108, 'bb', evTimeStr(first), { scale: 2 });
 		d.text(10, 138, 'mb', first.title, { maxW: 380 });
-		d.text(10, 160, 's', `${relDayText(dayIdx(first.startLocal), today)}  -  ${dayShort(t)} ${t.mday} ${monthShort(t)}`);
+		d.text(10, 160, 's', `${relDayText(dayIdx(first.startLocal), today)}  -  ${dateShort(t)}`);
 		d.hline(0, 172, 400);
 
 		for (let i = 0; i < 4; i++) {

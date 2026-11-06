@@ -3,6 +3,7 @@ import { Draw, PAPER } from '../draw';
 import { measure } from '../measure';
 import { dayIdx, dayShort, DAY_NAMES, MONTH_NAMES, monthShort, tmOf, type LayoutCtx } from '../context';
 import { batteryIcon } from '../batteryIcon';
+import { dateShort, dateLong } from '../context';
 
 export function parseDay(s: string): number | null {
 	const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
@@ -18,7 +19,7 @@ export function countdown(ctx: LayoutCtx): string {
 
 	d.fill(0, 0, 400, 30);
 	d.text(10, 21, 'sb', 'COUNTDOWN', { color: PAPER });
-	d.text(392, 21, 's', `${dayShort(now)} ${now.mday} ${monthShort(now)}`, { align: 'right', color: PAPER });
+	d.text(392, 21, 's', dateShort(now), { align: 'right', color: PAPER });
 	batteryIcon(d, ctx, 200, 4, 'center', PAPER);
 
 	const c = ctx.countdown;
@@ -51,6 +52,6 @@ export function countdown(ctx: LayoutCtx): string {
 	}
 
 	const t = tmOf(target * 86400 + 43200);
-	d.text(200, 282, 's', `${DAY_NAMES[t.wday]} ${t.mday} ${MONTH_NAMES[t.mon]} ${t.year}`, { align: 'center' });
+	d.text(200, 282, 's', dateLong(t), { align: 'center' });
 	return d.toString();
 }

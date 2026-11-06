@@ -36,6 +36,9 @@
 // The firmware ignores any command letter it doesn't know, so a newer server
 // can add commands without breaking older devices.
 import { fontId, type Family, type Role } from './fonts';
+import { tr } from './i18n';
+import { hasGlyph, hasJp, jpAscent, jpAdvance, jpBitmap } from './jp';
+import { advanceOf } from './measure';
 
 export type Color = 0 | 1;
 export const INK: Color = 0;
@@ -89,6 +92,28 @@ export function toAscii(input: string, tidy = false): string {
 	return s;
 }
 
+// Like toAscii, but keeps Japanese (kana, kanji, Japanese punctuation, full-width letters and digits), which
+// the server draws itself (see jp.ts). For text the person typed into the dashboard (countdown name,
+// layout builder text boxes). Event and task titles still go through toAscii.
+export function cleanText(input: string, tidy = false): string {
+	let out = '';
+	for (const ch of String(input ?? '')) {
+		const cp = ch.codePointAt(0)!;
+		if (hasGlyph(cp)) {
+			out += ch;
+			continue;
+		}
+		const k = ch.normalize('NFKC'); // half-width katakana become full-width, and so on
+		if (k !== ch && Array.from(k).every((c) => hasGlyph(c.codePointAt(0)!))) out += k;
+		else out += toAscii(ch);
+	}
+	if (tidy) {
+		out = out.replace(/ +/g, ' ').trim();
+		if (out.length > MAX_TITLE_CHARS) out = out.slice(0, MAX_TITLE_CHARS).trim();
+	}
+	return out;
+}
+
 // An event title, made safe to draw. Never empty.
 export function cleanTitle(input: string): string {
 	return toAscii(input, true) || '(event)';
@@ -107,6 +132,8 @@ export class Draw {
 
 	// ---- text ----
 	text(x: number, y: number, role: Role, s: string, o: TextOpts = {}): this {
+		s = tr(s);
+		if (hasJp(s)) return this.mixedText(x, y, role, s, o);
 		const clean = toAscii(s);
 		if (!clean.trim()) return this;
 		const scale = Math.min(4, Math.max(1, Math.round(o.scale ?? 1)));
@@ -117,6 +144,55 @@ export class Draw {
 			(o.ring ? 32 : 0) |
 			((scale - 1) << 6);
 		this.lines.push(`T\t${this.n(x)}\t${this.n(y)}\t${fontId(this.family, role)}\t${flags}\t${this.n(o.maxW ?? 0)}\t${clean}`);
+		return this;
+	}
+
+	// Text with Japanese in it. The firmware can't draw Japanese, so this lays the line out itself:
+	// runs of Latin text become normal text commands, runs of Japanese become bitmaps (jp.ts), side by side
+	// on the same baseline. Alignment and ".." shortening, which the firmware does for plain text, are done here.
+	private mixedText(x: number, y: number, role: Role, s: string, o: TextOpts): this {
+		const scale = Math.min(4, Math.max(1, Math.round(o.scale ?? 1)));
+		const align = o.align ?? 'left';
+		// one entry per character: Japanese ones as they are, everything else as plain ASCII
+		let chars: { ch: string; jp: boolean; w: number }[] = [];
+		for (const c of Array.from(s)) {
+			if (hasGlyph(c.codePointAt(0)!)) chars.push({ ch: c, jp: true, w: jpAdvance(role, scale) });
+			else for (const a of toAscii(c)) chars.push({ ch: a, jp: false, w: advanceOf(this.family, role, a, scale) });
+		}
+		const total = () => chars.reduce((n, c) => n + c.w, 0);
+		const maxW = o.maxW ?? 0;
+		if (maxW > 0 && align !== 'box' && total() > maxW) {
+			const dotW = advanceOf(this.family, role, '.', scale) * 2;
+			while (chars.length && total() + dotW > maxW) chars.pop();
+			chars.push({ ch: '.', jp: false, w: dotW / 2 }, { ch: '.', jp: false, w: dotW / 2 });
+		}
+		if (!chars.some((c) => c.jp || c.ch.trim())) return this;
+		const w = total();
+		let cx = x;
+		if (align === 'center' || align === 'rawC') cx = x - w / 2;
+		else if (align === 'right' || align === 'rawR') cx = x - w;
+		else if (align === 'box') cx = x + ((o.maxW ?? 0) - w) / 2;
+		const colour: Color = o.color === PAPER ? PAPER : INK;
+		const latinFlags = (o.color === PAPER ? 8 : 0) | (o.bold ? 16 : 0) | ((scale - 1) << 6);
+		let i = 0;
+		while (i < chars.length) {
+			let j = i;
+			let run = '';
+			let rw = 0;
+			while (j < chars.length && chars[j].jp === chars[i].jp) {
+				run += chars[j].ch;
+				rw += chars[j].w;
+				j++;
+			}
+			if (chars[i].jp) {
+				const bmp = jpBitmap(run, role, scale, o.bold === true);
+				this.bitmapBytes(cx, y - jpAscent(role, scale), bmp.w, bmp.h, bmp.bytes, colour);
+			} else if (run.trim()) {
+				this.lines.push(`T\t${this.n(cx)}\t${this.n(y)}\t${fontId(this.family, role)}\t${latinFlags}\t0\t${run}`);
+			}
+			cx += rw;
+			i = j;
+		}
 		return this;
 	}
 

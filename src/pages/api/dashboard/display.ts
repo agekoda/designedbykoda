@@ -4,7 +4,8 @@
 import { isStyleId, isRefreshSec, DEFAULT_STYLE } from '../../../data/calendarStyles';
 import { isFamily } from '../../../lib/eink/fonts';
 import { b64ToBytes, decodePic, FRAME_BYTES, cleanSettings } from '../../../lib/eink/image';
-import { toAscii } from '../../../lib/eink/draw';
+import { cleanText } from '../../../lib/eink/draw';
+import { isLang } from '../../../lib/eink/i18n';
 import { sanitizeLayout } from '../../../lib/eink/builder/model';
 export const prerender = false;
 
@@ -42,6 +43,11 @@ export async function GET({ request, locals }) {
 		const w = await db.prepare('SELECT weather_lat FROM devices WHERE id = ?').bind(deviceId).first();
 		hasWeather = w?.weather_lat !== null && w?.weather_lat !== undefined;
 	} catch {}
+	let lang = 'en';
+	try {
+		const lq = await db.prepare('SELECT language FROM devices WHERE id = ?').bind(deviceId).first();
+		lang = lq?.language === 'ja' ? 'ja' : 'en';
+	} catch {} // language column comes from schema-language.sql
 	let cfg: unknown = null;
 	try {
 		cfg = extra.corner_cfg ? JSON.parse(extra.corner_cfg) : null;
@@ -86,6 +92,7 @@ export async function GET({ request, locals }) {
 			name: dev.name || '',
 			style,
 			dark: dev.dark_mode === 1,
+			lang,
 			refreshSec: isRefreshSec(dev.refresh_interval_sec) ? dev.refresh_interval_sec : 86400,
 			font: isFamily(extra.layout_font) ? extra.layout_font : null,
 			cornerMode: extra.corner_mode === 'image' ? 'image' : 'calendar',
@@ -121,6 +128,7 @@ export async function POST({ request, locals }) {
 	if (body.font !== undefined && body.font !== null && !isFamily(body.font)) return json({ error: 'Unknown font.' }, 400);
 	if (body.refreshSec !== undefined && !isRefreshSec(body.refreshSec)) return json({ error: 'Unknown refresh option.' }, 400);
 	if (body.dark !== undefined && typeof body.dark !== 'boolean') return json({ error: 'Invalid dark mode value.' }, 400);
+	if (body.lang !== undefined && !isLang(body.lang)) return json({ error: 'Unknown language.' }, 400);
 
 	const sets: string[] = [];
 	const vals: unknown[] = [];
@@ -170,7 +178,7 @@ export async function POST({ request, locals }) {
 	// Countdown: a name and a date.
 	const cd = body.countdown;
 	if (cd !== undefined) {
-		const title = typeof cd?.title === 'string' ? toAscii(cd.title, true).slice(0, 40) : '';
+		const title = typeof cd?.title === 'string' ? cleanText(cd.title, true).slice(0, 40) : '';
 		const date = typeof cd?.date === 'string' ? cd.date : '';
 		if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date + 'T00:00:00Z')))) return json({ error: 'That date is not valid.' }, 400);
 		sets.push('countdown_title = ?', 'countdown_date = ?');
@@ -199,6 +207,14 @@ export async function POST({ request, locals }) {
 		}
 	}
 
+	// Language has its own column (schema-language.sql), saved on its own so a server that hasn't run it yet still saves everything else.
+	if (body.lang !== undefined) {
+		try {
+			await db.prepare('UPDATE devices SET language = ? WHERE id = ? AND user_id = ?').bind(body.lang, deviceId, o.userId).run();
+		} catch {
+			return json({ error: 'Language is not enabled on the server yet (run schema-language.sql).' }, 500);
+		}
+	}
 	if (!sets.length) return json({ ok: true }, 200);
 	try {
 		await db.prepare(`UPDATE devices SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`).bind(...vals, deviceId, o.userId).run();

@@ -131,6 +131,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	let hist: string[] = [];
 	let hi = -1;
 	let fonts: any = null;
+	let lang: 'en' | 'ja' = 'en';
 
 	const key = () => JSON.stringify({ l: layout, f: font, d: dark });
 	const ser = () => JSON.stringify(layout);
@@ -175,6 +176,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			style: 'custom',
 			font,
 			dark,
+			lang,
 			hasWeather: info.hasWeather,
 			vbat: 4.0,
 			loc: info.loc,
@@ -1308,6 +1310,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		info = { hasWeather: !!d.hasWeather, loc: d.lat !== null && d.lon !== null ? { lat: d.lat, lon: d.lon } : null, countdown: d.countdown, cornerBits: d.cornerBits, cornerSrc: d.cornerSrc ?? null, cornerCfg: d.cornerCfg ?? null, tasksGranted: !!d.tasksGranted, migrated: !!d.migrated };
 		font = d.font;
 		dark = !!d.dark;
+		lang = d.lang === 'ja' ? 'ja' : 'en';
 		layout = sanitizeLayout(d.custom);
 		if (!info.migrated) {
 			banner.hidden = false;

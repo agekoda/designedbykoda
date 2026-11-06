@@ -387,6 +387,13 @@ export async function GET({ params, request, locals }) {
 		dark = dm?.dark_mode === 1;
 	} catch {}
 
+	// Language of the screen (schema-language.sql). Its own query for the same reason.
+	let lang: 'en' | 'ja' = 'en';
+	try {
+		const lq = await db.prepare('SELECT language FROM devices WHERE id = ?').bind(deviceId).first();
+		lang = lq?.language === 'ja' ? 'ja' : 'en';
+	} catch {}
+
 	// The calendar tells us its battery voltage on every refresh (?v=). Save it
 	// next to last_seen_at (same write, so no extra work) for the dashboard.
 	const vRaw = parseFloat(reqUrl.searchParams.get('v') ?? '');
@@ -441,6 +448,7 @@ export async function GET({ params, request, locals }) {
 			weather,
 			vbat,
 			dark,
+			lang,
 			cornerImage,
 			cornerSize,
 			refreshSec: intervalSec,

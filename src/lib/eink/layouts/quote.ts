@@ -4,6 +4,7 @@ import { measure, wrapText } from '../measure';
 import { dayIdx, dayShort, monthShort, tmOf, type LayoutCtx } from '../context';
 import { batteryIcon } from '../batteryIcon';
 import { quoteForDay } from '../../../data/quotes';
+import { dateShort } from '../context';
 
 export function quote(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -12,7 +13,7 @@ export function quote(ctx: LayoutCtx): string {
 
 	d.fill(0, 0, 400, 30);
 	d.text(10, 21, 'sb', 'QUOTE OF THE DAY', { color: PAPER });
-	d.text(392, 21, 's', `${dayShort(now)} ${now.mday} ${monthShort(now)}`, { align: 'right', color: PAPER });
+	d.text(392, 21, 's', dateShort(now), { align: 'right', color: PAPER });
 
 	const [text, who] = quoteForDay(dayIdx(ctx.nowLocal));
 	const boxW = 350;

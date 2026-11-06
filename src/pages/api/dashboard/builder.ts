@@ -47,6 +47,12 @@ export async function GET({ request, locals }) {
 		} catch {}
 	} catch {}
 
+	let lang = 'en';
+	try {
+		const lq = await db.prepare('SELECT language FROM devices WHERE id = ?').bind(deviceId).first();
+		lang = lq?.language === 'ja' ? 'ja' : 'en';
+	} catch {}
+
 	let lat: number | null = null;
 	let lon: number | null = null;
 	try {
@@ -80,6 +86,7 @@ export async function GET({ request, locals }) {
 		name: dev.name || '',
 		style: dev.calendar_style || null,
 		dark: dev.dark_mode === 1,
+		lang,
 		font,
 		custom,
 		cornerBits,

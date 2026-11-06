@@ -13,8 +13,10 @@ import { weatherBits, wxKind, wxLabel } from '../weatherIcon';
 import { moonInfo, sunTimes } from '../astro';
 import { quoteForDay } from '../../../data/quotes';
 import {
-	dayIdx, dayShort, daysInMonth, DAY_NAMES, evTimeStr, MONTH_NAMES, monthName, monthShort, round0, tmOf, type CalEvent, type LayoutCtx,
+	dateShort, dayAbbr, dayIdx, dayLetter, dayLong, dayShort, daysInMonth, dayMonth, evTimeStr, monthLong, monthName, monthShort, monthYear, round0, tmOf, weekLetters, type CalEvent, type LayoutCtx,
 } from '../context';
+import { isJa, tr } from '../i18n';
+import { DAY_NAMES } from '../context';
 import { withDefaults, type CustomLayout, type Widget } from './model';
 
 interface Env {
@@ -174,8 +176,8 @@ function nextEventWidget(env: Env, w: Widget, o: Opts) {
 	const today = dayIdx(env.ctx.nowLocal);
 	const day = dayIdx(ev.startLocal);
 	const t = tmOf(ev.startLocal);
-	const dayWord = day === today ? 'Today' : day === today + 1 ? 'Tomorrow' : `${dayShort(t)} ${t.mday} ${monthShort(t)}`;
-	const whenLine = ev.allDay ? `${dayWord}, all day` : `${dayWord}, ${evTimeStr(ev)}`;
+	const dayWord = day === today ? tr('Today') : day === today + 1 ? tr('Tomorrow') : dateShort(t);
+	const whenLine = isJa() ? `${dayWord}・${evTimeStr(ev)}` : ev.allDay ? `${dayWord}, all day` : `${dayWord}, ${evTimeStr(ev)}`;
 	if (bottom - top > mv.lh + 30) {
 		const wv = mv.asc + mv.desc;
 		drawLines(env, { x: inner.x, y: bottom - wv, w: inner.w, h: wv }, [whenLine], med, o.align, 'top', color);
@@ -208,11 +210,11 @@ function miniMonth(env: Env, w: Widget, o: Opts) {
 	const sv = vm(env, FACES.s);
 
 	if (titleH) {
-		const full = `${monthName(now)} ${now.year}`;
-		const title = measure(env.fam, sb.role, full).w <= w.w ? full : `${monthShort(now)} ${now.year}`;
+		const full = monthYear(now);
+		const title = measure(env.fam, sb.role, full).w <= w.w ? full : monthYear(now, true);
 		d.text(w.x + w.w / 2, w.y + 17, sb.role, title, { align: 'center', maxW: w.w });
 	}
-	const letters = monFirst ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+	const letters = weekLetters(monFirst);
 	letters.forEach((l, i) => d.text(w.x + cw * i + cw / 2, w.y + titleH + 15, sb.role, l, { align: 'center' }));
 
 	const counts = new Array(32).fill(0);
@@ -255,7 +257,7 @@ function weekStrip(env: Env, w: Widget, o: Opts) {
 		const isToday = day === today;
 		if (isToday) d.fillRound(x + 1, w.y, cw - 2, w.h, 4, INK);
 		const ink: Color = isToday ? PAPER : INK;
-		d.text(cx, top + 14, 's', wide ? DAY_NAMES[t.wday].slice(0, 3) : DAY_NAMES[t.wday][0], { align: 'center', color: ink });
+		d.text(cx, top + 14, 's', wide ? dayAbbr(t.wday) : dayLetter(t.wday), { align: 'center', color: ink });
 		d.text(cx, top + 40, 'm', String(t.mday), { align: 'center', color: ink });
 		const n = o.dots === true ? Math.min(3, counts.get(day) ?? 0) : 0;
 		if (n && w.h >= 54) for (let k = 0; k < n; k++) d.fill(cx - (n * 6 - 2) / 2 + k * 6, top + 48, 4, 4, ink);
@@ -327,7 +329,7 @@ function forecastWidget(env: Env, w: Widget, o: Opts) {
 	const small = FACES.s;
 	const sv = vm(env, small);
 	const hiOnly = o.temps === 'high';
-	const name = (i: number) => (start + i === 0 ? 'Today' : DAY_NAMES[new Date(days[i].date + 'T00:00:00Z').getUTCDay()].slice(0, 3));
+	const name = (i: number) => (start + i === 0 ? tr('Today') : dayAbbr(new Date(days[i].date + 'T00:00:00Z').getUTCDay()));
 	const temp = (i: number) => (hiOnly ? `${round0(days[i].high)}` : `${round0(days[i].high)}/${round0(days[i].low)}`);
 	if (inner.w >= inner.h * 1.15) {
 		// columns: name on top, picture in the middle, temperatures underneath
@@ -542,7 +544,7 @@ function progressWidget(env: Env, w: Widget, o: Opts) {
 		name = 'Week';
 	} else if (o.span === 'month') {
 		frac = (now.mday - 1 + dayFrac) / daysInMonth(now.year, now.mon);
-		name = MONTH_NAMES[now.mon];
+		name = monthLong(now.mon);
 	} else if (o.span === 'year') {
 		const start = Date.UTC(now.year, 0, 1) / 86400000;
 		const len = (Date.UTC(now.year + 1, 0, 1) - Date.UTC(now.year, 0, 1)) / 86400000;
@@ -626,11 +628,11 @@ function drawWidget(env: Env, w: Widget) {
 		case 'date_num':
 			return textWidget(env, w, o, String(now.mday));
 		case 'weekday':
-			return textWidget(env, w, o, o.short === true ? DAY_NAMES[now.wday].slice(0, 3) : DAY_NAMES[now.wday]);
+			return textWidget(env, w, o, o.short === true ? dayAbbr(now.wday) : dayLong(now.wday));
 		case 'month':
-			return textWidget(env, w, o, `${o.short === true ? monthShort(now) : monthName(now)}${o.year === true ? ' ' + now.year : ''}`);
+			return textWidget(env, w, o, isJa() ? (o.year === true ? monthYear(now) : monthLong(now.mon)) : `${o.short === true ? monthShort(now) : monthName(now)}${o.year === true ? ' ' + now.year : ''}`);
 		case 'date_full': {
-			const t = o.fmt === 'long' ? `${DAY_NAMES[now.wday]} ${now.mday} ${monthName(now)}` : o.fmt === 'num' ? `${pad2(now.mday)}/${pad2(now.mon + 1)}/${now.year}` : `${dayShort(now)} ${now.mday} ${monthShort(now)}`;
+			const t = o.fmt === 'long' ? (isJa() ? `${dayMonth(now)} ${dayLong(now.wday)}` : `${DAY_NAMES[now.wday]} ${now.mday} ${monthName(now)}`) : o.fmt === 'num' ? `${pad2(now.mday)}/${pad2(now.mon + 1)}/${now.year}` : dateShort(now);
 			return textWidget(env, w, o, t);
 		}
 		case 'events':

@@ -6,7 +6,8 @@
 // No firmware change is needed, devices pick it up the next time they wake.
 import { DEFAULT_FAMILY, isFamily, type Family } from '../fonts';
 import type { LayoutCtx } from '../context';
-import { cleanTitle } from '../draw';
+import { cleanText, cleanTitle, toAscii } from '../draw';
+import { getLang, isLang, setLang } from '../i18n';
 import { agenda } from './agenda';
 import { month } from './month';
 import { bigdate } from './bigdate';
@@ -48,9 +49,21 @@ export function defaultFontFor(styleId: string): Family {
 	return isFamily(f) ? f : DEFAULT_FAMILY;
 }
 
+// Event and task titles are always plain ASCII (the server only draws Japanese for the screen's own words
+// and for text typed into the dashboard). Flip this to let Japanese titles through as well; the
+// layouts already cope, it just hasn't been asked for.
+const JAPANESE_EVENT_TITLES = false;
+
 export function renderLayout(styleId: string, ctx: Omit<LayoutCtx, 'family'>, familyOverride?: unknown): string {
 	const entry = LAYOUTS[styleId] ?? LAYOUTS.agenda;
 	const family = isFamily(familyOverride) ? familyOverride : isFamily(entry.font) ? entry.font : DEFAULT_FAMILY;
-	const events = ctx.events.map((e) => ({ ...e, title: cleanTitle(e.title) }));
-	return entry.render({ ...ctx, events, family });
+	const events = ctx.events.map((e) => ({ ...e, title: JAPANESE_EVENT_TITLES ? cleanText(e.title, true) || '(event)' : cleanTitle(e.title) }));
+	const tasks = ctx.tasks ? ctx.tasks.map((t) => ({ ...t, title: JAPANESE_EVENT_TITLES ? cleanText(t.title, true) : toAscii(t.title, true) })) : ctx.tasks;
+	const before = getLang();
+	setLang(isLang(ctx.lang) ? ctx.lang : 'en');
+	try {
+		return entry.render({ ...ctx, events, tasks, family });
+	} finally {
+		setLang(before);
+	}
 }

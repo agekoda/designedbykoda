@@ -86,6 +86,7 @@ export interface PreviewOptions {
 	style: string;
 	font?: string | null;
 	dark: boolean;
+	lang?: 'en' | 'ja';
 	hasWeather: boolean;
 	vbat?: number | null;
 	cornerImage?: Uint8Array | null;
@@ -111,6 +112,7 @@ export function drawListFor(o: PreviewOptions): string {
 			weather: o.hasWeather ? sampleWeather(nowLocal) : null,
 			vbat: o.vbat ?? null,
 			dark: o.dark,
+			lang: o.lang ?? 'en',
 			cornerImage: o.cornerImage ?? null,
 			cornerSize: o.cornerSize ?? null,
 			refreshSec: o.refreshSec ?? 86400,

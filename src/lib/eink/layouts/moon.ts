@@ -3,9 +3,11 @@
 import { Draw, PAPER } from '../draw';
 import { dayIdx, dayShort, monthShort, tmOf, type LayoutCtx } from '../context';
 import { batteryIcon } from '../batteryIcon';
+import { tr } from '../i18n';
 import { moonInfo, nextPhase, sunTimes } from '../astro';
 import { moonBits } from '../moonImage';
 import { measure, wrapText, firstThatFits } from '../measure';
+import { dateShort, dayMonth } from '../context';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -22,7 +24,7 @@ export function moon(ctx: LayoutCtx): string {
 
 	d.fill(0, 0, 400, 30);
 	d.text(10, 21, 'sb', 'MOON & SUN', { color: PAPER });
-	d.text(392, 21, 's', `${dayShort(now)} ${now.mday} ${monthShort(now)}`, { align: 'right', color: PAPER });
+	d.text(392, 21, 's', dateShort(now), { align: 'right', color: PAPER });
 	batteryIcon(d, ctx, 200, 4, 'center', PAPER);
 
 	// The moon as it is at midday on this date.
@@ -37,14 +39,14 @@ export function moon(ctx: LayoutCtx): string {
 	d.bitmapBytes(8, wide ? 76 : 56, SZ, SZ, moonBits({ size: SZ, elong: info.elong, flip: !!ctx.loc && ctx.loc.lat < 0, dark: ctx.dark }));
 
 	// phase name, how much is lit, and the next new and full moon
-	const words = info.name.split(' ');
+	const words = tr(info.name).split(' ');
 	d.text(PX, 56, 'mb', words[0]);
 	d.text(PX, 78, 'mb', words.slice(1).join(' '));
 	d.text(PX, 100, 's', `${Math.round(info.illum * 100)}% lit`);
 
 	const dateOf = (ms: number) => {
 		const t = tmOf(Math.floor(ms / 1000) + off);
-		return `${t.mday} ${monthShort(t)}`;
+		return dayMonth(t);
 	};
 	const nn = nextPhase(noonMs, 0);
 	const nf = nextPhase(noonMs, 180);

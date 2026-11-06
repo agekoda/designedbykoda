@@ -1,7 +1,7 @@
 // The layout builder's data: what a custom layout is, which widgets exist, what options each
 // one has, and the checking that keeps a saved layout safe. Pure data and maths (no DOM), so the
 // server (to check and draw a saved layout) and the browser editor (to build one) share it.
-import { toAscii } from '../draw';
+import { cleanText } from '../draw';
 
 export const SCREEN = { w: 400, h: 300 } as const;
 export const MAX_WIDGETS = 30;
@@ -433,7 +433,7 @@ export function sanitizeLayout(input: unknown): CustomLayout {
 			if (def.kind === 'toggle') o[def.key] = v === true;
 			else if (def.kind === 'choice') {
 				if (typeof v === 'string' && def.choices.some((c) => c[0] === v)) o[def.key] = v;
-			} else if (typeof v === 'string') o[def.key] = toAscii(v, false).replace(/ +/g, ' ').slice(0, def.max);
+			} else if (typeof v === 'string') o[def.key] = cleanText(v, false).replace(/ +/g, ' ').slice(0, def.max);
 		}
 		out.widgets.push(clampWidget({ id, t: w.t, x: w.x, y: w.y, w: w.w, h: w.h, o }));
 	}

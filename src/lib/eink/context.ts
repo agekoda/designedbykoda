@@ -4,6 +4,7 @@ import { batteryPercent } from './battery';
 // the user's timezone offset and then read with the UTC getters, so no Intl
 // calls are needed (they're comparatively slow on a Worker).
 import type { Family } from './fonts';
+import { isJa, tr, type Lang } from './i18n';
 
 export interface CalEvent {
 	title: string;
@@ -44,6 +45,8 @@ export interface LayoutCtx {
 	// The To-do layout: tasks from Google Tasks, and whether we were allowed to read them.
 	tasks?: TaskItem[] | null;
 	tasksState?: 'ok' | 'needs_permission' | 'error';
+	// Which language the screen is written in (default English). See i18n.ts.
+	lang?: Lang;
 	// The layout builder: the widgets of the person's own design (see builder/model.ts).
 	custom?: import('./builder/model').CustomLayout | null;
 }
@@ -75,10 +78,31 @@ export const dayIdx = (localSec: number) => Math.floor(localSec / 86400);
 // Noon on a given day number (safe for weekday / date / month lookups).
 export const tmFromDayIdx = (idx: number) => tmOf(idx * 86400 + 43200);
 
-export const dayName = (t: Tm) => DAY_NAMES[t.wday];
-export const dayShort = (t: Tm) => DAY_NAMES[t.wday].slice(0, 3);
-export const monthName = (t: Tm) => MONTH_NAMES[t.mon];
-export const monthShort = (t: Tm) => MONTH_NAMES[t.mon].slice(0, 3);
+const JA_DAYS = ['日', '月', '火', '水', '木', '金', '土'];
+
+// Weekday and month names, in the screen's language. Japanese has no short and long month names: 11月 either way.
+export const dayLong = (wday: number) => (isJa() ? JA_DAYS[wday] + '曜日' : DAY_NAMES[wday]);
+export const dayAbbr = (wday: number) => (isJa() ? JA_DAYS[wday] : DAY_NAMES[wday].slice(0, 3));
+export const dayLetter = (wday: number) => (isJa() ? JA_DAYS[wday] : DAY_NAMES[wday][0]);
+export const monthLong = (mon: number) => (isJa() ? `${mon + 1}月` : MONTH_NAMES[mon]);
+export const dayName = (t: Tm) => dayLong(t.wday);
+export const dayShort = (t: Tm) => dayAbbr(t.wday);
+export const monthName = (t: Tm) => monthLong(t.mon);
+export const monthShort = (t: Tm) => (isJa() ? `${t.mon + 1}月` : MONTH_NAMES[t.mon].slice(0, 3));
+
+// Whole dates. English: "Fri 6 Nov". Japanese: "11月6日(金)".
+export const dateShort = (t: Tm) => (isJa() ? `${t.mon + 1}月${t.mday}日(${JA_DAYS[t.wday]})` : `${dayShort(t)} ${t.mday} ${monthShort(t)}`);
+// "6 Nov" / "11月6日"
+export const dayMonth = (t: Tm) => (isJa() ? `${t.mon + 1}月${t.mday}日` : `${t.mday} ${monthShort(t)}`);
+// "November 2026" / "2026年11月", and the short form "Nov 2026" (same in Japanese)
+export const monthYear = (t: Tm, short = false) => (isJa() ? `${t.year}年${t.mon + 1}月` : `${short ? monthShort(t) : monthName(t)} ${t.year}`);
+// "Friday 6 November 2026" / "2026年11月6日 金曜日"
+export const dateLong = (t: Tm) => (isJa() ? `${t.year}年${t.mon + 1}月${t.mday}日 ${dayLong(t.wday)}` : `${DAY_NAMES[t.wday]} ${t.mday} ${MONTH_NAMES[t.mon]} ${t.year}`);
+// Column heads of a month grid, Monday first (or Sunday first).
+export const weekLetters = (monFirst = true): string[] => {
+	const order = monFirst ? [1, 2, 3, 4, 5, 6, 0] : [0, 1, 2, 3, 4, 5, 6];
+	return order.map((w) => (isJa() ? JA_DAYS[w] : ['S', 'M', 'T', 'W', 'T', 'F', 'S'][w]));
+};
 
 export function daysInMonth(year: number, mon: number): number {
 	if (mon === 1) return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 29 : 28;
@@ -87,7 +111,7 @@ export function daysInMonth(year: number, mon: number): number {
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 export function evTimeStr(e: CalEvent): string {
-	if (e.allDay) return 'All day';
+	if (e.allDay) return tr('All day');
 	const t = tmOf(e.startLocal);
 	return `${pad2(t.hour)}:${pad2(t.min)}`;
 }
@@ -104,7 +128,7 @@ export function round0(x: number): string {
 export function batteryText(v: number | null): string | null {
 	if (v === null) return null;
 	const pct = batteryPercent(v);
-	return pct <= 15 ? `Low ${pct}%` : `${pct}%`;
+	return pct <= 15 ? tr(`Low ${pct}%`) : `${pct}%`;
 }
 
 // "High 19C  Low 12C"; `sep` is the gap between the two halves.
@@ -127,7 +151,7 @@ export function upcoming(ctx: LayoutCtx, n: number): CalEvent | null {
 
 export function relDayText(evDay: number, today: number): string {
 	const n = evDay - today;
-	if (n <= 0) return 'Today';
-	if (n === 1) return 'Tomorrow';
-	return `in ${n} days`;
+	if (n <= 0) return tr('Today');
+	if (n === 1) return tr('Tomorrow');
+	return tr(`in ${n} days`);
 }

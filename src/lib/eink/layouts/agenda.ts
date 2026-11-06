@@ -5,6 +5,8 @@ import { CORNER, fitBits } from '../image';
 import { firstThatFits, measure } from '../measure';
 import { batteryIcon } from '../batteryIcon';
 import { daysInMonth, dayName, evTimeStr, monthName, monthShort, round0, tmOf, type LayoutCtx } from '../context';
+import { monthYear, weekLetters } from '../context';
+import { isJa } from '../i18n';
 
 export function agenda(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -21,7 +23,7 @@ export function agenda(ctx: LayoutCtx): string {
 	d.text(80, 15, 's', weatherText, { align: 'box', maxW: 40 });
 	d.text(80, 70, 'bb', String(now.mday), { align: 'box', maxW: 40 });
 	d.text(80, 98, 'mb', dayName(now), { align: 'box', maxW: 40 });
-	d.text(80, 118, 's', firstThatFits(ctx.family, 's', [`${monthName(now)} ${now.year}`, `${monthShort(now)} ${now.year}`], 188), { align: 'box', maxW: 40 });
+	d.text(80, 118, 's', firstThatFits(ctx.family, 's', [monthYear(now), monthYear(now, true)], 188), { align: 'box', maxW: 40 });
 
 	// ---- top right: a picture if one was set up, otherwise the mini month ----
 	const sw = ctx.cornerSize?.w ?? CORNER.w;
@@ -38,7 +40,7 @@ export function agenda(ctx: LayoutCtx): string {
 		const startX = 400 - 7 * cellW - 5;
 		const miniY = 7;
 		d.text(startX + Math.floor((7 * cellW) / 2), miniY + 5, 's', monthShort(now), { align: 'rawC' });
-		['M', 'T', 'W', 'T', 'F', 'S', 'S'].forEach((l, i) => d.text(startX + i * cellW + Math.floor(cellW / 2) - 4, miniY + 28, 's', l));
+		weekLetters().forEach((l, i) => d.text(startX + i * cellW + Math.floor(cellW / 2) - (isJa() ? 8 : 4), miniY + 28, 's', l));
 
 		const firstWday = (((now.wday - (now.mday - 1)) % 7) + 7) % 7;
 		const offset = (firstWday + 6) % 7; // Monday first

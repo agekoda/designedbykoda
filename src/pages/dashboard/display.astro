@@ -78,6 +78,12 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						<span class="track" aria-hidden="true"></span>
 						<span class="switch-text">Dark mode <small>white on black</small></span>
 					</label>
+					<div class="label sub" style="margin-top:1.6em">Language</div>
+					<div class="seg" id="lang" role="radiogroup" aria-label="Language">
+						<label><input type="radio" name="lang" value="en" /><span>English</span></label>
+						<label><input type="radio" name="lang" value="ja" /><span>日本語</span></label>
+					</div>
+					<p class="muted small hint">Japanese writes the weekdays, months, headings and messages on the screen in Japanese. Event and task names stay as they are in your calendar, in plain English letters. Text you type yourself (a countdown name, the layout builder's text boxes) can be Japanese.</p>
 					<div id="refresh-box" hidden>
 						<div class="label sub" style="margin-top:1.6em">How often it updates</div>
 						<div class="seg wrap" id="refreshes" role="radiogroup" aria-label="How often the Timeline updates"></div>
@@ -189,6 +195,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const layoutsEl = $('layouts');
 	const fontsEl = $('fonts');
 	const darkBox = $<HTMLInputElement>('dark');
+	const langEl = $('lang');
 	const tabPicBtn = $('tab-picture-btn');
 	const tabOptBtn = $('tab-options-btn');
 	const cornerSeg = $('corner-seg');
@@ -232,6 +239,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		style: string;
 		font: string | null; // null = the layout's own font
 		dark: boolean;
+		lang: 'en' | 'ja';
 		refreshSec: number;
 		cornerMode: 'calendar' | 'image';
 		cfg: ImageSettings; // the Agenda's picture settings
@@ -263,6 +271,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		style: 'agenda',
 		font: null,
 		dark: false,
+		lang: 'en',
 		refreshSec: 86400,
 		cornerMode: 'calendar',
 		cfg: { ...DEFAULT_IMAGE_SETTINGS },
@@ -416,7 +425,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	async function redraw() {
-		const common = { font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12, refreshSec: st.refreshSec };
+		const common = { font: effFont(), dark: st.dark, lang: st.lang, hasWeather, vbat: vbat ?? 4.12, refreshSec: st.refreshSec };
 		try {
 			const r = await renderPreview({ ...common, style: st.style, ...extras(st.style, false) });
 			const dpr = window.devicePixelRatio || 1;
@@ -517,6 +526,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		});
 		cdDate.addEventListener('input', () => {
 			st.countdown.date = cdDate.value;
+			schedule();
+			changed();
+		});
+		langEl.addEventListener('change', (e) => {
+			st.lang = (e.target as HTMLInputElement).value === 'ja' ? 'ja' : 'en';
 			schedule();
 			changed();
 		});
@@ -643,7 +657,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const sid = isFrame() ? 'frame' : 'agenda';
 		const cv = layoutsEl.querySelector<HTMLCanvasElement>(`canvas[data-sid="${sid}"]`);
 		if (cv)
-			renderPreview({ style: sid, font: effFont(), dark: st.dark, hasWeather, vbat: vbat ?? 4.12, ...extras(sid, true) }).then((r) => paintScreen(cv, r.px, { mode: 'screen', scale: 1 }));
+			renderPreview({ style: sid, font: effFont(), dark: st.dark, lang: st.lang, hasWeather, vbat: vbat ?? 4.12, ...extras(sid, true) }).then((r) => paintScreen(cv, r.px, { mode: 'screen', scale: 1 }));
 		changed();
 	}
 
@@ -665,6 +679,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		layoutsEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.style));
 		fontsEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === effFont()));
 		darkBox.checked = st.dark;
+		langEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.lang));
 		refreshBox.hidden = st.style !== 'timeline';
 		refreshEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = parseInt(i.value, 10) === st.refreshSec));
 		refreshHint.textContent = REFRESH_HINTS[st.refreshSec] ?? '';
@@ -741,7 +756,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		}
 		saveBtn.disabled = true;
 		flash('Saving…');
-		const body: any = { deviceId, style: st.style, font: st.font, dark: st.dark, refreshSec: st.refreshSec, countdown: st.countdown };
+		const body: any = { deviceId, style: st.style, font: st.font, dark: st.dark, lang: st.lang, refreshSec: st.refreshSec, countdown: st.countdown };
 		const baseState = JSON.parse(base);
 		if (supportsCorner() || st.cornerMode === 'image') {
 			body.corner = { mode: st.cornerMode };
@@ -885,6 +900,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				style: info.style,
 				font: info.font,
 				dark: !!info.dark,
+				lang: info.lang === 'ja' ? 'ja' : 'en',
 				refreshSec: info.refreshSec || 86400,
 				cornerMode: info.cornerMode,
 				cfg: cleanSettings(info.cornerCfg),
