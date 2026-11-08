@@ -87,6 +87,7 @@ export interface PreviewOptions {
 	font?: string | null;
 	dark: boolean;
 	lang?: 'en' | 'ja';
+	unit?: 'c' | 'f';
 	hasWeather: boolean;
 	vbat?: number | null;
 	cornerImage?: Uint8Array | null;
@@ -113,6 +114,7 @@ export function drawListFor(o: PreviewOptions): string {
 			vbat: o.vbat ?? null,
 			dark: o.dark,
 			lang: o.lang ?? 'en',
+			unit: o.unit ?? 'c',
 			cornerImage: o.cornerImage ?? null,
 			cornerSize: o.cornerSize ?? null,
 			refreshSec: o.refreshSec ?? 86400,

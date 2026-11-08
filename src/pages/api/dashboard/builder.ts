@@ -3,6 +3,7 @@
 import { isFamily } from '../../../lib/eink/fonts';
 import { cleanSettings } from '../../../lib/eink/image';
 import { MAX_JSON, sanitizeLayout } from '../../../lib/eink/builder/model';
+import { markSaved } from '../../../lib/screens';
 export const prerender = false;
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
@@ -52,6 +53,11 @@ export async function GET({ request, locals }) {
 		const lq = await db.prepare('SELECT language FROM devices WHERE id = ?').bind(deviceId).first();
 		lang = lq?.language === 'ja' ? 'ja' : 'en';
 	} catch {}
+	let unit = 'c';
+	try {
+		const uq = await db.prepare('SELECT temp_unit FROM devices WHERE id = ?').bind(deviceId).first();
+		unit = uq?.temp_unit === 'f' ? 'f' : 'c';
+	} catch {} // temp_unit comes from schema-screens.sql
 
 	let lat: number | null = null;
 	let lon: number | null = null;
@@ -87,6 +93,7 @@ export async function GET({ request, locals }) {
 		style: dev.calendar_style || null,
 		dark: dev.dark_mode === 1,
 		lang,
+		unit,
 		font,
 		custom,
 		cornerBits,
@@ -139,5 +146,6 @@ export async function POST({ request, locals }) {
 	} catch {
 		return json({ error: 'The layout builder is not enabled on the server yet (run schema-builder.sql).' }, 500);
 	}
+	await markSaved(db, deviceId);
 	return json({ ok: true, widgets: layout.widgets.length });
 }

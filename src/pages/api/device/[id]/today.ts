@@ -10,6 +10,7 @@ import { renderLayout } from '../../../../lib/eink/layouts';
 import { b64ToBytes, decodePic, FRAME_BYTES } from '../../../../lib/eink/image';
 import { fetchTasks } from '../../../../lib/tasks';
 import { layoutNeeds, sanitizeLayout, type CustomLayout } from '../../../../lib/eink/builder/model';
+import { pickScreen, secondsToNextEventEdge } from '../../../../lib/screens';
 export const prerender = false;
 
 function getCookielessAuthSecret(request: Request): string | null {
@@ -230,6 +231,19 @@ export async function GET({ params, request, locals }) {
 	} catch {}
 	if (deviceStyle) style = deviceStyle;
 
+	// The screen schedule and the button (schema-screens.sql): the main layout above may give way
+	// to a scheduled one, or to one picked with the button. Uses the saved timezone, since Google's
+	// isn't known until the events come back, and the layout decides which events to ask for.
+	let tzPick = 'UTC';
+	try {
+		if (user.timezone) {
+			new Intl.DateTimeFormat('en-US', { timeZone: user.timezone });
+			tzPick = user.timezone;
+		}
+	} catch {}
+	const screens = await pickScreen(db, deviceId, style, Math.floor(rightNow.getTime() / 1000) + getUtcOffsetSeconds(tzPick, rightNow), now, reqUrl.searchParams.get('w'));
+	style = screens.style;
+
 	// How often this calendar wakes: only the Timeline can wake more than once a day.
 	const intervalSec = LIVE_STYLES.includes(style) && isRefreshSec(device.refresh_interval_sec) ? device.refresh_interval_sec : 86400;
 
@@ -368,7 +382,7 @@ export async function GET({ params, request, locals }) {
 			customLayout = r?.custom_layout ? sanitizeLayout(r.custom_layout) : null;
 		} catch {}
 	}
-	const needs = style === 'planner' ? { tasks: true, countdown: false, picture: false } : layoutNeeds(customLayout);
+	const needs = style === 'planner' ? { tasks: true, countdown: false, picture: false, live: false } : layoutNeeds(customLayout);
 
 	// To-do: the person's Google Tasks (only fetched when that layout, or a to-do widget, is used).
 	let tasks: { title: string; done: boolean; due?: string }[] | null = null;
@@ -393,6 +407,12 @@ export async function GET({ params, request, locals }) {
 		const lq = await db.prepare('SELECT language FROM devices WHERE id = ?').bind(deviceId).first();
 		lang = lq?.language === 'ja' ? 'ja' : 'en';
 	} catch {}
+	// Celsius or Fahrenheit (schema-screens.sql).
+	let unit: 'c' | 'f' = 'c';
+	try {
+		const uq = await db.prepare('SELECT temp_unit FROM devices WHERE id = ?').bind(deviceId).first();
+		unit = uq?.temp_unit === 'f' ? 'f' : 'c';
+	} catch {}
 
 	// The calendar tells us its battery voltage on every refresh (?v=). Save it
 	// next to last_seen_at (same write, so no extra work) for the dashboard.
@@ -409,6 +429,17 @@ export async function GET({ params, request, locals }) {
 		} catch {} // columns come from schema-display.sql; fall back below if not run yet
 	}
 	if (!seenSaved) await db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(now, deviceId).run();
+	// Battery life from real use (schema-screens.sql): remember the voltage and time just after a
+	// charge, so the dashboard can work out how fast this calendar actually drains.
+	if (vbat !== null) {
+		try {
+			const mv = Math.round(vbat * 1000);
+			const b = await db.prepare('SELECT battery_anchor_mv, battery_prev_mv FROM devices WHERE id = ?').bind(deviceId).first();
+			const charged = !b?.battery_anchor_mv || (typeof b.battery_prev_mv === 'number' && mv > b.battery_prev_mv + 60);
+			if (charged) await db.prepare('UPDATE devices SET battery_anchor_mv = ?, battery_anchor_at = ?, battery_prev_mv = ? WHERE id = ?').bind(mv, now, mv, deviceId).run();
+			else await db.prepare('UPDATE devices SET battery_prev_mv = ? WHERE id = ?').bind(mv, deviceId).run();
+		} catch {}
+	}
 
 	if (proto === '2') {
 		// Display options from the customise page (schema-display.sql). One query,
@@ -449,6 +480,7 @@ export async function GET({ params, request, locals }) {
 			vbat,
 			dark,
 			lang,
+			unit,
 			cornerImage,
 			cornerSize,
 			refreshSec: intervalSec,
@@ -460,6 +492,16 @@ export async function GET({ params, request, locals }) {
 			tasksState,
 			custom: customLayout,
 		}, fontChoice ?? undefined);
+		// How long to sleep: the layout's own answer, but wake sooner for a scheduled screen change,
+		// and (for a "Free or busy" widget) when a meeting starts or ends.
+		const evs = trimmedEvents.map((e) => ({ title: e.title, startLocal: e.startLocal, allDay: e.allDay, endLocal: e.endLocal }));
+		let sleepSec = style === 'timeline' ? timelineSleep(nowLocal, evs, intervalSec) : secondsUntilNextRefresh(nowLocal, 86400);
+		if (screens.changeIn !== null) sleepSec = Math.min(sleepSec, Math.max(30, screens.changeIn));
+		if (needs.live) {
+			const edge = secondsToNextEventEdge(evs, nowLocal);
+			if (edge !== null) sleepSec = Math.min(sleepSec, Math.max(120, edge + 30));
+		}
+		await screens.save(db, sleepSec);
 		return new Response(screen, {
 			status: 200,
 			headers: {
@@ -472,11 +514,7 @@ export async function GET({ params, request, locals }) {
 					const s = ((nowLocal % 86400) + 86400) % 86400;
 					return s < 1800 || s >= 86400 - 600 ? '1' : '0';
 				})(),
-				'X-Sleep': String(
-					style === 'timeline'
-						? timelineSleep(nowLocal, trimmedEvents.map((e) => ({ title: e.title, startLocal: e.startLocal, allDay: e.allDay, endLocal: e.endLocal })), intervalSec)
-						: secondsUntilNextRefresh(nowLocal, 86400)
-				),
+				'X-Sleep': String(sleepSec),
 			},
 		});
 	}

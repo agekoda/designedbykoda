@@ -1,6 +1,7 @@
 // The logged-in user's paired devices: list them, and edit one device's
 // name / layout / calendars. Everything is checked against the session's
 // user, so you can only ever see or change your own devices.
+import { sanitizeSchedule } from '../../../lib/eink/schedule';
 import { isStyleId, DEFAULT_STYLE } from '../../../data/calendarStyles';
 import { sanitizeLayout } from '../../../lib/eink/builder/model';
 import { cornerPlain } from '../../../lib/eink/image';
@@ -81,6 +82,20 @@ export async function GET({ request, locals }) {
 		for (const r of pr.results ?? []) pairedAt.set(r.id, r.paired_at);
 	} catch {}
 
+	// Schedule, °C/°F, what's on screen now and battery history, from schema-screens.sql (own query, same reason).
+	const scr = new Map<string, { schedule: unknown; unit: string; shownStyle: string | null; anchorMv: number | null; anchorAt: number | null }>();
+	try {
+		const sr = await db.prepare('SELECT id, schedule, temp_unit, shown_style, battery_anchor_mv, battery_anchor_at FROM devices WHERE user_id = ?').bind(userId).all();
+		for (const e of sr.results ?? [])
+			scr.set(e.id, {
+				schedule: sanitizeSchedule(e.schedule, isStyleId),
+				unit: e.temp_unit === 'f' ? 'f' : 'c',
+				shownStyle: isStyleId(e.shown_style) ? e.shown_style : null,
+				anchorMv: e.battery_anchor_mv ?? null,
+				anchorAt: e.battery_anchor_at ?? null,
+			});
+	} catch {}
+
 	const devices = (rows.results ?? []).map((d: any) => ({
 		id: d.id,
 		name: d.name || '',
@@ -99,6 +114,11 @@ export async function GET({ request, locals }) {
 		frameBits: more.get(d.id)?.frameBits ?? null,
 		countdown: more.get(d.id)?.countdown ?? null,
 		custom: customs.get(d.id) ?? null,
+		schedule: scr.get(d.id)?.schedule ?? null,
+		unit: scr.get(d.id)?.unit ?? 'c',
+		shownStyle: scr.get(d.id)?.shownStyle ?? null,
+		batteryAnchorMv: scr.get(d.id)?.anchorMv ?? null,
+		batteryAnchorAt: scr.get(d.id)?.anchorAt ?? null,
 	}));
 	return json({ devices }, 200);
 }

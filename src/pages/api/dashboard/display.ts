@@ -6,6 +6,9 @@ import { isFamily } from '../../../lib/eink/fonts';
 import { b64ToBytes, decodePic, FRAME_BYTES, cleanSettings } from '../../../lib/eink/image';
 import { cleanText } from '../../../lib/eink/draw';
 import { isLang } from '../../../lib/eink/i18n';
+import { isTempUnit } from '../../../lib/eink/units';
+import { sanitizeSchedule } from '../../../lib/eink/schedule';
+import { markSaved } from '../../../lib/screens';
 import { sanitizeLayout } from '../../../lib/eink/builder/model';
 export const prerender = false;
 
@@ -48,6 +51,21 @@ export async function GET({ request, locals }) {
 		const lq = await db.prepare('SELECT language FROM devices WHERE id = ?').bind(deviceId).first();
 		lang = lq?.language === 'ja' ? 'ja' : 'en';
 	} catch {} // language column comes from schema-language.sql
+	let unit = 'c';
+	try {
+		const uq = await db.prepare('SELECT temp_unit FROM devices WHERE id = ?').bind(deviceId).first();
+		unit = uq?.temp_unit === 'f' ? 'f' : 'c';
+	} catch {} // temp_unit comes from schema-screens.sql
+	let schedule: unknown = null;
+	let screensReady = true;
+	let batteryAnchor: { mv: number; at: number } | null = null;
+	try {
+		const sq = await db.prepare('SELECT schedule, battery_anchor_mv, battery_anchor_at FROM devices WHERE id = ?').bind(deviceId).first();
+		schedule = sanitizeSchedule(sq?.schedule, isStyleId);
+		if (sq?.battery_anchor_mv && sq?.battery_anchor_at) batteryAnchor = { mv: sq.battery_anchor_mv, at: sq.battery_anchor_at };
+	} catch {
+		screensReady = false;
+	}
 	let cfg: unknown = null;
 	try {
 		cfg = extra.corner_cfg ? JSON.parse(extra.corner_cfg) : null;
@@ -93,6 +111,10 @@ export async function GET({ request, locals }) {
 			style,
 			dark: dev.dark_mode === 1,
 			lang,
+			unit,
+			schedule,
+			screensReady,
+			batteryAnchor,
 			refreshSec: isRefreshSec(dev.refresh_interval_sec) ? dev.refresh_interval_sec : 86400,
 			font: isFamily(extra.layout_font) ? extra.layout_font : null,
 			cornerMode: extra.corner_mode === 'image' ? 'image' : 'calendar',
@@ -129,6 +151,7 @@ export async function POST({ request, locals }) {
 	if (body.refreshSec !== undefined && !isRefreshSec(body.refreshSec)) return json({ error: 'Unknown refresh option.' }, 400);
 	if (body.dark !== undefined && typeof body.dark !== 'boolean') return json({ error: 'Invalid dark mode value.' }, 400);
 	if (body.lang !== undefined && !isLang(body.lang)) return json({ error: 'Unknown language.' }, 400);
+	if (body.unit !== undefined && !isTempUnit(body.unit)) return json({ error: 'Unknown temperature unit.' }, 400);
 
 	const sets: string[] = [];
 	const vals: unknown[] = [];
@@ -213,6 +236,21 @@ export async function POST({ request, locals }) {
 			await db.prepare('UPDATE devices SET language = ? WHERE id = ? AND user_id = ?').bind(body.lang, deviceId, o.userId).run();
 		} catch {
 			return json({ error: 'Language is not enabled on the server yet (run schema-language.sql).' }, 500);
+		}
+	}
+	if (body.schedule !== undefined) {
+		try {
+			await db.prepare('UPDATE devices SET schedule = ? WHERE id = ? AND user_id = ?').bind(JSON.stringify(sanitizeSchedule(body.schedule, isStyleId)), deviceId, o.userId).run();
+		} catch {
+			return json({ error: 'Schedules are not enabled on the server yet (run schema-screens.sql).' }, 500);
+		}
+	}
+	await markSaved(db, deviceId);
+	if (body.unit !== undefined) {
+		try {
+			await db.prepare('UPDATE devices SET temp_unit = ? WHERE id = ? AND user_id = ?').bind(body.unit, deviceId, o.userId).run();
+		} catch {
+			return json({ error: 'Fahrenheit is not enabled on the server yet (run schema-screens.sql).' }, 500);
 		}
 	}
 	if (!sets.length) return json({ ok: true }, 200);

@@ -7,6 +7,7 @@
 // "now" and a countdown, and the server (timelineSleep below) only wakes it while the bar
 // is actually moving across the timeline: from the first visible hour to the last, then
 // it sleeps until midnight.
+import { deg } from '../units';
 import { Draw, PAPER } from '../draw';
 import { firstThatFits, measure } from '../measure';
 import { dayIdx, dayShort, monthShort, round0, tmOf, type CalEvent, type LayoutCtx } from '../context';
@@ -263,8 +264,8 @@ export function timeline(ctx: LayoutCtx): string {
 	const hi = ctx.weather ? round0(ctx.weather.high) : '';
 	const lo = ctx.weather ? round0(ctx.weather.low) : '';
 	if (ctx.weather) {
-		d.text(px, 256, 's', firstThatFits(fam, 's', [`High ${hi}C`, `H ${hi}C`], colW));
-		d.text(px, 276, 's', firstThatFits(fam, 's', [`Low ${lo}C`, `L ${lo}C`], colW));
+		d.text(px, 256, 's', firstThatFits(fam, 's', [`High ${hi}${deg()}`, `H ${hi}${deg()}`], colW));
+		d.text(px, 276, 's', firstThatFits(fam, 's', [`Low ${lo}${deg()}`, `L ${lo}${deg()}`], colW));
 	}
 	return d.toString();
 }

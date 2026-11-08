@@ -1,3 +1,4 @@
+import { deg } from './units';
 import { batteryPercent } from './battery';
 // What a layout gets to work with, plus the small date helpers every layout
 // needs. Everything is "local wall-clock seconds": the real instant shifted by
@@ -47,6 +48,8 @@ export interface LayoutCtx {
 	tasksState?: 'ok' | 'needs_permission' | 'error';
 	// Which language the screen is written in (default English). See i18n.ts.
 	lang?: Lang;
+	// Celsius (default) or Fahrenheit. See units.ts.
+	unit?: import('./units').TempUnit;
 	// The layout builder: the widgets of the person's own design (see builder/model.ts).
 	custom?: import('./builder/model').CustomLayout | null;
 }
@@ -134,7 +137,7 @@ export function batteryText(v: number | null): string | null {
 // "High 19C  Low 12C"; `sep` is the gap between the two halves.
 export function hiLoText(ctx: LayoutCtx, sep: string): string {
 	if (!ctx.weather) return '---';
-	return `High ${round0(ctx.weather.high)}C${sep}Low ${round0(ctx.weather.low)}C`;
+	return `High ${round0(ctx.weather.high)}${deg()}${sep}Low ${round0(ctx.weather.low)}${deg()}`;
 }
 
 // n-th upcoming event (0 = next), counting events from today onwards by DAY.

@@ -25,7 +25,18 @@ export interface CustomLayout {
 export type OptDef =
 	| { key: string; label: string; kind: 'choice'; choices: [string, string][]; def: string; show?: Record<string, string | boolean> }
 	| { key: string; label: string; kind: 'toggle'; def: boolean; show?: Record<string, string | boolean> }
-	| { key: string; label: string; kind: 'text'; def: string; max: number; rows?: number; show?: Record<string, string | boolean> };
+	| {
+			key: string;
+			label: string;
+			kind: 'text';
+			def: string;
+			max: number;
+			rows?: number;
+			ph?: string; // placeholder shown in the empty box
+			raw?: boolean; // keep the text exactly as typed (links, Wi-Fi names and passwords inside a QR code)
+			multiline?: boolean; // keep line breaks (one item per line)
+			show?: Record<string, string | boolean>;
+	  };
 
 const SIZE_CHOICES: [string, string][] = [
 	['auto', 'Auto (fills the box)'],
@@ -108,6 +119,16 @@ export const WIDGETS: Record<string, WidgetDef> = {
 			...TEXTY,
 		],
 	},
+	updated: {
+		label: 'Updated at',
+		group: 'Date',
+		blurb: 'When the screen last changed, e.g. "Updated 14:05"',
+		w: 130,
+		h: 20,
+		min: { w: 40, h: 14 },
+		opts: [{ key: 'prefix', label: 'Words before the time', kind: 'text', def: 'Updated', max: 20, rows: 1 }, ...TEXTY],
+		def: { size: 's' },
+	},
 	date_full: {
 		label: 'Full date',
 		group: 'Date',
@@ -149,6 +170,24 @@ export const WIDGETS: Record<string, WidgetDef> = {
 			BORDER,
 		],
 		def: { size: 'auto' },
+	},
+	room_status: {
+		label: 'Free or busy',
+		group: 'Calendar',
+		blurb: 'Says if you (or a room) are busy right now, and until when. Updates itself when a meeting starts or ends',
+		w: 380,
+		h: 110,
+		min: { w: 100, h: 40 },
+		opts: [
+			{ key: 'free', label: 'When free', kind: 'text', def: 'Available', max: 24, rows: 1 },
+			{ key: 'busy', label: 'When busy', kind: 'text', def: 'In use', max: 24, rows: 1 },
+			{ key: 'detail', label: 'Show until when, and what\'s next', kind: 'toggle', def: true },
+			{ key: 'title', label: 'Show the meeting name', kind: 'toggle', def: true },
+			{ key: 'black', label: 'Black box when busy', kind: 'toggle', def: true },
+			ALIGN,
+			BORDER,
+		],
+		def: { align: 'center' },
 	},
 	event_count: {
 		label: 'Event count',
@@ -299,6 +338,45 @@ export const WIDGETS: Record<string, WidgetDef> = {
 		min: { w: 120, h: 34 },
 		opts: [{ key: 'dots', label: 'Dotted lines between', kind: 'toggle', def: true }, { key: 'done', label: 'Show finished tasks', kind: 'toggle', def: true }],
 	},
+	qr: {
+		label: 'QR code',
+		group: 'Extras',
+		blurb: 'A link, your Wi-Fi or any text, with your own words under it',
+		w: 150,
+		h: 172,
+		min: { w: 50, h: 50 },
+		opts: [
+			{ key: 'mode', label: 'Opens', kind: 'choice', choices: [['link', 'A link'], ['wifi', 'Wi-Fi'], ['text', 'Text']], def: 'link' },
+			{ key: 'url', label: 'Link', kind: 'text', def: 'designedbykoda.com', max: 300, rows: 2, ph: 'example.com', raw: true, show: { mode: 'link' } },
+			{ key: 'ssid', label: 'Network name', kind: 'text', def: '', max: 32, rows: 1, ph: 'My Wi-Fi', raw: true, show: { mode: 'wifi' } },
+			{ key: 'pass', label: 'Password', kind: 'text', def: '', max: 63, rows: 1, raw: true, show: { mode: 'wifi' } },
+			{ key: 'sec', label: 'Security', kind: 'choice', choices: [['WPA', 'WPA'], ['WEP', 'WEP'], ['nopass', 'None']], def: 'WPA', show: { mode: 'wifi' } },
+			{ key: 'hidden', label: 'Hidden network', kind: 'toggle', def: false, show: { mode: 'wifi' } },
+			{ key: 'details', label: 'Write the name and password too', kind: 'toggle', def: true, show: { mode: 'wifi' } },
+			{ key: 'data', label: 'Text inside the code', kind: 'text', def: '', max: 300, rows: 3, raw: true, show: { mode: 'text' } },
+			{ key: 'caption', label: 'Your words', kind: 'text', def: 'Scan me', max: 60, rows: 2, ph: 'Leave empty for none' },
+			{ key: 'pos', label: 'Words go', kind: 'choice', choices: [['below', 'Below'], ['right', 'Beside']], def: 'below' },
+			BOLD,
+			BORDER,
+		],
+		def: { bold: true },
+	},
+	list: {
+		label: 'List',
+		group: 'Text',
+		blurb: 'One line per item: house rules, an agenda, a shopping list',
+		w: 240,
+		h: 120,
+		min: { w: 60, h: 20 },
+		opts: [
+			{ key: 'items', label: 'Items (one per line)', kind: 'text', def: 'Check-out by 10am\nNo smoking inside\nQuiet after 10pm', max: 500, rows: 6, multiline: true },
+			{ key: 'bullet', label: 'Bullets', kind: 'choice', choices: [['dot', 'Dots'], ['dash', 'Dashes'], ['num', '1. 2. 3.'], ['box', 'Tick boxes'], ['none', 'None']], def: 'dot' },
+			{ key: 'size', label: 'Text size', kind: 'choice', choices: [['auto', 'Auto (fills the box)'], ['s', 'Small'], ['m', 'Medium'], ['l', 'Large']], def: 'auto' },
+			BOLD,
+			INVERT,
+			BORDER,
+		],
+	},
 	progress: {
 		label: 'Progress bar',
 		group: 'Extras',
@@ -407,6 +485,20 @@ export function clampWidget(w: Widget): Widget {
 	return { ...w, w: width, h: height, x: clamp(int(w.x), 0, SCREEN.w - Math.min(width, SCREEN.w)), y: clamp(int(w.y), 0, SCREEN.h - Math.min(height, SCREEN.h)) };
 }
 
+// A text option as it may be saved: links and Wi-Fi details exactly as typed (no control
+// characters), lists one line per item, everything else as one tidy line.
+function cleanOpt(def: Extract<OptDef, { kind: 'text' }>, v: string): string {
+	if (def.raw) return v.replace(/[\x00-\x1f\x7f]/g, '').slice(0, def.max);
+	if (def.multiline)
+		return v
+			.split(/\r?\n/)
+			.slice(0, 15)
+			.map((ln) => cleanText(ln, false).replace(/ +/g, ' ').trim())
+			.join('\n')
+			.slice(0, def.max);
+	return cleanText(v, false).replace(/ +/g, ' ').slice(0, def.max);
+}
+
 // Turns whatever came in (the database, or a request) into a layout that is safe to draw.
 // Unknown widgets and options are dropped, numbers are clamped, text is made plain ASCII.
 export function sanitizeLayout(input: unknown): CustomLayout {
@@ -433,7 +525,7 @@ export function sanitizeLayout(input: unknown): CustomLayout {
 			if (def.kind === 'toggle') o[def.key] = v === true;
 			else if (def.kind === 'choice') {
 				if (typeof v === 'string' && def.choices.some((c) => c[0] === v)) o[def.key] = v;
-			} else if (typeof v === 'string') o[def.key] = cleanText(v, false).replace(/ +/g, ' ').slice(0, def.max);
+			} else if (typeof v === 'string') o[def.key] = cleanOpt(def, v);
 		}
 		out.widgets.push(clampWidget({ id, t: w.t, x: w.x, y: w.y, w: w.w, h: w.h, o }));
 	}
@@ -446,6 +538,8 @@ export function layoutNeeds(layout: CustomLayout | null | undefined) {
 		tasks: types.has('tasks'),
 		countdown: types.has('countdown'),
 		picture: types.has('picture'),
+		// redraw when a meeting starts or ends, not just at midnight
+		live: types.has('room_status'),
 	};
 }
 
@@ -561,6 +655,53 @@ export const TEMPLATES: Template[] = [
 				W('date_full', 22, 202, 180, 28, { fmt: 'med', size: 's', align: 'left' }),
 				W('countdown', 214, 196, 168, 92, { title: false }),
 				W('battery', 22, 252, 56, 22, { align: 'left' }),
+			],
+		}),
+	},
+	{
+		id: 'room',
+		label: 'Meeting room',
+		note: 'Room name, free or in use, and today\'s bookings',
+		build: () => ({
+			v: 1,
+			widgets: [
+				W('box', 0, 0, 400, 44, { fill: 'solid' }),
+				W('text', 12, 4, 250, 36, { text: 'Boardroom', light: true, bold: true, size: 'auto', valign: 'middle' }),
+				W('updated', 262, 12, 128, 20, { light: true, align: 'right', size: 's' }),
+				W('room_status', 10, 54, 380, 124, { free: 'Available', busy: 'In use', black: true, title: true, detail: true }),
+				W('text', 10, 188, 200, 20, { text: 'Today', bold: true, size: 's', valign: 'top' }),
+				W('events', 10, 210, 380, 84, { today: true, when: 'time', dots: true }),
+			],
+		}),
+	},
+	{
+		id: 'guest',
+		label: 'Guest welcome',
+		note: 'Wi-Fi QR code, house rules and check-out time',
+		build: () => ({
+			v: 1,
+			widgets: [
+				W('text', 10, 6, 380, 46, { text: 'Welcome, Sam!', bold: true, size: 'auto' }),
+				W('line', 10, 54, 380, 2),
+				W('qr', 10, 64, 150, 214, { mode: 'wifi', ssid: 'Guest Wi-Fi', pass: 'change-me', sec: 'WPA', details: true, caption: 'Scan to join Wi-Fi', bold: true }),
+				W('text', 176, 64, 214, 20, { text: 'House rules', bold: true, size: 's', valign: 'top' }),
+				W('list', 176, 88, 214, 134, { items: 'No smoking inside\nQuiet after 10pm\nBins go out on Tuesday\nLeave keys on the table', bullet: 'dot', size: 'auto' }),
+				W('text', 176, 230, 214, 40, { text: 'Check-out 10am', invert: true, bold: true, size: 'auto', align: 'center' }),
+				W('text', 10, 280, 380, 18, { text: 'Questions? Text Koda on 0400 000 000', size: 's', align: 'center' }),
+			],
+		}),
+	},
+	{
+		id: 'nameplate',
+		label: 'Desk name plate',
+		note: 'Your name, your role, and whether you\'re free',
+		build: () => ({
+			v: 1,
+			widgets: [
+				W('text', 10, 24, 380, 104, { text: 'Alex Koda', bold: true, size: 'auto', align: 'center' }),
+				W('text', 10, 130, 380, 30, { text: 'Hardware Engineer', size: 'm', align: 'center' }),
+				W('line', 120, 176, 160, 2),
+				W('room_status', 50, 192, 300, 92, { free: 'Available', busy: 'In a meeting', black: true, title: false, detail: true }),
 			],
 		}),
 	},

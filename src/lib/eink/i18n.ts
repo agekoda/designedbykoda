@@ -97,16 +97,16 @@ const JA: Record<string, string> = {
 
 // Pattern translations, for strings with numbers in them.
 const PATTERNS: [RegExp, (...m: string[]) => string][] = [
-	[/^High:? ?(-?\d+)C( +)Low:? ?(-?\d+)C$/, (_a, h, sp, l) => `最高${h}C${sp}最低${l}C`],
-	[/^H:(-?\d+)C( +)L:(-?\d+)C$/, (_a, h, sp, l) => `高${h}C${sp}低${l}C`],
-	[/^H (-?\d+)C$/, (_a, h) => `高 ${h}C`],
-	[/^L (-?\d+)C$/, (_a, l) => `低 ${l}C`],
-	[/^High +(-?\d+)C$/, (_a, h) => `最高${h}C`],
-	[/^Low +(-?\d+)C$/, (_a, l) => `最低${l}C`],
+	[/^High:? ?(-?\d+)([CF])( +)Low:? ?(-?\d+)[CF]$/, (_a, h, u, sp, l) => `最高${h}${u}${sp}最低${l}${u}`],
+	[/^H:(-?\d+)([CF])( +)L:(-?\d+)[CF]$/, (_a, h, u, sp, l) => `高${h}${u}${sp}低${l}${u}`],
+	[/^H (-?\d+)([CF])$/, (_a, h, u) => `高 ${h}${u}`],
+	[/^L (-?\d+)([CF])$/, (_a, l, u) => `低 ${l}${u}`],
+	[/^High +(-?\d+)([CF])$/, (_a, h, u) => `最高${h}${u}`],
+	[/^Low +(-?\d+)([CF])$/, (_a, l, u) => `最低${l}${u}`],
 	[/^Low (\d+)%$/, (_a, p) => `低 ${p}%`],
 	[/^(\d+)% lit$/, (_a, p) => `輝面 ${p}%`],
 	[/^Rain (\d+)%$/, (_a, p) => `降水 ${p}%`],
-	[/^Wind (\d+) km\/h$/, (_a, p) => `風 ${p}km/h`],
+	[/^Wind (\d+) (km\/h|mph)$/, (_a, p, u) => `風 ${p}${u}`],
 	[/^in (\d+) days$/, (_a, n) => `${n}日後`],
 	[/^(\d+) to do(?: {3}\+(\d+) more)?$/, (_a, n, m) => `あと${n}件` + (m ? `   他${m}件` : '')],
 	[/^1 events? today$/, () => '今日は1件'],
