@@ -52,6 +52,8 @@ export interface LayoutCtx {
 	unit?: import('./units').TempUnit;
 	// The layout builder: the widgets of the person's own design (see builder/model.ts).
 	custom?: import('./builder/model').CustomLayout | null;
+	// Meeting room / Guest welcome / Desk name plate: the words to fill in (see builder/model.ts).
+	sign?: unknown;
 }
 
 export interface TaskItem {

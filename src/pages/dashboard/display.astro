@@ -140,6 +140,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						<input class="txt" id="cd-date" type="date" />
 						<p class="muted small hint">Counts down each morning, and says "Today!" on the day.</p>
 					</div>
+					<div id="opt-sign" hidden>
+						<div id="sign-fields"></div>
+						<a class="btn small ghost" id="sign-builder" href="#">Edit the layout in the builder</a>
+						<p class="muted small hint">Opens it in the layout builder, where you can move things around and add widgets. Saving there makes it your own design.</p>
+					</div>
 					<div id="opt-todo" hidden>
 						<p class="muted" id="todo-status"></p>
 						<a class="btn small" id="todo-connect" href="/api/auth/google/start?tasks=1">Connect Google Tasks</a>
@@ -211,7 +216,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { renderPreview, paint, paintScreen, loadFonts } from '../../lib/eink/previewKit';
 	import { defaultFontFor } from '../../lib/eink/layouts';
 	import { Draw } from '../../lib/eink/draw';
-	import { TEMPLATES, sanitizeLayout } from '../../lib/eink/builder/model';
+	import { TEMPLATES, sanitizeLayout, isSignStyle, sanitizeSign, signLayout, SIGN_DEFAULTS, type SignCfg } from '../../lib/eink/builder/model';
 	import { renderDrawList } from '../../lib/eink/preview';
 	import { sampleFrameBytes } from '../../lib/eink/sampleFrame';
 	import { EMPTY_SCHEDULE, SCHEDULE_PRESETS, ALL_DAYS, WEEKDAYS, MAX_SLOTS, activeSlot, activeStyle, cycleList, daysText, minutesToHHMM, hhmmToMinutes, type Schedule, type Slot } from '../../lib/eink/schedule';
@@ -248,6 +253,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const edNote = $('ed-note');
 	const optCountdown = $('opt-countdown');
 	const optTodo = $('opt-todo');
+	const optSign = $('opt-sign');
+	const signFields = $('sign-fields');
+	const signBuilder = $<HTMLAnchorElement>('sign-builder');
 	const customBox = $('custom-box');
 	const modesEl = $('modes');
 	const customStatus = $('custom-status');
@@ -311,6 +319,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		fsrc: string | null; // the Photo frame's photo
 		countdown: { title: string; date: string };
 		sch: Schedule;
+		sign: SignCfg;
 	}
 	// The picture editor works on one of two pictures: the Agenda's corner picture, or the Photo frame's full-screen one.
 	type PicKey = 'corner' | 'frame';
@@ -345,6 +354,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		fsrc: null,
 		countdown: { title: '', date: '' },
 		sch: { ...EMPTY_SCHEDULE },
+		sign: JSON.parse(JSON.stringify(SIGN_DEFAULTS)),
 	};
 	let base = JSON.stringify(st);
 	// A layout picked in the Schedule tab is previewed (and its Picture / Options tabs shown)
@@ -392,6 +402,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			countdown: styleId === 'countdown' ? cd : null,
 			custom: styleId === 'custom' ? (thumb && !customLayout?.widgets?.length ? sanitizeLayout(TEMPLATES.find((x) => x.id === 'sky')!.build()) : customLayout) : null,
 			tasksState: (thumb || tasksGranted ? 'ok' : 'needs_permission') as 'ok' | 'needs_permission',
+			sign: st.sign,
 		};
 	}
 
@@ -791,12 +802,14 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		paintEditor();
 
 		// Options tab: the Countdown's name and date, or connecting Google Tasks
-		const opt = fs() === 'countdown' ? 'countdown' : (fs() === 'todo' || fs() === 'planner') ? 'todo' : null;
+		const opt = fs() === 'countdown' ? 'countdown' : (fs() === 'todo' || fs() === 'planner') ? 'todo' : isSignStyle(fs()) ? 'sign' : null;
 		tabOptBtn.hidden = !opt;
-		tabOptBtn.textContent = opt === 'countdown' ? 'Countdown' : opt === 'todo' ? 'Tasks' : 'Options';
+		tabOptBtn.textContent = opt === 'countdown' ? 'Countdown' : opt === 'todo' ? 'Tasks' : opt === 'sign' ? 'Words' : 'Options';
 		if (!opt && activeTab === 'options') showTab('layout');
 		optCountdown.hidden = opt !== 'countdown';
 		optTodo.hidden = opt !== 'todo';
+		optSign.hidden = opt !== 'sign';
+		if (opt === 'sign') syncSignFields();
 		const isCustom = st.style === 'custom';
 		customBox.hidden = !isCustom;
 		layoutsEl.hidden = isCustom;
@@ -816,6 +829,61 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		todoConnect.textContent = tasksGranted ? 'Reconnect Google Tasks' : 'Connect Google Tasks';
 		todoConnect.href = '/api/auth/google/start?tasks=1&return=' + encodeURIComponent('/dashboard/display?device=' + deviceId);
 	}
+
+	// ---------------------------------------------------------------- signs (Meeting room, Guest welcome, Desk name plate)
+	const SIGN_FIELDS: Record<string, { key: string; label: string; max: number; rows?: number; ph?: string }[]> = {
+		room: [{ key: 'name', label: 'Room name', max: 40 }],
+		guest: [
+			{ key: 'title', label: 'Welcome message', max: 40 },
+			{ key: 'ssid', label: 'Wi-Fi name', max: 32 },
+			{ key: 'pass', label: 'Wi-Fi password', max: 63, ph: 'Leave empty if there isn\u2019t one' },
+			{ key: 'rules', label: 'House rules (one per line)', max: 300, rows: 5 },
+			{ key: 'checkout', label: 'Check-out', max: 30 },
+			{ key: 'contact', label: 'Bottom line', max: 60 },
+		],
+		nameplate: [
+			{ key: 'name', label: 'Name', max: 40 },
+			{ key: 'role', label: 'Role', max: 40 },
+		],
+	};
+	let signFor = '';
+	function syncSignFields() {
+		const id = fs();
+		if (!isSignStyle(id)) return;
+		const vals = st.sign[id] as Record<string, string>;
+		if (signFor !== id) {
+			signFor = id;
+			signFields.innerHTML = SIGN_FIELDS[id]
+				.map((f) => {
+					const v = (vals[f.key] ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+					const ph = f.ph ? ` placeholder="${f.ph}"` : '';
+					const inp = f.rows ? `<textarea class="txt" data-k="${f.key}" rows="${f.rows}" maxlength="${f.max}"${ph}>${v}</textarea>` : `<input class="txt" data-k="${f.key}" type="text" maxlength="${f.max}" value="${v}"${ph} autocomplete="off" spellcheck="${f.key === 'ssid' || f.key === 'pass' ? 'false' : 'true'}" />`;
+					return `<label class="sign-f"><span class="label sub">${f.label}</span>${inp}</label>`;
+				})
+				.join('');
+		} else {
+			signFields.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[data-k]').forEach((el) => {
+				if (document.activeElement !== el && el.value !== (vals[el.dataset.k!] ?? '')) el.value = vals[el.dataset.k!] ?? '';
+			});
+		}
+		signBuilder.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId) + '&seed=1';
+	}
+	signFields.addEventListener('input', (e) => {
+		const el = e.target as HTMLInputElement | HTMLTextAreaElement;
+		const id = fs();
+		if (!el.dataset.k || !isSignStyle(id)) return;
+		(st.sign[id] as Record<string, string>)[el.dataset.k] = el.value;
+		schedule(false);
+		changed();
+	});
+	// The builder picks this up (seed=1) and starts from this layout, filled in, as unsaved changes.
+	signBuilder.addEventListener('click', () => {
+		const id = fs();
+		if (!isSignStyle(id)) return;
+		try {
+			sessionStorage.setItem('builderSeed:' + deviceId, JSON.stringify({ label: labelOf(id), layout: signLayout(id, sanitizeSign(st.sign)) }));
+		} catch {}
+	});
 
 	// ---------------------------------------------------------------- schedule
 	const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday first
@@ -1066,6 +1134,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const body: any = { deviceId, style: st.style, font: st.font, dark: st.dark, lang: st.lang, refreshSec: st.refreshSec, countdown: st.countdown };
 		const baseState = JSON.parse(base);
 		if (JSON.stringify(st.sch) !== JSON.stringify(baseState.sch)) body.schedule = st.sch;
+		if (JSON.stringify(st.sign) !== JSON.stringify(baseState.sign)) body.sign = st.sign;
 		if (st.unit !== baseState.unit) body.unit = st.unit; // only when changed, so a server without schema-screens.sql still saves the rest
 		if (anyCorner || st.cornerMode === 'image') {
 			body.corner = { mode: st.cornerMode };
@@ -1221,6 +1290,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				fsrc: info.frameSrc,
 				countdown: info.countdown ?? { title: '', date: '' },
 				sch: info.schedule ?? { ...EMPTY_SCHEDULE },
+				sign: sanitizeSign(info.sign),
 			};
 			screensReady = info.screensReady !== false;
 			battAnchor = info.batteryAnchor ?? null;
@@ -1429,4 +1499,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .view-pill { display: flex; gap: 0.6em; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.6em; padding: 0.5em 0.9em; border-radius: 999px; background: rgba(var(--accent-rgb), 0.12); color: var(--fg); font-size: 0.85em; font-weight: 600; }
 	.cust .batt-line { margin-top: 0.7em; font-size: 0.85em; color: var(--muted); line-height: 1.5; }
 	.cust .batt-line b { color: var(--fg); }
+	.cust .sign-f { display: block; margin-bottom: 1em; }
+	.cust .sign-f .label { display: block; margin-bottom: 0.45em; }
+	.cust textarea.txt { resize: vertical; line-height: 1.45; }
+	.cust #opt-sign[hidden] { display: none; }
 </style>

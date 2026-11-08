@@ -106,7 +106,7 @@ if (!userId) return Astro.redirect('/setup');
 			const needs = pct <= 10;
 			// days left: from real use once there's enough of it, else from the settings
 			const real = measured(d.batteryAnchorMv, d.batteryAnchorAt, d.batteryMv, d.batteryAt);
-			const live = d.style === 'custom' && layoutNeeds(d.custom).live;
+			const live = (d.style === 'custom' && layoutNeeds(d.custom).live) || d.style === 'room' || d.style === 'nameplate';
 			const left = real ? real.left : (estimate({ style: d.style, refreshSec: d.refreshIntervalSec, schedule: d.schedule, live }) * pct) / 100;
 			const leftText = needs ? ' · Needs charging' : pct >= 99 && !real ? '' : ` · ${lifeText(left)} left`;
 			battery = `<span class="sep">·</span><span class="batt${needs ? ' needs' : ''}" title="Battery level${d.batteryAt ? ', ' + ago(d.batteryAt) : ''}${real ? '. Time left is from how fast it has actually been using its battery.' : '. Time left is an estimate from its settings.'}"><span class="batt-icon ${pct < 20 ? 'low' : ''}"><i style="width:${Math.max(6, pct)}%"></i></span>${pct}%${leftText}</span>`;
@@ -152,7 +152,7 @@ if (!userId) return Astro.redirect('/setup');
 				frameImage = Uint8Array.from(atob(d.frameBits), (c) => c.charCodeAt(0));
 			} catch {}
 		}
-		renderPreview({ style: onScreen, unit: d.unit, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null, cornerImage, refreshSec: onScreen === 'timeline' ? d.refreshIntervalSec : 86400, loc: d.location ? { lat: d.location.lat, lon: d.location.lon } : null, countdown: d.countdown ?? null, frameImage, custom: onScreen === 'custom' ? d.custom ?? null : null })
+		renderPreview({ style: onScreen, unit: d.unit, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null, cornerImage, refreshSec: onScreen === 'timeline' ? d.refreshIntervalSec : 86400, loc: d.location ? { lat: d.location.lat, lon: d.location.lon } : null, countdown: d.countdown ?? null, frameImage, custom: onScreen === 'custom' ? d.custom ?? null : null, sign: d.sign ?? null })
 			.then((r) => paintScreen(canvas, r.px, { mode: 'screen', scale: 2 }))
 			.catch(() => {});
 

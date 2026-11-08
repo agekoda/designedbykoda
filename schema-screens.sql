@@ -12,3 +12,4 @@ ALTER TABLE devices ADD COLUMN temp_unit TEXT;             -- 'c' (default) or '
 ALTER TABLE devices ADD COLUMN battery_anchor_mv INTEGER;  -- battery voltage just after the last charge
 ALTER TABLE devices ADD COLUMN battery_anchor_at INTEGER;  -- unix seconds of that reading
 ALTER TABLE devices ADD COLUMN battery_prev_mv INTEGER;    -- the reading before the latest one (a jump up means it was charged)
+ALTER TABLE devices ADD COLUMN sign_cfg TEXT;             -- JSON: the words on the Meeting room / Guest welcome / Desk name plate layouts

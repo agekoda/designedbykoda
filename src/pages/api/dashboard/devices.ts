@@ -3,7 +3,7 @@
 // user, so you can only ever see or change your own devices.
 import { sanitizeSchedule } from '../../../lib/eink/schedule';
 import { isStyleId, DEFAULT_STYLE } from '../../../data/calendarStyles';
-import { sanitizeLayout } from '../../../lib/eink/builder/model';
+import { sanitizeLayout, sanitizeSign } from '../../../lib/eink/builder/model';
 import { cornerPlain } from '../../../lib/eink/image';
 export const prerender = false;
 
@@ -83,11 +83,12 @@ export async function GET({ request, locals }) {
 	} catch {}
 
 	// Schedule, °C/°F, what's on screen now and battery history, from schema-screens.sql (own query, same reason).
-	const scr = new Map<string, { schedule: unknown; unit: string; shownStyle: string | null; anchorMv: number | null; anchorAt: number | null }>();
+	const scr = new Map<string, { sign: unknown; schedule: unknown; unit: string; shownStyle: string | null; anchorMv: number | null; anchorAt: number | null }>();
 	try {
-		const sr = await db.prepare('SELECT id, schedule, temp_unit, shown_style, battery_anchor_mv, battery_anchor_at FROM devices WHERE user_id = ?').bind(userId).all();
+		const sr = await db.prepare('SELECT id, schedule, temp_unit, shown_style, battery_anchor_mv, battery_anchor_at, sign_cfg FROM devices WHERE user_id = ?').bind(userId).all();
 		for (const e of sr.results ?? [])
 			scr.set(e.id, {
+				sign: sanitizeSign(e.sign_cfg),
 				schedule: sanitizeSchedule(e.schedule, isStyleId),
 				unit: e.temp_unit === 'f' ? 'f' : 'c',
 				shownStyle: isStyleId(e.shown_style) ? e.shown_style : null,
@@ -115,6 +116,7 @@ export async function GET({ request, locals }) {
 		countdown: more.get(d.id)?.countdown ?? null,
 		custom: customs.get(d.id) ?? null,
 		schedule: scr.get(d.id)?.schedule ?? null,
+		sign: scr.get(d.id)?.sign ?? null,
 		unit: scr.get(d.id)?.unit ?? 'c',
 		shownStyle: scr.get(d.id)?.shownStyle ?? null,
 		batteryAnchorMv: scr.get(d.id)?.anchorMv ?? null,

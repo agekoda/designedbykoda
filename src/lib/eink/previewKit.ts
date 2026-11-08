@@ -98,6 +98,7 @@ export interface PreviewOptions {
 	frameImage?: Uint8Array | null; // Photo frame
 	tasksState?: 'ok' | 'needs_permission'; // To-do: pretend we can / cannot read Google Tasks
 	custom?: CustomLayout | null; // Your own design (layout builder)
+	sign?: unknown; // Meeting room / Guest welcome / Desk name plate words
 }
 
 export function drawListFor(o: PreviewOptions): string {
@@ -125,6 +126,7 @@ export function drawListFor(o: PreviewOptions): string {
 			tasks: o.tasksState === 'needs_permission' ? null : sampleTasks(nowLocal),
 			tasksState: o.tasksState ?? 'ok',
 			custom: o.custom ?? null,
+			sign: o.sign ?? null,
 		},
 		o.font ?? undefined
 	);

@@ -658,55 +658,106 @@ export const TEMPLATES: Template[] = [
 			],
 		}),
 	},
-	{
-		id: 'room',
-		label: 'Meeting room',
-		note: 'Room name, free or in use, and today\'s bookings',
-		build: () => ({
+	{ id: 'room', label: 'Meeting room', note: 'Room name, free or in use, and today\'s bookings', build: () => signLayout('room', SIGN_DEFAULTS) },
+	{ id: 'guest', label: 'Guest welcome', note: 'Wi-Fi QR code, house rules and check-out time', build: () => signLayout('guest', SIGN_DEFAULTS) },
+	{ id: 'nameplate', label: 'Desk name plate', note: 'Your name, your role, and whether you\'re free', build: () => signLayout('nameplate', SIGN_DEFAULTS) },
+];
+
+export function templateById(id: string): Template {
+	return TEMPLATES.find((t) => t.id === id) ?? TEMPLATES[0];
+}
+
+// ---- signs: Meeting room, Guest welcome and Desk name plate ----
+// These are ready-made layouts (pick one, fill in a few boxes on Customize display) and also
+// builder templates. Both are built here from the same few words, so they always match.
+export type SignStyle = 'room' | 'guest' | 'nameplate';
+export const SIGN_STYLES: SignStyle[] = ['room', 'guest', 'nameplate'];
+export const isSignStyle = (s: unknown): s is SignStyle => SIGN_STYLES.includes(s as SignStyle);
+
+export interface SignCfg {
+	room: { name: string };
+	guest: { title: string; ssid: string; pass: string; rules: string; checkout: string; contact: string };
+	nameplate: { name: string; role: string };
+}
+export const SIGN_DEFAULTS: SignCfg = {
+	room: { name: 'Boardroom' },
+	guest: {
+		title: 'Welcome, Sam!',
+		ssid: 'Guest Wi-Fi',
+		pass: 'change-me',
+		rules: 'No smoking inside\nQuiet after 10pm\nBins go out on Tuesday\nLeave keys on the table',
+		checkout: 'Check-out 10am',
+		contact: 'Questions? Text Koda on 0400 000 000',
+	},
+	nameplate: { name: 'Alex Koda', role: 'Hardware Engineer' },
+};
+// How long each box may be, and which ones are kept exactly as typed (Wi-Fi details).
+const SIGN_LIMITS: Record<string, { max: number; raw?: boolean; multiline?: boolean }> = {
+	name: { max: 40 }, title: { max: 40 }, role: { max: 40 }, checkout: { max: 30 }, contact: { max: 60 },
+	ssid: { max: 32, raw: true }, pass: { max: 63, raw: true }, rules: { max: 300, multiline: true },
+};
+
+export function sanitizeSign(input: unknown): SignCfg {
+	let raw: any = input;
+	if (typeof raw === 'string') {
+		try {
+			raw = JSON.parse(raw);
+		} catch {
+			raw = null;
+		}
+	}
+	const out = JSON.parse(JSON.stringify(SIGN_DEFAULTS)) as SignCfg;
+	for (const sign of SIGN_STYLES) {
+		const src = raw?.[sign];
+		if (!src || typeof src !== 'object') continue;
+		for (const key of Object.keys(out[sign]) as (keyof SignCfg[typeof sign])[]) {
+			const v = src[key];
+			if (typeof v !== 'string') continue;
+			const lim = SIGN_LIMITS[key as string];
+			(out[sign] as any)[key] = cleanOpt({ key: String(key), label: '', kind: 'text', def: '', max: lim.max, raw: lim.raw, multiline: lim.multiline }, v);
+		}
+	}
+	return out;
+}
+
+export function signLayout(sign: SignStyle, cfg: SignCfg): CustomLayout {
+	if (sign === 'room') {
+		const c = cfg.room;
+		return {
 			v: 1,
 			widgets: [
 				W('box', 0, 0, 400, 44, { fill: 'solid' }),
-				W('text', 12, 4, 250, 36, { text: 'Boardroom', light: true, bold: true, size: 'auto', valign: 'middle' }),
+				W('text', 12, 4, 250, 36, { text: c.name, light: true, bold: true, size: 'auto', valign: 'middle' }),
 				W('updated', 262, 12, 128, 20, { light: true, align: 'right', size: 's' }),
 				W('room_status', 10, 54, 380, 124, { free: 'Available', busy: 'In use', black: true, title: true, detail: true }),
 				W('text', 10, 188, 200, 20, { text: 'Today', bold: true, size: 's', valign: 'top' }),
 				W('events', 10, 210, 380, 84, { today: true, when: 'time', dots: true }),
 			],
-		}),
-	},
-	{
-		id: 'guest',
-		label: 'Guest welcome',
-		note: 'Wi-Fi QR code, house rules and check-out time',
-		build: () => ({
+		};
+	}
+	if (sign === 'guest') {
+		const c = cfg.guest;
+		return {
 			v: 1,
 			widgets: [
-				W('text', 10, 6, 380, 46, { text: 'Welcome, Sam!', bold: true, size: 'auto' }),
+				W('text', 10, 6, 380, 46, { text: c.title, bold: true, size: 'auto' }),
 				W('line', 10, 54, 380, 2),
-				W('qr', 10, 64, 150, 214, { mode: 'wifi', ssid: 'Guest Wi-Fi', pass: 'change-me', sec: 'WPA', details: true, caption: 'Scan to join Wi-Fi', bold: true }),
+				W('qr', 10, 64, 150, 214, { mode: 'wifi', ssid: c.ssid, pass: c.pass, sec: c.pass ? 'WPA' : 'nopass', details: true, caption: 'Scan to join Wi-Fi', bold: true }),
 				W('text', 176, 64, 214, 20, { text: 'House rules', bold: true, size: 's', valign: 'top' }),
-				W('list', 176, 88, 214, 134, { items: 'No smoking inside\nQuiet after 10pm\nBins go out on Tuesday\nLeave keys on the table', bullet: 'dot', size: 'auto' }),
-				W('text', 176, 230, 214, 40, { text: 'Check-out 10am', invert: true, bold: true, size: 'auto', align: 'center' }),
-				W('text', 10, 280, 380, 18, { text: 'Questions? Text Koda on 0400 000 000', size: 's', align: 'center' }),
+				W('list', 176, 88, 214, 134, { items: c.rules, bullet: 'dot', size: 'auto' }),
+				W('text', 176, 230, 214, 40, { text: c.checkout, invert: true, bold: true, size: 'auto', align: 'center' }),
+				W('text', 10, 280, 380, 18, { text: c.contact, size: 's', align: 'center' }),
 			],
-		}),
-	},
-	{
-		id: 'nameplate',
-		label: 'Desk name plate',
-		note: 'Your name, your role, and whether you\'re free',
-		build: () => ({
-			v: 1,
-			widgets: [
-				W('text', 10, 24, 380, 104, { text: 'Alex Koda', bold: true, size: 'auto', align: 'center' }),
-				W('text', 10, 130, 380, 30, { text: 'Hardware Engineer', size: 'm', align: 'center' }),
-				W('line', 120, 176, 160, 2),
-				W('room_status', 50, 192, 300, 92, { free: 'Available', busy: 'In a meeting', black: true, title: false, detail: true }),
-			],
-		}),
-	},
-];
-
-export function templateById(id: string): Template {
-	return TEMPLATES.find((t) => t.id === id) ?? TEMPLATES[0];
+		};
+	}
+	const c = cfg.nameplate;
+	return {
+		v: 1,
+		widgets: [
+			W('text', 10, 24, 380, 104, { text: c.name, bold: true, size: 'auto', align: 'center' }),
+			W('text', 10, 130, 380, 30, { text: c.role, size: 'm', align: 'center' }),
+			W('line', 120, 176, 160, 2),
+			W('room_status', 50, 192, 300, 92, { free: 'Available', busy: 'In a meeting', black: true, title: false, detail: true }),
+		],
+	};
 }

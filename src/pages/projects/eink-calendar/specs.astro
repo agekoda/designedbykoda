@@ -5,6 +5,7 @@
 import Layout from '../../../layouts/Layout.astro';
 import { EARLY_PRICES, STANDARD_PRICES, CURRENCIES } from '../../../data/preorderPricing';
 import { CALENDAR_STYLES } from '../../../data/calendarStyles';
+import drawing from '../../../assets/eink-calendar-drawing.svg?raw';
 
 const VERSION = '1.0';
 const UPDATED = '8 November 2026';
@@ -37,7 +38,9 @@ const SECTIONS: Section[] = [
 			['Resolution', '400 × 300 pixels'],
 			['Pixel density', '119 PPI'],
 			['Display type', 'ePaper (EPD)'],
-			['Colours', 'Black and white'],
+			['Grayscale', '2 levels'],
+			['Refresh time', '~2 seconds'],
+			['Viewing angle', '180°'],
 			['Partial refresh', 'Yes'],
 		],
 	},
@@ -48,11 +51,11 @@ const SECTIONS: Section[] = [
 			['Dimensions (W × H × D)', '95.8 × 93.8 × 19 mm'],
 			['Weight', '114 g'],
 			['Enclosure', 'Resin'],
-			['Colour', 'Black (White coming soon)'],
+			['Colour', 'Black, White'],
 			['Orientation', 'Landscape'],
-			['Mounting', 'Kickstand (29.5°), keyhole, adhesive strips'],
-			['Controls', '1 button'],
-			['Status LEDs', 'Charging, charged'],
+			['Mounting', 'Kickstand (30°), keyhole, adhesive strips'],
+			['Controls', 'Button'],
+			['Status LED', 'Charging, standby'],
 		],
 	},
 	{
@@ -64,6 +67,7 @@ const SECTIONS: Section[] = [
 			['Charging port', 'USB-C'],
 			['Charging time', '~2.5 hours'],
 			['Refresh', 'Daily, on button press, or scheduled'],
+			['Power consumption (sleep)', '~0.5 mW (estimated)'],
 		],
 	},
 	{
@@ -92,7 +96,7 @@ const SECTIONS: Section[] = [
 		id: 'software',
 		title: 'Software',
 		rows: [
-			['Calendar', 'Google Calendar (read-only)'],
+			['Calendar', 'Google Calendar'],
 			['Tasks', 'Google Tasks (optional)'],
 			['Layouts', `${layouts.length} built-in, plus your own design`],
 			['Schedules', 'By time and day'],
@@ -109,7 +113,7 @@ const SECTIONS: Section[] = [
 			['Communication', 'One-way (device-initiated only)'],
 			['Calendar access', 'Read-only'],
 			['Event storage', 'None'],
-			['Encryption', 'TLS (HTTPS)'],
+			['Encryption', 'TLS 1.2+'],
 		],
 	},
 	{
@@ -124,9 +128,9 @@ const SECTIONS: Section[] = [
 		id: 'box',
 		title: 'Package contents',
 		rows: [
-			['E-Ink Calendar (kickstand fitted)', '1'],
+			['E-Ink Calendar', '1'],
+			['Kickstand', '1'],
 			['Quick start guide', '1'],
-			['USB-C cable', 'Not included'],
 		],
 	},
 	{
@@ -170,7 +174,7 @@ const num = (i: number) => String(i).padStart(2, '0');
 			</div>
 		</header>
 
-		<!-- Drawing goes here once the front / side SVG from the 3D model is ready. -->
+		<figure class="drawing" set:html={drawing} />
 
 		{
 			SECTIONS.map((s, i) => (
@@ -232,15 +236,8 @@ const num = (i: number) => String(i).padStart(2, '0');
 	.sbtn:hover { opacity: 0.85; }
 
 	.drawing { margin: 2em 0 1em; padding: 1.2em; border: 1px solid var(--border); border-radius: 16px; background: var(--bg-raised); }
-	.drawing svg { display: block; width: 100%; max-width: 620px; margin: 0 auto; }
-	.ln rect, .ln circle, .ln path { fill: none; stroke: var(--fg); stroke-width: 1.6; }
-	.ln .scr { stroke-dasharray: 4 3; stroke-width: 1.2; }
-	.ln .dim { stroke: var(--muted); stroke-width: 1; }
-	.ln .stand { stroke-width: 3; stroke-linecap: round; }
-	.ln .ground { stroke: var(--muted-dim); stroke-dasharray: 2 4; }
-	.lbl { fill: var(--muted); font-size: 12px; text-anchor: middle; font-family: inherit; }
-	.lbl.l { text-anchor: start; }
-	.cap { fill: var(--fg); font-size: 12px; font-weight: 700; text-anchor: middle; letter-spacing: 0.08em; text-transform: uppercase; }
+	.drawing { color: var(--fg); }
+	.drawing :global(svg) { display: block; width: 100%; margin: 0 auto; }
 
 	.sec { padding: 1.8em 0 0.6em; border-bottom: 1px solid var(--border); }
 	.sec h2, .grp h3 { break-after: avoid; }

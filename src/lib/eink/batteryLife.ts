@@ -30,7 +30,7 @@ export interface UsageInput {
 function wakesFor(style: string, refreshSec: number, live: boolean): number {
 	let n = 1; // midnight
 	if (style === 'timeline' && refreshSec < 86400) n += Math.ceil((BATTERY.timelineHours * 3600) / refreshSec);
-	if (style === 'custom' && live) n += BATTERY.liveEdgesPerDay;
+	if ((style === 'custom' && live) || style === 'room' || style === 'nameplate') n += BATTERY.liveEdgesPerDay;
 	return n;
 }
 

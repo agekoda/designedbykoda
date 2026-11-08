@@ -9,7 +9,7 @@ import { isLang } from '../../../lib/eink/i18n';
 import { isTempUnit } from '../../../lib/eink/units';
 import { sanitizeSchedule } from '../../../lib/eink/schedule';
 import { markSaved } from '../../../lib/screens';
-import { sanitizeLayout } from '../../../lib/eink/builder/model';
+import { sanitizeLayout, sanitizeSign } from '../../../lib/eink/builder/model';
 export const prerender = false;
 
 const MAX_SRC = 280_000; // characters in the stored photo (a small JPEG data URL)
@@ -57,10 +57,12 @@ export async function GET({ request, locals }) {
 		unit = uq?.temp_unit === 'f' ? 'f' : 'c';
 	} catch {} // temp_unit comes from schema-screens.sql
 	let schedule: unknown = null;
+	let sign: unknown = sanitizeSign(null);
 	let screensReady = true;
 	let batteryAnchor: { mv: number; at: number } | null = null;
 	try {
-		const sq = await db.prepare('SELECT schedule, battery_anchor_mv, battery_anchor_at FROM devices WHERE id = ?').bind(deviceId).first();
+		const sq = await db.prepare('SELECT schedule, battery_anchor_mv, battery_anchor_at, sign_cfg FROM devices WHERE id = ?').bind(deviceId).first();
+		sign = sanitizeSign(sq?.sign_cfg);
 		schedule = sanitizeSchedule(sq?.schedule, isStyleId);
 		if (sq?.battery_anchor_mv && sq?.battery_anchor_at) batteryAnchor = { mv: sq.battery_anchor_mv, at: sq.battery_anchor_at };
 	} catch {
@@ -113,6 +115,7 @@ export async function GET({ request, locals }) {
 			lang,
 			unit,
 			schedule,
+			sign,
 			screensReady,
 			batteryAnchor,
 			refreshSec: isRefreshSec(dev.refresh_interval_sec) ? dev.refresh_interval_sec : 86400,
@@ -236,6 +239,13 @@ export async function POST({ request, locals }) {
 			await db.prepare('UPDATE devices SET language = ? WHERE id = ? AND user_id = ?').bind(body.lang, deviceId, o.userId).run();
 		} catch {
 			return json({ error: 'Language is not enabled on the server yet (run schema-language.sql).' }, 500);
+		}
+	}
+	if (body.sign !== undefined) {
+		try {
+			await db.prepare('UPDATE devices SET sign_cfg = ? WHERE id = ? AND user_id = ?').bind(JSON.stringify(sanitizeSign(body.sign)), deviceId, o.userId).run();
+		} catch {
+			return json({ error: 'These layouts need a one-off database update on the server (schema-screens.sql).' }, 500);
 		}
 	}
 	if (body.schedule !== undefined) {
