@@ -832,6 +832,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		customStatus.textContent = nW ? `Your design has ${nW} widget${nW === 1 ? '' : 's'}.` : 'You haven\u2019t designed a screen yet.';
 		customOpen.textContent = nW ? 'Edit your design' : 'Start designing';
 		customOpen.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId);
+		customOpen.dataset.builder = '1';
 		if (cdTitle.value !== st.countdown.title) cdTitle.value = st.countdown.title;
 		if (cdDate.value !== st.countdown.date) cdDate.value = st.countdown.date;
 		todoStatus.textContent = tasksGranted ? 'Google Tasks is connected.' : 'To show your tasks, allow this calendar to read your Google Tasks.';
@@ -876,6 +877,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			});
 		}
 		signBuilder.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId) + '&seed=1';
+		signBuilder.dataset.builder = '1';
 	}
 	signFields.addEventListener('input', (e) => {
 		const el = e.target as HTMLInputElement | HTMLTextAreaElement;
@@ -885,14 +887,28 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		schedule(false);
 		changed();
 	});
-	// The builder picks this up (seed=1) and starts from this layout, filled in, as unsaved changes.
-	signBuilder.addEventListener('click', () => {
+	// Opening the builder. Choosing a layout counts as an unsaved change, and asking "Save your
+	// changes?" on the way to the builder made no sense to people (they hadn't typed anything), so
+	// these buttons just save what's chosen and go. From a sign layout, the builder opens with that
+	// layout filled in (seed=1 picks it up from sessionStorage).
+	async function openBuilder(e: Event, fromSign: boolean) {
+		e.preventDefault();
 		const id = fs();
-		if (!isSignStyle(id)) return;
-		try {
-			sessionStorage.setItem('builderSeed:' + deviceId, JSON.stringify({ label: labelOf(id), layout: signLayout(id, sanitizeSign(st.sign)) }));
-		} catch {}
-	});
+		const seed = fromSign && isSignStyle(id);
+		if (seed) {
+			try {
+				sessionStorage.setItem('builderSeed:' + deviceId, JSON.stringify({ label: labelOf(id), layout: signLayout(id, sanitizeSign(st.sign)) }));
+			} catch {}
+		}
+		if (isDirty()) {
+			await save();
+			if (isDirty()) return; // save() has already said what went wrong
+		}
+		skipUnload = true;
+		location.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId) + (seed ? '&seed=1' : '');
+	}
+	signBuilder.addEventListener('click', (e) => openBuilder(e, true));
+	customOpen.addEventListener('click', (e) => openBuilder(e, false));
 
 	// ---------------------------------------------------------------- schedule
 	const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday first
@@ -1223,7 +1239,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		'click',
 		(e) => {
 			const a = (e.target as HTMLElement).closest('a[href]') as HTMLAnchorElement | null;
-			if (!a || !isDirty() || a.target === '_blank' || a.href.startsWith('javascript:') || a.href.includes('#')) return;
+			if (!a || !isDirty() || a.dataset.builder || a.target === '_blank' || a.href.startsWith('javascript:') || a.href.includes('#')) return;
 			e.preventDefault();
 			e.stopPropagation();
 			leaveTo = a.href;
