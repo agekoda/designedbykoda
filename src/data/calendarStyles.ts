@@ -11,6 +11,7 @@ export interface CalendarStyle {
 	corner?: boolean; // has a spot that can show a picture instead of the mini calendar
 	frame?: boolean; // the picture fills the whole screen (Photo frame)
 	builder?: boolean; // the person's own design from the layout builder
+	sign?: boolean; // a sign (meeting room, guest welcome, name plate): a few words to fill in, editable in the builder
 	setup?: boolean; // false = not offered on the setup page, so the first setup stays uncluttered with just the six original layouts (everything else is chosen later in Customize display)
 }
 
@@ -29,6 +30,9 @@ export const CALENDAR_STYLES: CalendarStyle[] = [
 	{ id: 'month', label: 'Month', note: 'The whole month, with marks on busy days', image: '/images/polls/eink-styles/month.png', imageDark: '/images/polls/eink-styles/month-dark.png', view: 4 },
 	{ id: 'bigdate', label: 'Big date', note: 'A huge date beside an upcoming list', image: '/images/polls/eink-styles/bigdate.png', imageDark: '/images/polls/eink-styles/bigdate-dark.png', view: 5 },
 	{ id: 'week', label: 'Week', note: 'This week, day by day', image: '/images/polls/eink-styles/week.png', imageDark: '/images/polls/eink-styles/week-dark.png', view: 6 },
+	{ id: 'room', label: 'Meeting room', note: 'Free or in use, and today\'s bookings', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 16, sign: true, setup: false },
+	{ id: 'guest', label: 'Guest welcome', note: 'Wi-Fi QR code, house rules and check-out', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 17, sign: true, setup: false },
+	{ id: 'nameplate', label: 'Desk name plate', note: 'Your name, role, and if you\'re free', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 18, sign: true, setup: false },
 	{ id: 'custom', label: 'Your own design', note: 'Drag, drop and resize widgets in the layout builder', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 14, builder: true, setup: false },
 ];
 

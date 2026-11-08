@@ -1342,6 +1342,22 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		hist = [ser()];
 		hi = 0;
 		savedKey = key();
+		// "Edit the layout in the builder" on Customize display: start from that layout, filled in,
+		// as an unsaved change (so Undo goes back to the saved design, and nothing changes until Save).
+		if (new URLSearchParams(location.search).get('seed') === '1') {
+			try {
+				const k = 'builderSeed:' + deviceId;
+				const seed = JSON.parse(sessionStorage.getItem(k) || 'null');
+				sessionStorage.removeItem(k);
+				if (seed?.layout) {
+					layout = sanitizeLayout(seed.layout);
+					commit();
+					banner.hidden = false;
+					banner.textContent = `Started from your ${seed.label || 'layout'}. Save to make it your own design.`;
+				}
+			} catch {}
+			history.replaceState(null, '', '/dashboard/builder?device=' + encodeURIComponent(deviceId));
+		}
 		everything();
 		fonts = await loadFonts().catch(() => null);
 		redraw();

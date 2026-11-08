@@ -22,6 +22,11 @@ import { frame } from './frame';
 import { todo } from './todo';
 import { custom } from './custom';
 import { planner } from './planner';
+import { renderCustom } from '../builder/render';
+import { sanitizeLayout, sanitizeSign, signLayout, type SignStyle } from '../builder/model';
+
+// Meeting room, Guest welcome and Desk name plate: a builder design filled in from a few words.
+const sign = (s: SignStyle) => (ctx: LayoutCtx) => renderCustom({ ...ctx, custom: sanitizeLayout(signLayout(s, sanitizeSign(ctx.sign))) });
 
 interface LayoutEntry {
 	render: (ctx: LayoutCtx) => string;
@@ -42,6 +47,9 @@ export const LAYOUTS: Record<string, LayoutEntry> = {
 	todo: { render: todo, font: 'sans' },
 	custom: { render: custom, font: 'sans' },
 	planner: { render: planner, font: 'sans' },
+	room: { render: sign('room'), font: 'sans' },
+	guest: { render: sign('guest'), font: 'sans' },
+	nameplate: { render: sign('nameplate'), font: 'sans' },
 };
 
 // The font a layout uses when nothing else is chosen.

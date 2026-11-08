@@ -25,6 +25,8 @@ cameraOrbit: "180deg 25deg 120%"
 
 A low-power e-ink display that syncs with Google Calendar, built for months of unattended battery life. Mount it on the wall or leave it on a desk, and it shows your upcoming events at a glance, without needing to unlock your phone.
 
+[See the full spec sheet →](/projects/eink-calendar/specs)
+
 ## Make it yours
 
 Pick from five layouts: Agenda, Month, Big date, Week and Next up. Each one shows your schedule differently, so you can choose whichever suits the spot it lives in. There's also a dark mode if you'd rather have white on black.
