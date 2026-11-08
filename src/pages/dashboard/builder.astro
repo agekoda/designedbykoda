@@ -1352,7 +1352,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				const k = 'builderSeed:' + deviceId;
 				const seed = JSON.parse(sessionStorage.getItem(k) || 'null');
 				sessionStorage.removeItem(k);
-				if (seed?.layout) {
+				// Already have a design? Ask before swapping it (Undo would bring it back, but people shouldn't have to know that).
+				const use = seed?.layout && (!layout.widgets.length || (await ask(`Your current design is replaced when you save. You can still undo it.`, { title: `Start from your ${seed.label || 'layout'} instead?`, ok: `Use ${seed.label || 'it'}`, cancel: 'Keep my design' })));
+				if (use) {
 					layout = sanitizeLayout(seed.layout);
 					commit();
 					banner.hidden = false;
