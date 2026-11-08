@@ -107,7 +107,7 @@ if (!userId) return Astro.redirect('/setup');
 			// days left: from real use once there's enough of it, else from the settings
 			const real = measured(d.batteryAnchorMv, d.batteryAnchorAt, d.batteryMv, d.batteryAt);
 			const live = (d.style === 'custom' && layoutNeeds(d.custom).live) || d.style === 'room' || d.style === 'nameplate';
-			const left = real ? real.left : (estimate({ style: d.style, refreshSec: d.refreshIntervalSec, schedule: d.schedule, live }) * pct) / 100;
+			const left = real ? real.left : (estimate({ style: d.style, refreshSec: d.refreshIntervalSec, schedule: d.schedule, live, msgCheck: d.msgCheck }) * pct) / 100;
 			const leftText = needs ? ' · Needs charging' : pct >= 99 && !real ? '' : ` · ${lifeText(left)} left`;
 			battery = `<span class="sep">·</span><span class="batt${needs ? ' needs' : ''}" title="Battery level${d.batteryAt ? ', ' + ago(d.batteryAt) : ''}${real ? '. Time left is from how fast it has actually been using its battery.' : '. Time left is an estimate from its settings.'}"><span class="batt-icon ${pct < 20 ? 'low' : ''}"><i style="width:${Math.max(6, pct)}%"></i></span>${pct}%${leftText}</span>`;
 		}
@@ -119,6 +119,7 @@ if (!userId) return Astro.redirect('/setup');
 				<div class="dev-meta">${status}${paired ? `<span class="sep">·</span>Paired ${paired}` : ''}${battery}</div>
 
 					<a class="btn customize" href="/dashboard/display?device=${encodeURIComponent(d.id)}">Customize display</a>
+					<a class="btn ghost customize" href="/dashboard/messages?device=${encodeURIComponent(d.id)}">Messages${d.msgCount ? ` <span class="msg-count">${d.msgCount}</span>` : ''}</a>
 					<p class="muted small cust-hint">Layout, font, dark mode and the Agenda picture. See changes live before you save.</p>
 
 				<div class="label">Calendars</div>
@@ -316,6 +317,8 @@ if (!userId) return Astro.redirect('/setup');
 	.dash .dev-preview-cap { position: absolute; left: 8px; bottom: 8px; font-size: 0.7em; letter-spacing: 0.1em; text-transform: uppercase; background: rgba(0,0,0,0.65); color: #fff; padding: 0.2em 0.6em; border-radius: 999px; opacity: 0; transition: opacity 0.2s; }
 	.dash .dev-preview:hover .dev-preview-cap { opacity: 1; }
 	.dash .customize { margin-top: 1.1em; }
+	.dash .customize + .customize { margin-left: 0.5em; }
+	.dash .msg-count { display: inline-block; min-width: 1.4em; margin-left: 0.35em; padding: 0 0.4em; border-radius: 999px; background: var(--accent); color: var(--bg); font-size: 0.8em; line-height: 1.5; text-align: center; }
 	.dash .cust-hint { margin-top: 0.6em; }
 	.dash .batt { display: inline-flex; align-items: center; gap: 0.4em; }
 	.dash .batt.needs { color: #d9a441; }

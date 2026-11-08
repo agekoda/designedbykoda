@@ -1,0 +1,454 @@
+---
+// The message board for one calendar: send a message, see and remove what's on it, share a link
+// so family can send messages from their phone, and choose how messages show.
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+import { getSessionUserId } from '../../lib/session';
+import { CHECK_CHOICES, EXPIRY_CHOICES, MAX_BODY, MAX_AUTHOR } from '../../lib/messages';
+
+const db = Astro.locals.runtime?.env?.DB;
+const userId = db ? await getSessionUserId(Astro.request, db) : null;
+if (!userId) return Astro.redirect('/setup');
+const deviceId = Astro.url.searchParams.get('device') ?? '';
+---
+
+<Layout title="Messages — designedbykoda" description="Send messages to your E-Ink Calendar." noindex>
+	<div class="msgs" data-device={deviceId} data-checks={JSON.stringify(CHECK_CHOICES)}>
+		<div class="topbar">
+			<div class="tb-left">
+				<a class="back" href="/dashboard">← My devices</a>
+				<div class="title" id="title">Messages</div>
+			</div>
+			<a class="btn ghost small" id="to-display" href="#">Customize display</a>
+		</div>
+		<p class="banner" id="banner" hidden></p>
+
+		<div class="stage">
+			<div class="left">
+				<div class="screen-wrap"><canvas id="screen" width="675" height="506" aria-label="How your calendar will look"></canvas></div>
+				<p class="muted small cap" id="cap"></p>
+			</div>
+
+			<div class="right">
+				<section class="card">
+					<h2>Send a message</h2>
+					<label class="fld">
+						<textarea class="txt" id="text" rows="3" maxlength={MAX_BODY} placeholder="Dinner at 7, love Mum"></textarea>
+						<span class="count" id="count">0 / {MAX_BODY}</span>
+					</label>
+					<div class="row2">
+						<label class="fld"><span class="lab">From</span><input class="txt" id="author" maxlength={MAX_AUTHOR} placeholder="Your name (optional)" autocomplete="nickname" /></label>
+						<label class="fld"><span class="lab">Shows for</span>
+							<select class="txt" id="expires">
+								{EXPIRY_CHOICES.map((c) => <option value={c.id} selected={c.id === 'tonight'}>{c.label}</option>)}
+							</select>
+						</label>
+					</div>
+					<div class="actions">
+						<button type="button" class="btn" id="send" disabled>Send</button>
+						<span class="note" id="send-note" aria-live="polite"></span>
+					</div>
+					<p class="muted small" id="when"></p>
+				</section>
+
+				<section class="card">
+					<div class="head-row">
+						<h2>On the calendar</h2>
+						<button type="button" class="link" id="clear" hidden>Remove all</button>
+					</div>
+					<ul class="list" id="list"></ul>
+				</section>
+
+				<section class="card">
+					<h2>Let family send messages</h2>
+					<div id="link-off">
+						<p class="muted small">Make a private link. Anyone you give it to can send messages from their phone, with no account. You can turn it off or make a new one at any time.</p>
+						<button type="button" class="btn small" id="link-make">Make a link</button>
+					</div>
+					<div id="link-on" hidden>
+						<div class="link-box">
+							<canvas id="qr" width="132" height="132" aria-label="QR code for the link"></canvas>
+							<div class="link-side">
+								<input class="txt mono" id="link" readonly />
+								<div class="actions">
+									<button type="button" class="btn small" id="link-copy">Copy link</button>
+									<button type="button" class="btn small ghost" id="link-share" hidden>Share</button>
+								</div>
+								<p class="muted small">Scan the code or send the link. Messages from it last until midnight, an hour, a day or a week; only you can pin one until removed.</p>
+							</div>
+						</div>
+						<div class="actions">
+							<button type="button" class="link" id="link-new">Make a new link (the old one stops working)</button>
+							<button type="button" class="link" id="link-stop">Turn the link off</button>
+						</div>
+					</div>
+				</section>
+
+				<section class="card">
+					<h2>How messages show</h2>
+					<div class="seg wrap3" id="show" role="radiogroup" aria-label="How messages show">
+						<label><input type="radio" name="show" value="banner" /><span>Banner at the bottom</span></label>
+						<label><input type="radio" name="show" value="full" /><span>Whole screen</span></label>
+						<label><input type="radio" name="show" value="off" /><span>Only on the Message board</span></label>
+					</div>
+					<p class="muted small hint" id="show-hint"></p>
+					<div class="lab" style="margin-top:1.3em">Check for new messages</div>
+					<div class="seg wrap2" id="check" role="radiogroup" aria-label="How often it checks for new messages"></div>
+					<p class="muted small hint" id="check-hint"></p>
+				</section>
+			</div>
+		</div>
+	</div>
+</Layout>
+
+<script>
+	import { renderPreview, paintScreen } from '../../lib/eink/previewKit';
+	import { qrMatrix, qrBits } from '../../lib/eink/qr';
+	import { estimate, lifeText } from '../../lib/eink/batteryLife';
+	import { layoutNeeds } from '../../lib/eink/builder/model';
+	import { CALENDAR_STYLES } from '../../data/calendarStyles';
+	import { DAY_FROM, DAY_TO, secondsToNextCheck } from '../../lib/messages';
+
+	const root = document.querySelector('.msgs') as HTMLElement;
+	const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+	let deviceId = root.dataset.device || '';
+	const checks: { sec: number; label: string }[] = JSON.parse(root.dataset.checks!);
+
+	const text = $<HTMLTextAreaElement>('text');
+	const author = $<HTMLInputElement>('author');
+	const expires = $<HTMLSelectElement>('expires');
+	const send = $<HTMLButtonElement>('send');
+	const sendNote = $('send-note');
+	const list = $('list');
+	const banner = $('banner');
+	const showEl = $('show');
+	const checkEl = $('check');
+
+	interface M { id: string; author: string; body: string; createdAt: number; expiresAt: number | null; via: string }
+	let msgs: M[] = [];
+	let cfg = { show: 'banner', check: 0 };
+	let dev: any = null; // this calendar, from the devices list (layout, picture, etc.) for the preview
+	let typing = ''; // what's in the box, previewed as if sent
+
+	const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+	const pad2 = (n: number) => String(n).padStart(2, '0');
+	const clock = (unix: number) => {
+		const d = new Date(unix * 1000);
+		return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+	};
+	const ago = (unix: number) => {
+		const s = Math.floor(Date.now() / 1000) - unix;
+		if (s < 60) return 'just now';
+		if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+		const d = new Date(unix * 1000);
+		return new Date().toDateString() === d.toDateString() ? clock(unix) : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + clock(unix);
+	};
+	const until = (m: M) => {
+		if (m.expiresAt === null) return 'until removed';
+		const d = new Date(m.expiresAt * 1000);
+		const sameDay = new Date().toDateString() === new Date(m.expiresAt * 1000 - 1000).toDateString();
+		if (d.getHours() === 0 && d.getMinutes() === 0 && sameDay) return 'until midnight';
+		return 'until ' + (new Date().toDateString() === d.toDateString() ? clock(m.expiresAt) : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + clock(m.expiresAt));
+	};
+
+	async function api(body: any) {
+		const r = await fetch('/api/dashboard/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceId, ...body }) });
+		const d = await r.json().catch(() => ({}));
+		if (!r.ok || d.error) throw new Error(d.error || 'Something went wrong.');
+		return d;
+	}
+
+	// ---------------------------------------------------------------- preview
+	let pending = false;
+	function redraw() {
+		if (pending) return;
+		pending = true;
+		requestAnimationFrame(async () => {
+			pending = false;
+			if (!dev) return;
+			const nowS = Math.floor(Date.now() / 1000);
+			const off = -new Date().getTimezoneOffset() * 60;
+			const shown = [...(typing.trim() ? [{ author: author.value.trim(), body: typing.trim(), atLocal: nowS + off }] : []), ...msgs.map((m) => ({ author: m.author, body: m.body, atLocal: m.createdAt + off }))];
+			const style = cfg.show === 'full' && shown.length ? 'messages' : dev.shownStyle ?? dev.style;
+			let frameImage: Uint8Array | null = null;
+			let cornerImage: Uint8Array | null = null;
+			try {
+				if (dev.frameBits && style === 'frame') frameImage = Uint8Array.from(atob(dev.frameBits), (c) => c.charCodeAt(0));
+				if (dev.cornerBits) cornerImage = Uint8Array.from(atob(dev.cornerBits), (c) => c.charCodeAt(0));
+			} catch {}
+			try {
+				const r = await renderPreview({
+					style, unit: dev.unit, font: dev.font, dark: !!dev.dark, hasWeather: !!dev.location, vbat: dev.batteryMv ? dev.batteryMv / 1000 : null,
+					cornerImage, frameImage, refreshSec: style === 'timeline' ? dev.refreshIntervalSec : 86400,
+					loc: dev.location ? { lat: dev.location.lat, lon: dev.location.lon } : null, countdown: dev.countdown ?? null,
+					custom: style === 'custom' ? dev.custom ?? null : null, sign: dev.sign ?? null,
+					messages: shown, msgBanner: cfg.show === 'banner',
+				} as any);
+				const canvas = $<HTMLCanvasElement>('screen');
+				const dpr = window.devicePixelRatio || 1;
+				const k = Math.max(1, Math.floor(((canvas.parentElement as HTMLElement).clientWidth * dpr) / 675));
+				paintScreen(canvas, r.px, { mode: 'device', scale: k });
+				canvas.style.width = canvas.width / dpr + 'px';
+			} catch {}
+			const label = CALENDAR_STYLES.find((s) => s.id === style)?.label ?? 'your layout';
+			$('cap').textContent = typing.trim() ? 'Preview, with the message you’re typing.' : shown.length ? `How it looks now, on ${label}.` : `No messages yet. This is ${label}.`;
+		});
+	}
+
+	// ---------------------------------------------------------------- the list
+	function renderList() {
+		list.innerHTML = msgs.length
+			? msgs
+					.map(
+						(m) => `<li><div class="m-body">${esc(m.body)}</div><div class="m-meta">${m.author ? `<b>${esc(m.author)}</b> · ` : ''}${ago(m.createdAt)}${m.via === 'link' ? ' · from the link' : ''} · ${until(m)}</div><button type="button" class="m-del" data-id="${m.id}" aria-label="Remove this message">&times;</button></li>`
+					)
+					.join('')
+			: '<li class="empty muted small">Nothing on the calendar right now.</li>';
+		$('clear').hidden = msgs.length < 2;
+	}
+	list.addEventListener('click', async (e) => {
+		const b = (e.target as HTMLElement).closest<HTMLElement>('.m-del');
+		if (!b) return;
+		try {
+			await api({ action: 'remove', id: b.dataset.id });
+			msgs = msgs.filter((m) => m.id !== b.dataset.id);
+			renderList();
+			redraw();
+		} catch (err: any) {
+			flash(err.message, true);
+		}
+	});
+	$('clear').addEventListener('click', async () => {
+		if (!confirm('Remove every message from the calendar?')) return;
+		await api({ action: 'clear' }).catch(() => {});
+		msgs = [];
+		renderList();
+		redraw();
+	});
+
+	// ---------------------------------------------------------------- sending
+	function flash(t: string, err = false) {
+		sendNote.textContent = t;
+		sendNote.classList.toggle('is-error', err);
+	}
+	const syncSend = () => {
+		$('count').textContent = `${text.value.length} / ${text.maxLength}`;
+		send.disabled = !text.value.trim();
+	};
+	text.addEventListener('input', () => {
+		typing = text.value;
+		syncSend();
+		redraw();
+	});
+	author.addEventListener('input', () => {
+		try {
+			localStorage.setItem('msgAuthor', author.value);
+		} catch {}
+		if (typing) redraw();
+	});
+	try {
+		author.value = localStorage.getItem('msgAuthor') ?? '';
+	} catch {}
+	text.addEventListener('keydown', (e) => {
+		if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !send.disabled) send.click();
+	});
+	send.addEventListener('click', async () => {
+		send.disabled = true;
+		flash('Sending…');
+		try {
+			await api({ action: 'send', text: text.value, author: author.value, expires: expires.value });
+			text.value = '';
+			typing = '';
+			syncSend();
+			await load();
+			flash('Sent.');
+		} catch (err: any) {
+			flash(err.message, true);
+			syncSend();
+		}
+	});
+
+	// when will it show up?
+	function whenText() {
+		const now = new Date();
+		const local = Math.floor(now.getTime() / 1000) - now.getTimezoneOffset() * 60;
+		const s = secondsToNextCheck(cfg.check, local);
+		if (!cfg.check || s === null) return 'It shows the next time the calendar updates (at midnight, or when someone presses its button). Press the button to see it now.';
+		const at = new Date(now.getTime() + s * 1000);
+		return `It shows when the calendar next checks, at about ${pad2(at.getHours())}:${pad2(at.getMinutes())}${at.getDate() !== now.getDate() ? ' tomorrow' : ''}. Press its button to see it now.`;
+	}
+
+	// ---------------------------------------------------------------- the shared link
+	function setLink(url: string | null) {
+		$('link-off').hidden = !!url;
+		$('link-on').hidden = !url;
+		if (!url) return;
+		$<HTMLInputElement>('link').value = url;
+		$('link-share').hidden = !navigator.share;
+		const m = qrMatrix(url);
+		const c = $<HTMLCanvasElement>('qr');
+		const ctx = c.getContext('2d')!;
+		ctx.fillStyle = '#fff';
+		ctx.fillRect(0, 0, c.width, c.height);
+		if (!m) return;
+		const scale = Math.floor(c.width / (m.size + 4));
+		const { w, bytes } = qrBits(m, scale);
+		const off = Math.floor((c.width - w) / 2);
+		const stride = Math.ceil(w / 8);
+		ctx.fillStyle = '#000';
+		for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) if (bytes[y * stride + (x >> 3)] & (0x80 >> (x & 7))) ctx.fillRect(off + x, off + y, 1, 1);
+	}
+	$('link-make').addEventListener('click', async () => setLink((await api({ action: 'link', on: true }).catch((e) => (flash(e.message, true), {} as any))).link ?? null));
+	$('link-new').addEventListener('click', async () => {
+		if (!confirm('Make a new link? The old one stops working, so anyone using it will need the new one.')) return;
+		setLink((await api({ action: 'link', on: true })).link);
+	});
+	$('link-stop').addEventListener('click', async () => {
+		if (!confirm('Turn the link off? Nobody will be able to send messages with it.')) return;
+		await api({ action: 'link', on: false });
+		setLink(null);
+	});
+	$('link-copy').addEventListener('click', async () => {
+		try {
+			await navigator.clipboard.writeText($<HTMLInputElement>('link').value);
+			$('link-copy').textContent = 'Copied';
+			setTimeout(() => ($('link-copy').textContent = 'Copy link'), 1500);
+		} catch {
+			$<HTMLInputElement>('link').select();
+		}
+	});
+	$('link-share').addEventListener('click', () => navigator.share?.({ title: 'Send a message to our calendar', url: $<HTMLInputElement>('link').value }).catch(() => {}));
+
+	// ---------------------------------------------------------------- settings
+	checkEl.innerHTML = checks.map((c) => `<label><input type="radio" name="check" value="${c.sec}" /><span>${c.label}</span></label>`).join('');
+	const SHOW_HINTS: Record<string, string> = {
+		banner: 'The newest message sits in a strip along the bottom of whatever layout is showing.',
+		full: 'While there are messages, the calendar shows the Message board instead of its layout.',
+		off: 'Messages only show on the Message board layout, or a Messages widget in your own design.',
+	};
+	function syncSettings() {
+		showEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === cfg.show));
+		checkEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = +i.value === cfg.check));
+		$('show-hint').textContent = SHOW_HINTS[cfg.show];
+		const live = dev ? (dev.style === 'custom' && layoutNeeds(dev.custom).live) || dev.style === 'room' || dev.style === 'nameplate' : false;
+		const life = dev ? lifeText(estimate({ style: dev.style, refreshSec: dev.refreshIntervalSec, schedule: dev.schedule, live, msgCheck: cfg.check })) : '';
+		$('check-hint').textContent = (cfg.check ? `Only between ${DAY_FROM}am and ${DAY_TO - 12}pm, so it sleeps overnight. ` : 'It still picks up messages at midnight and whenever it wakes for anything else. ') + (life ? `With this, a full charge lasts ${life}.` : '');
+		$('when').textContent = whenText();
+	}
+	async function saveSettings() {
+		syncSettings();
+		redraw();
+		await api({ action: 'settings', cfg }).catch((e) => flash(e.message, true));
+	}
+	showEl.addEventListener('change', (e) => {
+		cfg = { ...cfg, show: (e.target as HTMLInputElement).value };
+		saveSettings();
+	});
+	checkEl.addEventListener('change', (e) => {
+		cfg = { ...cfg, check: +(e.target as HTMLInputElement).value };
+		saveSettings();
+	});
+
+	// ---------------------------------------------------------------- start
+	async function load() {
+		const d = await (await fetch('/api/dashboard/messages?deviceId=' + encodeURIComponent(deviceId))).json();
+		if (d.error) {
+			$('title').textContent = d.error;
+			return;
+		}
+		if (!d.ready) {
+			banner.hidden = false;
+			banner.textContent = 'Messages need a one-off database update on the server (schema-messages.sql) before they can be sent.';
+		}
+		$('title').textContent = d.name ? `Messages · ${d.name}` : 'Messages';
+		msgs = d.messages ?? [];
+		cfg = d.cfg ?? cfg;
+		setLink(d.link);
+		renderList();
+		syncSettings();
+		redraw();
+	}
+	(async () => {
+		const devs = await (await fetch('/api/dashboard/devices')).json().catch(() => ({ devices: [] }));
+		if (!deviceId) deviceId = devs.devices?.[0]?.id ?? '';
+		dev = (devs.devices ?? []).find((x: any) => x.id === deviceId) ?? null;
+		$<HTMLAnchorElement>('to-display').href = '/dashboard/display?device=' + encodeURIComponent(deviceId);
+		await load();
+		syncSend();
+	})();
+	let lastW = 0;
+	window.addEventListener('resize', () => {
+		const w = (($('screen').parentElement as HTMLElement).clientWidth * (window.devicePixelRatio || 1)) | 0;
+		if (w !== lastW) (lastW = w), redraw();
+	});
+</script>
+
+<style is:global>
+	.msgs { position: relative; left: 50%; width: min(1300px, 100vw - 3em); transform: translateX(-50%); margin-top: -1.8em; padding: 0.6em 0 3em; }
+	.msgs .muted { color: var(--muted); margin: 0; }
+	.msgs .small { font-size: 0.88em; }
+	.msgs .banner { background: rgba(217, 164, 65, 0.12); border: 1px solid #d9a441; border-radius: 12px; padding: 0.8em 1em; margin: 0 0 1.2em; font-size: 0.92em; }
+	.msgs .topbar { display: flex; align-items: center; justify-content: space-between; gap: 1em; flex-wrap: wrap; padding: 0.7em 0.8em 0.7em 1.3em; margin-bottom: 1.4em; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 18px; }
+	.msgs .tb-left { display: flex; align-items: baseline; gap: 1.2em; min-width: 0; flex-wrap: wrap; }
+	.msgs .back { color: var(--muted); text-decoration: none; font-size: 0.9em; }
+	.msgs .back:hover { color: var(--fg); }
+	.msgs .title { font-size: 1.5em; font-weight: 800; }
+	.msgs .stage { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 2em; align-items: start; }
+	.msgs .left { position: sticky; top: 1.2em; }
+	.msgs .screen-wrap { border-radius: 14px; overflow: hidden; }
+	.msgs #screen { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+	.msgs .cap { text-align: center; margin-top: 0.6em; }
+	.msgs .card { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; padding: 1.2em 1.3em; margin-bottom: 1em; }
+	.msgs h2 { font-size: 1.05em; margin: 0 0 0.8em; }
+	.msgs .head-row { display: flex; justify-content: space-between; align-items: baseline; }
+	.msgs .fld { display: block; position: relative; }
+	.msgs .lab { display: block; font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.45em; }
+	.msgs .txt { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 12px; padding: 0.7em 0.9em; font: inherit; }
+	.msgs textarea.txt { resize: vertical; font-size: 1.05em; line-height: 1.4; }
+	.msgs .txt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.msgs .txt.mono { font-family: ui-monospace, Menlo, monospace; font-size: 0.82em; }
+	.msgs .count { position: absolute; right: 0.8em; bottom: 0.6em; font-size: 0.75em; color: var(--muted-dim); }
+	.msgs .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8em; margin-top: 0.9em; }
+	.msgs .actions { display: flex; align-items: center; gap: 0.8em; flex-wrap: wrap; margin: 0.9em 0 0.6em; }
+	.msgs .note { font-size: 0.88em; color: var(--muted); }
+	.msgs .note.is-error { color: #e08a8a; }
+	.msgs .btn { display: inline-block; padding: 0.65em 1.5em; border: 1px solid transparent; border-radius: 999px; background: var(--fg); color: var(--bg); font: inherit; font-weight: 700; font-size: 0.95em; text-decoration: none; cursor: pointer; }
+	.msgs .btn:hover:not(:disabled) { background: var(--accent); }
+	.msgs .btn:disabled { opacity: 0.45; cursor: default; }
+	.msgs .btn.small { padding: 0.45em 1.1em; font-size: 0.85em; }
+	.msgs .btn.ghost { background: transparent; color: var(--muted); border-color: var(--border); }
+	.msgs .btn.ghost:hover { color: var(--fg); border-color: var(--muted); background: transparent; }
+	.msgs .link { background: none; border: none; padding: 0; font: inherit; font-size: 0.86em; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+	.msgs .link:hover { color: var(--fg); }
+	.msgs .link[hidden], .msgs [hidden] { display: none !important; }
+	.msgs .list { list-style: none; margin: 0; padding: 0; }
+	.msgs .list li { position: relative; padding: 0.7em 2.2em 0.7em 0; border-top: 1px solid var(--border); }
+	.msgs .list li:first-child { border-top: none; }
+	.msgs .list li.empty { padding: 0.2em 0; }
+	.msgs .m-body { line-height: 1.4; overflow-wrap: anywhere; }
+	.msgs .m-meta { font-size: 0.8em; color: var(--muted); margin-top: 0.25em; }
+	.msgs .m-meta b { color: var(--fg); }
+	.msgs .m-del { position: absolute; right: 0; top: 0.55em; background: none; border: none; color: var(--muted); font-size: 1.4em; line-height: 1; cursor: pointer; }
+	.msgs .m-del:hover { color: var(--fg); }
+	.msgs .link-box { display: flex; gap: 1em; align-items: center; }
+	.msgs #qr { flex: 0 0 auto; width: 132px; height: 132px; border-radius: 10px; image-rendering: pixelated; }
+	.msgs .link-side { flex: 1; min-width: 0; }
+	.msgs .link-side .actions { margin: 0.6em 0; }
+	.msgs input[type='radio'] { position: absolute; opacity: 0; pointer-events: none; }
+	.msgs .seg { display: grid; gap: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 3px; }
+	.msgs .seg.wrap3 { grid-template-columns: repeat(3, 1fr); }
+	.msgs .seg.wrap2 { grid-template-columns: repeat(2, 1fr); }
+	.msgs .seg label span { display: flex; align-items: center; justify-content: center; height: 100%; box-sizing: border-box; padding: 0.5em 0.6em; border-radius: 13px; font-size: 0.85em; font-weight: 600; text-align: center; color: var(--muted); cursor: pointer; }
+	.msgs .seg input:checked + span { background: var(--fg); color: var(--bg); }
+	.msgs .seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.msgs .hint { margin-top: 0.6em; line-height: 1.45; }
+	@media (max-width: 900px) {
+		.msgs .stage { grid-template-columns: 1fr; }
+		.msgs .left { position: static; }
+	}
+	@media (max-width: 520px) {
+		.msgs .row2, .msgs .seg.wrap3 { grid-template-columns: 1fr; }
+		.msgs .link-box { flex-direction: column; align-items: stretch; }
+		.msgs #qr { align-self: center; }
+	}
+</style>

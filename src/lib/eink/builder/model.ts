@@ -338,6 +338,19 @@ export const WIDGETS: Record<string, WidgetDef> = {
 		min: { w: 120, h: 34 },
 		opts: [{ key: 'dots', label: 'Dotted lines between', kind: 'toggle', def: true }, { key: 'done', label: 'Show finished tasks', kind: 'toggle', def: true }],
 	},
+	messages: {
+		label: 'Messages',
+		group: 'Extras',
+		blurb: 'Notes sent from your dashboard or your message link',
+		w: 380,
+		h: 140,
+		min: { w: 100, h: 30 },
+		opts: [
+			{ key: 'big', label: 'Newest one big', kind: 'toggle', def: true },
+			{ key: 'author', label: 'Who sent it', kind: 'toggle', def: true },
+			{ key: 'time', label: 'When', kind: 'toggle', def: true },
+		],
+	},
 	qr: {
 		label: 'QR code',
 		group: 'Extras',

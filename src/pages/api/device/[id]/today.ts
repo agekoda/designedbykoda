@@ -11,6 +11,7 @@ import { b64ToBytes, decodePic, FRAME_BYTES } from '../../../../lib/eink/image';
 import { fetchTasks } from '../../../../lib/tasks';
 import { isSignStyle, layoutNeeds, sanitizeLayout, type CustomLayout } from '../../../../lib/eink/builder/model';
 import { pickScreen, secondsToNextEventEdge } from '../../../../lib/screens';
+import { activeMessages, sanitizeCfg, secondsToNextCheck, secondsToNextExpiry } from '../../../../lib/messages';
 export const prerender = false;
 
 function getCookielessAuthSecret(request: Request): string | null {
@@ -243,6 +244,15 @@ export async function GET({ params, request, locals }) {
 	} catch {}
 	const screens = await pickScreen(db, deviceId, style, Math.floor(rightNow.getTime() / 1000) + getUtcOffsetSeconds(tzPick, rightNow), now, reqUrl.searchParams.get('w'));
 	style = screens.style;
+
+	// The message board (schema-messages.sql): messages showing now, and how they show.
+	let msgCfg = sanitizeCfg(null);
+	try {
+		const mc = await db.prepare('SELECT msg_cfg FROM devices WHERE id = ?').bind(deviceId).first();
+		msgCfg = sanitizeCfg(mc?.msg_cfg);
+	} catch {}
+	const msgs = proto === '2' ? await activeMessages(db, deviceId, now) : [];
+	if (msgCfg.show === 'full' && msgs.length) style = 'messages';
 
 	// How often this calendar wakes: only the Timeline can wake more than once a day.
 	const intervalSec = LIVE_STYLES.includes(style) && isRefreshSec(device.refresh_interval_sec) ? device.refresh_interval_sec : 86400;
@@ -502,6 +512,8 @@ export async function GET({ params, request, locals }) {
 			tasksState,
 			custom: customLayout,
 			sign,
+			messages: msgs.map((m) => ({ author: m.author, body: m.body, atLocal: m.createdAt + offsetSec })),
+			msgBanner: msgCfg.show === 'banner',
 		}, fontChoice ?? undefined);
 		// How long to sleep: the layout's own answer, but wake sooner for a scheduled screen change,
 		// and (for a "Free or busy" widget) when a meeting starts or ends.
@@ -512,7 +524,22 @@ export async function GET({ params, request, locals }) {
 			const edge = secondsToNextEventEdge(evs, nowLocal);
 			if (edge !== null) sleepSec = Math.min(sleepSec, Math.max(120, edge + 30));
 		}
+		// wake to look for new messages, and to take one off the screen when it runs out
+		const check = secondsToNextCheck(msgCfg.check, nowLocal);
+		if (check !== null) sleepSec = Math.min(sleepSec, Math.max(60, check));
+		const expiry = secondsToNextExpiry(msgs, now);
+		if (expiry !== null) sleepSec = Math.min(sleepSec, Math.max(60, expiry + 5));
 		await screens.save(db, sleepSec);
+		// X-Unchanged: 1 when this is exactly what the screen already shows, so firmware that
+		// knows the header can skip redrawing (no flash when a message check finds nothing new).
+		let unchanged = false;
+		try {
+			const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(screen));
+			const hash = [...new Uint8Array(digest).slice(0, 12)].map((b) => b.toString(16).padStart(2, '0')).join('');
+			const prev = await db.prepare('SELECT last_hash FROM devices WHERE id = ?').bind(deviceId).first();
+			unchanged = prev?.last_hash === hash;
+			if (!unchanged) await db.prepare('UPDATE devices SET last_hash = ? WHERE id = ?').bind(hash, deviceId).run();
+		} catch {}
 		return new Response(screen, {
 			status: 200,
 			headers: {
@@ -526,6 +553,7 @@ export async function GET({ params, request, locals }) {
 					return s < 1800 || s >= 86400 - 600 ? '1' : '0';
 				})(),
 				'X-Sleep': String(sleepSec),
+				'X-Unchanged': unchanged ? '1' : '0',
 			},
 		});
 	}

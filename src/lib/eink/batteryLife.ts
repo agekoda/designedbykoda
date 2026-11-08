@@ -4,6 +4,7 @@
 // The dashboard shows the first while you change settings, and the second once there's enough data.
 import { batteryPercent } from './battery';
 import { activeStyle, changesPerDay, type Schedule } from './schedule';
+import { checksPerDay } from '../messages';
 
 // ---- tune these to the real hardware ----
 // 450 mAh cell (102025; measured cells hold 520-545 mAh, so this is conservative).
@@ -25,6 +26,7 @@ export interface UsageInput {
 	refreshSec: number;
 	schedule?: Schedule | null;
 	live?: boolean; // the custom design has a "Free or busy" widget
+	msgCheck?: number; // seconds between checks for new messages (0 / missing = none)
 }
 
 function wakesFor(style: string, refreshSec: number, live: boolean): number {
@@ -50,7 +52,7 @@ export function wakesPerDay(u: UsageInput): number {
 		for (const [s, f] of share) n += f * wakesFor(s, u.refreshSec, live);
 		n += changesPerDay(u.schedule, u.style);
 	} else n = wakesFor(u.style, u.refreshSec, live);
-	return n + BATTERY.pressesPerDay;
+	return n + checksPerDay(u.msgCheck ?? 0) + BATTERY.pressesPerDay;
 }
 
 // Days a full charge lasts with these settings.
