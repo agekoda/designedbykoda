@@ -140,6 +140,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						<input class="txt" id="cd-date" type="date" />
 						<p class="muted small hint">Counts down each morning, and says "Today!" on the day.</p>
 					</div>
+					<div id="opt-msgs" hidden>
+						<p class="muted small">Send messages, share a link so family can send them from their phone, and choose how they show.</p>
+						<a class="btn small" id="msgs-open" href="#">Open Messages</a>
+					</div>
 					<div id="opt-sign" hidden>
 						<div id="sign-fields"></div>
 						<a class="btn small ghost" id="sign-builder" href="#">Edit the layout in the builder</a>
@@ -254,6 +258,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const optCountdown = $('opt-countdown');
 	const optTodo = $('opt-todo');
 	const optSign = $('opt-sign');
+	const optMsgs = $('opt-msgs');
 	const signFields = $('sign-fields');
 	const signBuilder = $<HTMLAnchorElement>('sign-builder');
 	const customBox = $('custom-box');
@@ -363,6 +368,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	let screensReady = true;
 	let battAnchor: { mv: number; at: number } | null = null;
 	let battAt: number | null = null;
+	let msgCheck = 0; // how often it checks for messages (set on the Messages page)
 	const fs = () => viewStyle ?? st.style; // the layout the page is focused on
 	const labelOf = (id: string) => styles.find((x) => x.id === id)?.label ?? id;
 	// every layout this device will show: the main one, the scheduled ones, the button's ones
@@ -802,13 +808,15 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		paintEditor();
 
 		// Options tab: the Countdown's name and date, or connecting Google Tasks
-		const opt = fs() === 'countdown' ? 'countdown' : (fs() === 'todo' || fs() === 'planner') ? 'todo' : isSignStyle(fs()) ? 'sign' : null;
+		const opt = fs() === 'countdown' ? 'countdown' : (fs() === 'todo' || fs() === 'planner') ? 'todo' : isSignStyle(fs()) ? 'sign' : fs() === 'messages' ? 'msgs' : null;
 		tabOptBtn.hidden = !opt;
-		tabOptBtn.textContent = opt === 'countdown' ? 'Countdown' : opt === 'todo' ? 'Tasks' : opt === 'sign' ? 'Words' : 'Options';
+		tabOptBtn.textContent = opt === 'countdown' ? 'Countdown' : opt === 'todo' ? 'Tasks' : opt === 'sign' ? 'Words' : opt === 'msgs' ? 'Messages' : 'Options';
 		if (!opt && activeTab === 'options') showTab('layout');
 		optCountdown.hidden = opt !== 'countdown';
 		optTodo.hidden = opt !== 'todo';
 		optSign.hidden = opt !== 'sign';
+		optMsgs.hidden = opt !== 'msgs';
+		($('msgs-open') as HTMLAnchorElement).href = '/dashboard/messages?device=' + encodeURIComponent(deviceId);
 		if (opt === 'sign') syncSignFields();
 		const isCustom = st.style === 'custom';
 		customBox.hidden = !isCustom;
@@ -1089,7 +1097,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	// ---------------------------------------------------------------- battery
 	function syncBattery() {
 		const live = usedStyles().includes('custom') && layoutNeeds(customLayout).live;
-		const full = estimate({ style: st.style, refreshSec: st.refreshSec, schedule: st.sch, live });
+		const full = estimate({ style: st.style, refreshSec: st.refreshSec, schedule: st.sch, live, msgCheck });
 		const parts: string[] = [];
 		if (vbat !== null) parts.push(`<b>Battery ${batteryPercent(vbat)}%</b>`);
 		parts.push(`With these settings a full charge lasts <b>${lifeText(full)}</b>`);
@@ -1295,6 +1303,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			screensReady = info.screensReady !== false;
 			battAnchor = info.batteryAnchor ?? null;
 			battAt = info.batteryAt ?? null;
+			msgCheck = info.msgCheck ?? 0;
 			if (st.src) {
 				try {
 					await loadSource(st.src, 'corner');
@@ -1502,5 +1511,6 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .sign-f { display: block; margin-bottom: 1em; }
 	.cust .sign-f .label { display: block; margin-bottom: 0.45em; }
 	.cust textarea.txt { resize: vertical; line-height: 1.45; }
-	.cust #opt-sign[hidden] { display: none; }
+	.cust #opt-sign[hidden], .cust #opt-msgs[hidden] { display: none; }
+	.cust #opt-msgs .btn { margin-top: 0.8em; }
 </style>

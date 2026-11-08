@@ -45,6 +45,12 @@ const JA: Record<string, string> = {
 	'Free day': '予定なし',
 	'All done': '完了',
 	'Today': '今日',
+	'Yesterday': '昨日',
+	'MESSAGES': 'メッセージ',
+	'No messages': 'メッセージなし',
+	'No messages yet': 'メッセージはまだありません',
+	'Send one from your dashboard,': 'ダッシュボードから送るか、',
+	"or share your calendar's message link.": 'メッセージ用リンクを共有してください。',
 	'Tomorrow': '明日',
 	'Overdue': '期限切れ',
 	// countdown

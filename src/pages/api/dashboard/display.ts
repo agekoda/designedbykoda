@@ -8,6 +8,7 @@ import { cleanText } from '../../../lib/eink/draw';
 import { isLang } from '../../../lib/eink/i18n';
 import { isTempUnit } from '../../../lib/eink/units';
 import { sanitizeSchedule } from '../../../lib/eink/schedule';
+import { sanitizeCfg } from '../../../lib/messages';
 import { markSaved } from '../../../lib/screens';
 import { sanitizeLayout, sanitizeSign } from '../../../lib/eink/builder/model';
 export const prerender = false;
@@ -58,6 +59,11 @@ export async function GET({ request, locals }) {
 	} catch {} // temp_unit comes from schema-screens.sql
 	let schedule: unknown = null;
 	let sign: unknown = sanitizeSign(null);
+	let msgCheck = 0;
+	try {
+		const mq = await db.prepare('SELECT msg_cfg FROM devices WHERE id = ?').bind(deviceId).first();
+		msgCheck = sanitizeCfg(mq?.msg_cfg).check;
+	} catch {} // schema-messages.sql
 	let screensReady = true;
 	let batteryAnchor: { mv: number; at: number } | null = null;
 	try {
@@ -116,6 +122,7 @@ export async function GET({ request, locals }) {
 			unit,
 			schedule,
 			sign,
+			msgCheck,
 			screensReady,
 			batteryAnchor,
 			refreshSec: isRefreshSec(dev.refresh_interval_sec) ? dev.refresh_interval_sec : 86400,

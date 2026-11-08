@@ -2,6 +2,7 @@
 // name / layout / calendars. Everything is checked against the session's
 // user, so you can only ever see or change your own devices.
 import { sanitizeSchedule } from '../../../lib/eink/schedule';
+import { sanitizeCfg } from '../../../lib/messages';
 import { isStyleId, DEFAULT_STYLE } from '../../../data/calendarStyles';
 import { sanitizeLayout, sanitizeSign } from '../../../lib/eink/builder/model';
 import { cornerPlain } from '../../../lib/eink/image';
@@ -97,6 +98,17 @@ export async function GET({ request, locals }) {
 			});
 	} catch {}
 
+	// Message board (schema-messages.sql): how often each checks, and how many messages are showing.
+	const msg = new Map<string, { check: number; count: number }>();
+	try {
+		const nowS = Math.floor(Date.now() / 1000);
+		const mr = await db
+			.prepare('SELECT d.id, d.msg_cfg, (SELECT COUNT(*) FROM messages m WHERE m.device_id = d.id AND m.removed = 0 AND (m.expires_at IS NULL OR m.expires_at > ?)) AS n FROM devices d WHERE d.user_id = ?')
+			.bind(nowS, userId)
+			.all();
+		for (const e of mr.results ?? []) msg.set(e.id, { check: sanitizeCfg(e.msg_cfg).check, count: e.n ?? 0 });
+	} catch {}
+
 	const devices = (rows.results ?? []).map((d: any) => ({
 		id: d.id,
 		name: d.name || '',
@@ -117,6 +129,8 @@ export async function GET({ request, locals }) {
 		custom: customs.get(d.id) ?? null,
 		schedule: scr.get(d.id)?.schedule ?? null,
 		sign: scr.get(d.id)?.sign ?? null,
+		msgCheck: msg.get(d.id)?.check ?? 0,
+		msgCount: msg.get(d.id)?.count ?? 0,
 		unit: scr.get(d.id)?.unit ?? 'c',
 		shownStyle: scr.get(d.id)?.shownStyle ?? null,
 		batteryAnchorMv: scr.get(d.id)?.anchorMv ?? null,

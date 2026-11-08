@@ -21,6 +21,7 @@ import { DAY_NAMES } from '../context';
 import { withDefaults, type CustomLayout, type Widget } from './model';
 import { linkPayload, qrBits, qrMatrix, wifiPayload, type WifiSecurity } from '../qr';
 import { toAscii } from '../draw';
+import { messageList } from '../layouts/messages';
 
 interface Env {
 	d: Draw;
@@ -864,6 +865,8 @@ function drawWidget(env: Env, w: Widget) {
 			return lineWidget(env, w, o);
 		case 'qr':
 			return qrWidget(env, w, o);
+		case 'messages':
+			return messageList(env.d, env.ctx, w, { big: o.big === true, author: o.author === true, time: o.time === true });
 		case 'list':
 			return listWidget(env, w, o);
 		case 'room_status':
