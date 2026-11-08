@@ -278,7 +278,7 @@ const deviceId = Astro.url.searchParams.get('device') ?? '';
 
 	// ---------------------------------------------------------------- the shared link
 	function setLink(url: string | null) {
-		$('share-btn').textContent = url ? 'Family link' : 'Let family send messages';
+		$('share-btn').textContent = url ? 'Shared link' : 'Let family send messages';
 		$('link-off').hidden = !!url;
 		$('link-on').hidden = !url;
 		if (!url) return;
