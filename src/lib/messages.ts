@@ -1,5 +1,5 @@
 // The message board: short notes sent to a calendar from the dashboard, or by anyone with the
-// calendar's shared link (family, housemates). Shared by the server (storing, the device endpoint)
+// calendar's shared link. Shared by the server (storing, the device endpoint)
 // and the dashboard pages. Tables and columns come from schema-messages.sql; until it's run every
 // read here quietly returns nothing, so the calendar works exactly as before.
 import { cleanText } from './eink/draw';
@@ -86,10 +86,11 @@ export async function addMessage(db: any, deviceId: string, m: { author: string;
 	if (!m.body) return { ok: false, error: 'Type a message first.' };
 	try {
 		const active = await db.prepare('SELECT COUNT(*) AS n FROM messages WHERE device_id = ? AND removed = 0 AND (expires_at IS NULL OR expires_at > ?)').bind(deviceId, nowUnix).first();
-		if ((active?.n ?? 0) >= MAX_ACTIVE) return { ok: false, error: `This calendar already has ${MAX_ACTIVE} messages. Remove some first.` };
+		if ((active?.n ?? 0) >= MAX_ACTIVE)
+			return { ok: false, error: m.via === 'link' ? `This calendar is full (${MAX_ACTIVE} messages). Ask whoever shared the link to clear some.` : `This calendar already has ${MAX_ACTIVE} messages. Remove some first.` };
 		if (m.via === 'link') {
 			const today = await db.prepare("SELECT COUNT(*) AS n FROM messages WHERE device_id = ? AND via = 'link' AND created_at > ?").bind(deviceId, nowUnix - 86400).first();
-			if ((today?.n ?? 0) >= LINK_PER_DAY) return { ok: false, error: 'Too many messages today. Try again tomorrow.' };
+			if ((today?.n ?? 0) >= LINK_PER_DAY) return { ok: false, error: `This link has sent ${LINK_PER_DAY} messages in the last 24 hours, which is the most it can. Try again later.` };
 		}
 		const id = newId();
 		await db

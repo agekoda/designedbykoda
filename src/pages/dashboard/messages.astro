@@ -1,6 +1,6 @@
 ---
 // The message board for one calendar: send a message, see and remove what's on it, share a link
-// so family can send messages from their phone, and choose how often the calendar checks.
+// so others can send messages from their phone, and choose how often the calendar checks.
 export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
 import { getSessionUserId } from '../../lib/session';
@@ -27,7 +27,7 @@ try {
 				<div class="title" id="title">Messages</div>
 			</div>
 			<div class="tb-right">
-				<button type="button" class="btn small" id="share-btn" aria-expanded="false" aria-controls="share">{hasLink ? 'Shared link' : 'Let family send messages'}</button>
+				<button type="button" class="btn small" id="share-btn" aria-expanded="false" aria-controls="share">{hasLink ? 'Shared link' : 'Create shared link'}</button>
 				<a class="btn ghost small" id="to-display" href="#">Customize display</a>
 			</div>
 			<!-- the shared link, opened from the top bar -->
@@ -286,7 +286,7 @@ try {
 
 	// ---------------------------------------------------------------- the shared link
 	function setLink(url: string | null) {
-		$('share-btn').textContent = url ? 'Shared link' : 'Let family send messages';
+		$('share-btn').textContent = url ? 'Shared link' : 'Create shared link';
 		$('link-off').hidden = !!url;
 		$('link-on').hidden = !url;
 		if (!url) return;
@@ -383,7 +383,7 @@ try {
 		}
 	});
 
-	// the family link, opened from the top bar
+	// the shared link, opened from the top bar
 	const shareBtn = $<HTMLButtonElement>('share-btn');
 	function toggleShare(open = $('share').hidden) {
 		$('share').hidden = !open;
