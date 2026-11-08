@@ -10,6 +10,13 @@ const db = Astro.locals.runtime?.env?.DB;
 const userId = db ? await getSessionUserId(Astro.request, db) : null;
 if (!userId) return Astro.redirect('/setup');
 const deviceId = Astro.url.searchParams.get('device') ?? '';
+// Whether the shared link is on, so the page arrives with the right button and panel
+// (no flicker while the script loads the rest).
+let hasLink = false;
+try {
+	const r = await db.prepare('SELECT msg_token FROM devices WHERE id = ? AND user_id = ?').bind(deviceId, userId).first();
+	hasLink = !!r?.msg_token;
+} catch {}
 ---
 
 <Layout title="Messages — designedbykoda" description="Send messages to your E-Ink Calendar." noindex>
@@ -20,16 +27,16 @@ const deviceId = Astro.url.searchParams.get('device') ?? '';
 				<div class="title" id="title">Messages</div>
 			</div>
 			<div class="tb-right">
-				<button type="button" class="btn small" id="share-btn" aria-expanded="false" aria-controls="share">Let family send messages</button>
+				<button type="button" class="btn small" id="share-btn" aria-expanded="false" aria-controls="share">{hasLink ? 'Shared link' : 'Let family send messages'}</button>
 				<a class="btn ghost small" id="to-display" href="#">Customize display</a>
 			</div>
 			<!-- the shared link, opened from the top bar -->
 			<div class="share" id="share" hidden>
-				<div id="link-off">
+				<div id="link-off" hidden={hasLink}>
 					<p class="muted small">Make a private link. Anyone you give it to can send messages from their phone, with no account. You can turn it off or make a new one at any time.</p>
 					<button type="button" class="btn small" id="link-make">Make a link</button>
 				</div>
-				<div id="link-on" hidden>
+				<div id="link-on" hidden={!hasLink}>
 					<div class="link-box">
 						<canvas id="qr" width="132" height="132" aria-label="QR code for the link"></canvas>
 						<div class="link-side">
@@ -456,7 +463,7 @@ const deviceId = Astro.url.searchParams.get('device') ?? '';
 	.msgs .txt.mono { font-family: ui-monospace, Menlo, monospace; font-size: 0.82em; }
 	.msgs .count { position: absolute; right: 0.8em; bottom: 0.6em; font-size: 0.75em; color: var(--muted-dim); }
 	.msgs .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8em; margin-top: 0.9em; align-items: end; }
-	.msgs .row2 .dd-btn { font-size: 0.95em; padding: 0.72em 0.9em 0.72em 1.1em; }
+	.msgs .row2 .dd-btn, .msgs .row2 select:not(.dd-native) { font-size: 0.95em; padding-top: 0.72em; padding-bottom: 0.72em; }
 	.msgs .actions { display: flex; align-items: center; gap: 0.8em; flex-wrap: wrap; margin: 0.9em 0 0.6em; }
 	.msgs .note { font-size: 0.88em; color: var(--muted); }
 	.msgs .note.is-error { color: #e08a8a; }

@@ -529,6 +529,11 @@ html.has-custom-cursor .lightbox-overlay model-viewer {
 .dd-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dd-chev { flex: 0 0 auto; width: 14px; height: 14px; color: var(--muted); transition: transform 0.2s; }
 .dd-btn[aria-expanded='true'] .dd-chev { transform: rotate(180deg); }
+/* A <select> before dropdown() has upgraded it (the first moment of page load) looks exactly like
+   the finished dropdown, so nothing jumps when the script swaps it. */
+select:not(.dd-native) { -webkit-appearance: none; appearance: none; box-sizing: border-box; font: inherit; font-size: 0.85em; font-weight: 600; letter-spacing: 0.02em; line-height: inherit; color: var(--fg); background-color: color-mix(in srgb, var(--fg) 9%, var(--bg-raised)); border: 1px solid color-mix(in srgb, var(--fg) 32%, transparent); border-radius: 999px; padding: 0.5em calc(1.4em + 14px) 0.5em 1.1em; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9L12 15L18 9' stroke='%23a3a3a3' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.8em center; background-size: 14px 14px; }
+:root[data-mode="light"] select:not(.dd-native) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9L12 15L18 9' stroke='%234b5662' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+select.wide:not(.dd-native) { display: block; width: 100%; }
 .dd-menu { position: fixed; z-index: 500; overflow-y: auto; padding: 6px; background: color-mix(in srgb, var(--fg) 7%, var(--bg-raised)); border: 1px solid color-mix(in srgb, var(--fg) 28%, transparent); border-radius: 14px; box-shadow: var(--shadow, 0 12px 32px rgba(0, 0, 0, 0.35)); animation: dd-in 0.14s ease-out; }
 .dd-menu[hidden] { display: none; }
 @keyframes dd-in { from { opacity: 0; transform: translateY(-4px); } }
