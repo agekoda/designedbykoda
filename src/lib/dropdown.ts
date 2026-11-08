@@ -80,6 +80,10 @@ export function dropdown(select: HTMLSelectElement): Dropdown {
 	}
 	function openMenu() {
 		open?.close();
+		// The menu is position: fixed. A parent with a transform (the dashboard pages centre themselves
+		// with one) would make that relative to the parent instead of the window, so while it's open the
+		// menu lives directly in <body>: it then sits right under its button, above everything.
+		if (menu.parentElement !== document.body) document.body.appendChild(menu);
 		build();
 		sync();
 		menu.hidden = false;
@@ -103,7 +107,7 @@ export function dropdown(select: HTMLSelectElement): Dropdown {
 		else if (e.key === 'Tab') close();
 	});
 	const away = (e: Event) => {
-		if (!menu.hidden && !wrap.contains(e.target as Node)) close();
+		if (!menu.hidden && !wrap.contains(e.target as Node) && !menu.contains(e.target as Node)) close();
 	};
 	const leave = () => !menu.hidden && close();
 	const leaveScroll = (e: Event) => {
@@ -121,6 +125,7 @@ export function dropdown(select: HTMLSelectElement): Dropdown {
 			window.removeEventListener('resize', leave);
 			window.removeEventListener('scroll', leaveScroll, true);
 			wrap.remove();
+			menu.remove();
 			select.hidden = false;
 		},
 	};
