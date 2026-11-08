@@ -27,48 +27,43 @@ const SECTIONS: Section[] = [
 	{
 		id: 'overview',
 		title: 'Overview',
-		intro:
-			'A small, battery-powered e-paper screen that shows your Google Calendar, and plenty more. The server draws each screen and the calendar shows it, then sleeps. It uses no power to keep the picture, so it runs for months on a charge. You change everything from a web dashboard: the layout, what it shows at different times of day, or a design of your own.',
+		intro: 'A battery-powered e-paper display that shows your Google Calendar, and more. Pick a layout, design your own, or set it to change through the day, all from a web dashboard.',
 	},
 	{
 		id: 'display',
 		title: 'Display',
 		rows: [
 			['Screen size', '4.2 inches (diagonal)'],
-			['Resolution', '400 × 300 pixels, landscape'],
+			['Resolution', '400 × 300 pixels'],
+			['Pixel density', '119 PPI'],
+			['Display type', 'ePaper (EPD)'],
 			['Colours', 'Black and white'],
-			['Type', 'E-paper (WeAct Studio 4.2" panel)'],
-			['Backlight', 'None. Reflective, like paper, so it reads best in normal room light or daylight'],
-			['Picture with power off', 'Stays on screen'],
-			['Refresh', 'Full refresh once a day to keep the screen clean; the panel also supports partial refresh'],
-			['Dark mode', 'White on black, switchable from the dashboard'],
+			['Partial refresh', 'Yes'],
 		],
 	},
 	{
 		id: 'physical',
 		title: 'Physical',
 		rows: [
-			['Dimensions', '95.8 mm wide × 93.8 mm high × 19 mm deep'],
-			['Weight', '114 g (measured on an earlier unit without the kickstand)'],
-			['Enclosure', '3D-printed resin'],
-			['Colour', 'Black (white coming soon)'],
-			['Stand', 'Built-in kickstand, leans back at 29.5°. Snaps into the back when you don’t need it'],
-			['Wall mounting', 'Keyhole for a screw, or a flat back for adhesive strips (not included)'],
-			['Controls', 'One button: refresh now, or flip to the next screen'],
-			['Lights', 'Charging (red) and charged (green)'],
+			['Dimensions (W × H × D)', '95.8 × 93.8 × 19 mm'],
+			['Weight', '114 g'],
+			['Enclosure', 'Resin'],
+			['Colour', 'Black (White coming soon)'],
+			['Orientation', 'Landscape'],
+			['Mounting', 'Kickstand (29.5°), keyhole, adhesive strips'],
+			['Controls', '1 button'],
+			['Status LEDs', 'Charging, charged'],
 		],
 	},
 	{
 		id: 'power',
 		title: 'Power',
 		rows: [
-			['Battery', '450 mAh rechargeable lithium-polymer, built in'],
-			['Charging', 'USB-C, 5 V, about 250 mA. Works with any USB charger or computer port'],
-			['Charge time', 'About 2½ hours from empty (estimated)'],
-			['Battery life', 'Months per charge with daily updates. Hourly updates and schedules use more; the dashboard shows an estimate for your settings'],
-			['Between updates', 'Deep sleep. The screen keeps its picture with no power'],
-			['Protection', 'Resettable fuse on the USB input; charge and discharge managed on board'],
-			['Power switch', 'None needed. It sleeps on its own'],
+			['Battery', 'Rechargeable Li-Po, 450 mAh'],
+			['Battery life', 'Months (daily updates)'],
+			['Charging port', 'USB-C'],
+			['Charging time', '~2.5 hours'],
+			['Refresh', 'Daily, on button press, or scheduled'],
 		],
 	},
 	{
@@ -78,103 +73,69 @@ const SECTIONS: Section[] = [
 			{
 				title: 'Processor and memory',
 				rows: [
-					['Chip', 'Espressif ESP32-C3, 32-bit RISC-V, up to 160 MHz'],
-					['Memory', '400 KB RAM, 4 MB flash'],
-					['Power supply', 'Low-power 3.3 V regulator'],
+					['Processor', 'ESP32-C3'],
+					['RAM', '400 KB'],
+					['Flash', '4 MB'],
 				],
 			},
 			{
 				title: 'Wireless',
 				rows: [
-					['Wi-Fi', '802.11 b/g/n, 2.4 GHz only (5 GHz networks are not supported)'],
-					['Security', 'WPA / WPA2 Personal (home networks with a password)'],
-					['Antenna', '2.4 GHz antenna on a U.FL connector'],
-				],
-			},
-			{
-				title: 'Other',
-				rows: [
-					['Buttons', '1'],
-					['Sensors', 'Battery level'],
-					['Board', 'Custom PCB, designed in Australia'],
+					['Wi-Fi', '802.11 b/g/n'],
+					['Frequency', '2.4 GHz'],
+					['Security', 'WPA, WPA2'],
 				],
 			},
 		],
 	},
 	{
 		id: 'software',
-		title: 'Software and service',
-		groups: [
-			{
-				title: 'What it shows',
-				rows: [
-					['Calendars', 'Google Calendar, read-only. Pick any of your calendars, including shared and family ones'],
-					['Tasks', 'Google Tasks, read-only (optional)'],
-					['Weather', 'Today’s high and low, forecast and conditions for a city you choose, in °C or °F'],
-					['Ready-made layouts', `${layouts.length}: ${layouts.join(', ')}`],
-					['Your own design', 'Layout builder: drag, drop and resize widgets such as dates, events, weather, moon, quotes, countdowns, to-do lists, QR codes and free/busy'],
-					['Templates', 'Including meeting room sign, guest welcome board (Wi-Fi QR code) and desk name plate'],
-					['Languages', 'English, Japanese'],
-				],
-			},
-			{
-				title: 'When it updates',
-				rows: [
-					['Every day', 'At midnight'],
-					['On demand', 'Press the button'],
-					['Schedules', 'Show different layouts at set times and days'],
-					['More often', 'The Timeline layout can update up to hourly'],
-				],
-			},
-			{
-				title: 'Dashboard',
-				rows: [
-					['Where', 'designedbykoda.com/dashboard, in any web browser. No app to install'],
-					['Sign-in', 'Google account'],
-					['Live preview', 'Shows exactly what the screen will look like before you save'],
-					['Firmware', 'New layouts and features arrive from the server, with no firmware update needed. Firmware itself is updated over USB'],
-				],
-			},
+		title: 'Software',
+		rows: [
+			['Calendar', 'Google Calendar (read-only)'],
+			['Tasks', 'Google Tasks (optional)'],
+			['Layouts', `${layouts.length} built-in, plus your own design`],
+			['Schedules', 'By time and day'],
+			['Weather', '°C or °F'],
+			['Languages', 'English, Japanese'],
+			['Dashboard', 'Web, no app needed'],
+			['OTA updates', 'Not needed (screens are drawn on the server)'],
 		],
 	},
 	{
-		id: 'privacy',
-		title: 'Privacy and security',
+		id: 'security',
+		title: 'Security',
 		rows: [
-			['Google access', 'Read-only. It can never change or delete your events'],
-			['Your events', 'Read when the screen updates, to draw it, and not stored'],
-			['Sign-in tokens', 'Encrypted at rest'],
-			['Connection', 'HTTPS for everything'],
-			['The device', 'Has its own secret key; your Google password is never on it'],
-			['Policy', 'designedbykoda.com/privacy'],
+			['Communication', 'One-way (device-initiated only)'],
+			['Calendar access', 'Read-only'],
+			['Event storage', 'None'],
+			['Encryption', 'TLS (HTTPS)'],
 		],
 	},
 	{
 		id: 'environment',
-		title: 'Environment',
+		title: 'Environmental',
 		rows: [
 			['Use', 'Indoors'],
-			['Heat', 'Keep out of direct sun and hot cars. The resin case softens at about 65 °C'],
-			['Charging temperature', 'Room temperature (0 to 40 °C)'],
+			['Max temperature', '65 °C'],
 		],
 	},
 	{
 		id: 'box',
-		title: 'In the box',
+		title: 'Package contents',
 		rows: [
-			['Calendar', 'With the kickstand fitted'],
-			['Quick start card', 'Setup in a few minutes, with a QR code to the full guide online'],
-			['Not included', 'USB-C cable, wall screw, adhesive strips'],
+			['E-Ink Calendar (kickstand fitted)', '1'],
+			['Quick start guide', '1'],
+			['USB-C cable', 'Not included'],
 		],
 	},
 	{
 		id: 'support',
 		title: 'Warranty and support',
 		rows: [
-			['Warranty', '12 months. This is in addition to your rights under the Australian Consumer Law'],
+			['Warranty', '1 year'],
 			['Support', SUPPORT],
 			['Setup guide', 'designedbykoda.com/setup'],
-			['Service status', 'designedbykoda.com/status'],
 		],
 	},
 	{
@@ -184,9 +145,8 @@ const SECTIONS: Section[] = [
 			['Early-bird price', money(EARLY_PRICES)],
 			['Standard price', money(STANDARD_PRICES)],
 			['Preorders open', '30 November 2026'],
-			['Shipping', 'Aiming to ship every preorder by the end of February 2027'],
-			['Ships from', 'Australia. A fixed shipping price per country, shown at checkout (US prices include estimated import duty)'],
-			['Made', 'Designed and finished by hand in Australia. Circuit boards made and assembled in China'],
+			['Shipping', 'By end of February 2027'],
+			['Ships from', 'Australia'],
 			['First batch', '50 units'],
 		],
 	},
@@ -210,35 +170,7 @@ const num = (i: number) => String(i).padStart(2, '0');
 			</div>
 		</header>
 
-		<!-- Front and side views, to scale (1 mm = 2 units). -->
-		<figure class="drawing" aria-label="Front and side drawing with dimensions">
-			<svg viewBox="0 0 520 270" role="img">
-				<title>95.8 mm wide, 93.8 mm high, 19 mm deep, kickstand at 29.5 degrees</title>
-				<g class="ln">
-					<!-- front -->
-					<rect x="40" y="30" width="192" height="188" rx="10" />
-					<rect x="60" y="56" width="152" height="114" rx="2" class="scr" />
-					<text x="136" y="118" class="lbl">4.2" screen</text>
-					<circle cx="136" cy="196" r="7" />
-					<!-- width -->
-					<path d="M40 236 V248 M232 236 V248 M40 244 H232" class="dim" />
-					<text x="136" y="262" class="lbl">95.8 mm</text>
-					<!-- height -->
-					<path d="M24 30 H12 M24 218 H12 M16 30 V218" class="dim" />
-					<text x="8" y="124" class="lbl v" transform="rotate(-90 8 124)">93.8 mm</text>
-					<text x="136" y="18" class="cap">Front</text>
-					<!-- side -->
-					<rect x="330" y="30" width="38" height="188" rx="6" />
-					<path d="M368 64 L478 218" class="stand" />
-					<path d="M300 218 H500" class="ground" />
-					<path d="M330 236 V248 M368 236 V248 M330 244 H368" class="dim" />
-					<text x="349" y="262" class="lbl">19 mm</text>
-					<path d="M368 120 A 60 60 0 0 0 400 110" class="dim" />
-					<text x="408" y="112" class="lbl l">29.5°</text>
-					<text x="410" y="18" class="cap">Side, kickstand out</text>
-				</g>
-			</svg>
-		</figure>
+		<!-- Drawing goes here once the front / side SVG from the 3D model is ready. -->
 
 		{
 			SECTIONS.map((s, i) => (
@@ -318,7 +250,7 @@ const num = (i: number) => String(i).padStart(2, '0');
 	.intro { margin: 0 0 1.2em; line-height: 1.6; color: var(--fg); }
 	.grp h3 { margin: 1.1em 0 0.3em; font-size: 0.78em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 	dl { margin: 0 0 1em; }
-	.row { display: grid; grid-template-columns: minmax(150px, 0.38fr) 1fr; gap: 1em; padding: 0.6em 0; border-top: 1px solid var(--border); }
+	.row { display: grid; grid-template-columns: 210px 1fr; gap: 1em; padding: 0.6em 0; border-top: 1px solid var(--border); }
 	.row:first-child { border-top: none; }
 	dt { color: var(--muted); font-size: 0.92em; }
 	dd { margin: 0; line-height: 1.5; }
