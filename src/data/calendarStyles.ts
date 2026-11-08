@@ -49,9 +49,18 @@ export const isRefreshSec = (v: unknown): v is number => REFRESH_CHOICES.some((c
 export const LIVE_STYLES = ['timeline'];
 
 export function viewForStyle(id: unknown): number {
+	if (isDesignStyle(id)) return 14;
 	return CALENDAR_STYLES.find((s) => s.id === id)?.view ?? 3;
 }
 
-export function isStyleId(id: unknown): id is string {
-	return typeof id === 'string' && CALENDAR_STYLES.some((s) => s.id === id);
+// One of the person's own designs ("design:<id>", see src/lib/designs.ts).
+export function isDesignStyle(id: unknown): id is string {
+	return typeof id === 'string' && /^design:[A-Za-z0-9_-]{6,32}$/.test(id);
 }
+
+export function isStyleId(id: unknown): id is string {
+	return typeof id === 'string' && (CALENDAR_STYLES.some((s) => s.id === id) || isDesignStyle(id));
+}
+
+// The layout that draws a style: a design draws with the builder's "custom" layout.
+export const renderStyleOf = (id: string) => (isDesignStyle(id) ? 'custom' : id);

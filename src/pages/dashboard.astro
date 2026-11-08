@@ -44,6 +44,9 @@ if (!userId) return Astro.redirect('/setup');
 	import { batteryPercent } from '../lib/eink/battery';
 	import { estimate, measured, lifeText } from '../lib/eink/batteryLife';
 	import { layoutNeeds } from '../lib/eink/builder/model';
+	import { CALENDAR_STYLES } from '../data/calendarStyles';
+	import { activeSlot, minutesToHHMM } from '../lib/eink/schedule';
+	import { dropdown } from '../lib/dropdown';
 	const list = document.getElementById('devices')!;
 
 	const esc = (v: string) =>
@@ -71,6 +74,25 @@ if (!userId) return Astro.redirect('/setup');
 		return `${Math.round(d / 86400)} d ago`;
 	}
 
+	const hhmm = (unix: number) => new Date(unix * 1000).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+	const dayTime = (unix: number) => {
+		const t = new Date(unix * 1000);
+		const days = Math.floor((Date.now() - t.getTime()) / 86400000);
+		return days < 6 ? t.toLocaleDateString(undefined, { weekday: 'long' }) : t.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+	};
+	// the screens a calendar can show: the ready-made ones, then its own designs
+	function screensOf(d: any): { id: string; label: string }[] {
+		const ready = CALENDAR_STYLES.filter((s) => !s.builder || d.designs === null).map((s) => ({ id: s.id, label: s.label }));
+		const mine = (d.designs ?? []).map((x: any) => ({ id: 'design:' + x.id, label: x.name }));
+		return [...ready, ...mine];
+	}
+	const labelIn = (d: any, id: string) => screensOf(d).find((x) => x.id === id)?.label ?? 'Your design';
+	const layoutFor = (d: any, id: string) => (id.startsWith('design:') ? d.designs?.find((x: any) => 'design:' + x.id === id)?.layout ?? null : id === 'custom' ? d.custom ?? null : null);
+	// does this screen show messages? The Message board, or a design with a Messages widget
+	const showsMsgs = (d: any, id: string) => id === 'messages' || !!layoutFor(d, id)?.widgets?.some((w: any) => w.t === 'messages');
+	// local wall-clock seconds, as the schedule counts them (the browser's clock)
+	const nowLocal = () => Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60;
+
 	let allCalendars: { id: string; summary: string; primary: boolean }[] | null = null;
 
 	function flash(el: HTMLElement, text: string, err = false) {
@@ -95,41 +117,61 @@ if (!userId) return Astro.redirect('/setup');
 		el.className = 'dev';
 		const interval = 86400; // every layout wakes at least once a day
 		let status = '<span class="dot off"></span>Hasn\'t checked in yet';
+		let alert = '';
 		if (d.lastSeenAt) {
-			const fresh = Date.now() / 1000 - d.lastSeenAt < interval * 2 + 600;
-			status = `<span class="dot ${fresh ? 'on' : 'warn'}"></span>Last active ${ago(d.lastSeenAt)}`;
+			const late = Date.now() / 1000 - d.lastSeenAt > interval + 3 * 3600;
+			status = `<span class="dot ${late ? 'bad' : 'on'}"></span>Checked in ${ago(d.lastSeenAt)}`;
+			if (late) {
+				el.classList.add('warn');
+				alert = `<div class="alert"><b>Hasn\'t checked in since ${esc(dayTime(d.lastSeenAt))}.</b> Press its button. If the screen doesn\'t change, charge it for an hour. If it still doesn\'t, it may not be reaching your Wi-Fi.</div>`;
+			}
 		}
 		let battery = '';
 		if (d.batteryMv) {
 			const v = d.batteryMv / 1000;
 			const pct = batteryPercent(v);
 			const needs = pct <= 10;
+			if (needs) el.classList.add('warn');
 			// days left: from real use once there's enough of it, else from the settings
 			const real = measured(d.batteryAnchorMv, d.batteryAnchorAt, d.batteryMv, d.batteryAt);
-			const live = (d.style === 'custom' && layoutNeeds(d.custom).live) || d.style === 'room' || d.style === 'nameplate';
+			const live = layoutNeeds(layoutFor(d, d.style)).live || d.style === 'room' || d.style === 'nameplate';
 			const left = real ? real.left : (estimate({ style: d.style, refreshSec: d.refreshIntervalSec, schedule: d.schedule, live, msgCheck: d.msgCheck }) * pct) / 100;
 			const leftText = needs ? ' · Needs charging' : pct >= 99 && !real ? '' : ` · ${lifeText(left)} left`;
-			battery = `<span class="sep">·</span><span class="batt${needs ? ' needs' : ''}" title="Battery level${d.batteryAt ? ', ' + ago(d.batteryAt) : ''}${real ? '. Time left is from how fast it has actually been using its battery.' : '. Time left is an estimate from its settings.'}"><span class="batt-icon ${pct < 20 ? 'low' : ''}"><i style="width:${Math.max(6, pct)}%"></i></span>${pct}%${leftText}</span>`;
+			battery = `<span class="sep">·</span><span class="batt${needs ? ' needs' : ''}" title="Battery level${d.batteryAt ? ', ' + ago(d.batteryAt) : ''}${real ? '. Time left is from how fast it has actually been using its battery.' : '. Time left is an estimate from its settings.'}"><span class="batt-icon ${needs ? 'flat' : pct < 20 ? 'low' : ''}"><i style="width:${Math.max(6, pct)}%"></i></span>${pct}%${leftText}</span>`;
 		}
 		const paired = d.createdAt ? new Date(d.createdAt * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 		el.innerHTML = `
 			<a class="dev-preview" data-preview href="/dashboard/display?device=${encodeURIComponent(d.id)}" aria-label="Customize this display"><canvas data-canvas width="800" height="600"></canvas><span class="dev-preview-cap">Preview</span></a>
 			<div class="dev-body">
 				<input class="dev-name" maxlength="40" value="${esc(d.name)}" placeholder="E-Ink Calendar${index ? ' ' + (index + 1) : ''}" aria-label="Device name" />
-				<div class="dev-meta">${status}${paired ? `<span class="sep">·</span>Paired ${paired}` : ''}${battery}</div>
-
+				${alert}
+				<div class="dev-meta">${status}${battery}</div>
+				<div class="onnow" data-onnow></div>
+				<div class="actions">
 					<a class="btn customize" href="/dashboard/display?device=${encodeURIComponent(d.id)}">Customize display</a>
-					<a class="btn ghost customize" href="/dashboard/messages?device=${encodeURIComponent(d.id)}">Messages${d.msgCount ? ` <span class="msg-count">${d.msgCount}</span>` : ''}</a>
-					<p class="muted small cust-hint">Layout, font, dark mode and the Agenda picture. See changes live before you save.</p>
-
-				<div class="label">Calendars</div>
-				<div class="cal-list" data-cals><p class="muted small">Loading calendars…</p></div>
-
-				<div class="label">Weather</div>
-				<div data-weather></div>
-				<p class="muted small weather-hint">Shows today's high and low on your calendar. Leave empty for none.</p>
+					<a class="btn ghost customize" data-msgbtn href="/dashboard/messages?device=${encodeURIComponent(d.id)}">Messages${d.msgCount ? ` <span class="msg-count">${d.msgCount}</span>` : ''}</a>
+					<label class="switch-screen"><span>Switch screen</span><select data-switch aria-label="Switch screen"></select></label>
+				</div>
+				<p class="muted small sched-note" data-schednote hidden></p>
+				<form class="quick" data-quick hidden>
+					<div class="label">Quick message</div>
+					<div class="qrow"><input class="txt" data-qtext maxlength="140" placeholder="Type a message for the screen…" autocomplete="off" /><button type="submit" class="btn small">Send</button></div>
+				</form>
 
 				<p class="note" data-note aria-live="polite"></p>
+				<div class="more">
+					<span>Calendars <b data-calsum>…</b></span><span>Weather <b data-wsum>${d.location?.name ? esc(String(d.location.name).split(',')[0]) : 'Off'}</b></span><button type="button" class="link" data-change aria-expanded="false">Change</button>
+				</div>
+				<div class="more-b" data-moreb hidden>
+					<div class="label">Calendars</div>
+					<div class="cal-list" data-cals><p class="muted small">Loading calendars…</p></div>
+
+					<div class="label">Weather</div>
+					<div data-weather></div>
+					<p class="muted small weather-hint">Shows today's high and low on your calendar. Leave empty for none.</p>
+					${paired ? `<p class="muted small paired">Paired ${paired}</p>` : ''}
+				</div>
+
 
 				<div class="dev-foot" data-foot>
 					<button type="button" class="link danger-link" data-unpair>Unpair this device</button>
@@ -153,9 +195,76 @@ if (!userId) return Astro.redirect('/setup');
 				frameImage = Uint8Array.from(atob(d.frameBits), (c) => c.charCodeAt(0));
 			} catch {}
 		}
-		renderPreview({ style: onScreen, unit: d.unit, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null, cornerImage, refreshSec: onScreen === 'timeline' ? d.refreshIntervalSec : 86400, loc: d.location ? { lat: d.location.lat, lon: d.location.lon } : null, countdown: d.countdown ?? null, frameImage, custom: onScreen === 'custom' ? d.custom ?? null : null, sign: d.sign ?? null })
+		renderPreview({ style: onScreen.startsWith('design:') ? 'custom' : onScreen, unit: d.unit, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null, cornerImage, refreshSec: onScreen === 'timeline' ? d.refreshIntervalSec : 86400, loc: d.location ? { lat: d.location.lat, lon: d.location.lon } : null, countdown: d.countdown ?? null, frameImage, custom: layoutFor(d, onScreen), sign: d.sign ?? null })
 			.then((r) => paintScreen(canvas, r.px, { mode: 'screen', scale: 2 }))
 			.catch(() => {});
+
+		// what's on it now, and when it next updates
+		const onnow = el.querySelector('[data-onnow]') as HTMLElement;
+		const next = d.nextWakeAt && d.nextWakeAt > Date.now() / 1000 ? ` <span class="sep">·</span> next update <b>${hhmm(d.nextWakeAt)}</b>` : '';
+		onnow.innerHTML = d.lastSeenAt ? `Showing <b>${esc(labelIn(d, onScreen))}</b>${next}` : '';
+
+		// switch screen: changes the main screen. The schedule still takes over at its times.
+		const sw = el.querySelector('[data-switch]') as HTMLSelectElement;
+		sw.innerHTML = screensOf(d).map((x) => `<option value="${esc(x.id)}"${x.id === d.style ? ' selected' : ''}>${esc(x.label)}</option>`).join('');
+		const swDd = dropdown(sw);
+		const schedNote = el.querySelector('[data-schednote]') as HTMLElement;
+		const quick = el.querySelector('[data-quick]') as HTMLFormElement;
+		const syncQuick = () => (quick.hidden = !(showsMsgs(d, d.style) || showsMsgs(d, onScreen)));
+		syncQuick();
+		sw.addEventListener('change', async () => {
+			const prev = d.style;
+			const r = await post('/api/dashboard/display', { deviceId: d.id, style: sw.value });
+			if (!r.ok) {
+				sw.value = prev;
+				swDd.sync();
+				flash(note, r.error || 'Could not switch the screen.', true);
+				return;
+			}
+			d.style = sw.value;
+			syncQuick();
+			const slot = activeSlot(d.schedule, nowLocal());
+			if (slot && slot.style !== d.style) {
+				schedNote.textContent = `Your schedule is showing ${labelIn(d, slot.style)}${slot.from === slot.to ? ' all day today' : ` until ${minutesToHHMM(slot.to)}`}. ${labelIn(d, d.style)} comes on after that.`;
+				schedNote.hidden = false;
+				flash(note, 'Saved');
+				return;
+			}
+			schedNote.hidden = true;
+			flash(note, d.nextWakeAt && d.nextWakeAt > Date.now() / 1000 ? `Saved. It changes at ${hhmm(d.nextWakeAt)}, or press its button.` : 'Saved. Press its button to see it now.');
+		});
+
+		// quick message
+		const qtext = el.querySelector('[data-qtext]') as HTMLInputElement;
+		quick.addEventListener('submit', async (e) => {
+			e.preventDefault();
+			const text = qtext.value.trim();
+			if (!text) return qtext.focus();
+			const btn = quick.querySelector('button')!;
+			btn.disabled = true;
+			const r = await post('/api/dashboard/messages', { deviceId: d.id, action: 'send', text, expires: 'tonight' });
+			btn.disabled = false;
+			if (r.ok) {
+				qtext.value = '';
+				d.msgCount = (d.msgCount || 0) + 1;
+				el.querySelector('[data-msgbtn]')!.innerHTML = `Messages <span class="msg-count">${d.msgCount}</span>`;
+				flash(note, 'Sent. It shows until midnight, from the next update.');
+			} else flash(note, r.error || 'Could not send.', true);
+		});
+
+		// calendars and weather: a summary, with Change to open them
+		const moreB = el.querySelector('[data-moreb]') as HTMLElement;
+		const changeBtn = el.querySelector('[data-change]') as HTMLButtonElement;
+		changeBtn.addEventListener('click', () => {
+			moreB.hidden = !moreB.hidden;
+			changeBtn.textContent = moreB.hidden ? 'Change' : 'Done';
+			changeBtn.setAttribute('aria-expanded', String(!moreB.hidden));
+		});
+		const calSum = el.querySelector('[data-calsum]') as HTMLElement;
+		const drawCalSum = () => {
+			const n = d.calendarIds.length || (allCalendars ?? []).filter((c) => c.primary).length || 1;
+			calSum.textContent = `${n} selected`;
+		};
 
 		// name: saves when you leave the box or press Enter
 		const nameInput = el.querySelector('.dev-name') as HTMLInputElement;
@@ -172,6 +281,7 @@ if (!userId) return Astro.redirect('/setup');
 		// calendars: saves shortly after you stop toggling
 		const calBox = el.querySelector('[data-cals]') as HTMLElement;
 		const drawCalendars = () => {
+			drawCalSum();
 			if (!allCalendars) {
 				calBox.innerHTML = '<p class="muted small">Couldn\'t load your calendars right now.</p>';
 				return;
@@ -192,7 +302,7 @@ if (!userId) return Astro.redirect('/setup');
 					clearTimeout(timer);
 					timer = setTimeout(async () => {
 						const res = await post('/api/dashboard/devices', { deviceId: d.id, calendarIds: ids });
-						if (res.ok) { d.calendarIds = ids; flash(note, 'Saved'); } else flash(note, res.error || 'Could not save.', true);
+						if (res.ok) { d.calendarIds = ids; drawCalSum(); flash(note, 'Saved'); } else flash(note, res.error || 'Could not save.', true);
 					}, 500);
 				})
 			);
@@ -210,7 +320,10 @@ if (!userId) return Astro.redirect('/setup');
 						deviceId: d.id,
 						location: c ? { name: c.label, lat: c.lat, lon: c.lon } : null,
 					});
-					if (res.ok) flash(note, c ? 'Saved. Weather appears on the next refresh.' : 'Weather removed.');
+					if (res.ok) {
+						(el.querySelector('[data-wsum]') as HTMLElement).textContent = c ? c.label.split(',')[0] : 'Off';
+						flash(note, c ? 'Saved. Weather appears on the next refresh.' : 'Weather removed.');
+					}
 					else flash(note, res.error || 'Could not save the location.', true);
 				},
 			})
@@ -339,6 +452,31 @@ if (!userId) return Astro.redirect('/setup');
 	.dash .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 0.15em; background: var(--muted-dim); }
 	.dash .dot.on { background: #4caf7a; }
 	.dash .dot.warn { background: #d9a441; }
+	.dash .dot.bad { background: #e08a8a; }
+	.dash .dev.warn { border-color: #d9a441; }
+	.dash .alert { margin: 0.5em 0 0.6em; padding: 0.75em 0.95em; border-radius: 12px; background: rgba(217, 164, 65, 0.12); border: 1px solid #d9a441; font-size: 0.9em; line-height: 1.45; }
+	.dash .batt.needs { color: #e08a8a; }
+	.dash .batt-icon.flat { border-color: #e08a8a; }
+	.dash .batt-icon.flat i { background: #e08a8a; }
+	.dash .onnow { color: var(--muted); font-size: 0.9em; margin: -0.8em 0 0; display: flex; gap: 0.45em; flex-wrap: wrap; align-items: baseline; }
+	.dash .onnow:empty { display: none; }
+	.dash .onnow b { color: var(--fg); }
+	.dash .onnow .sep { opacity: 0.5; }
+	.dash .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6em; margin-top: 1.1em; }
+	.dash .actions .customize { margin: 0; }
+	.dash .switch-screen { margin-left: auto; display: inline-flex; align-items: center; gap: 0.6em; font-size: 0.88em; color: var(--muted); }
+	.dash .sched-note { margin-top: 0.7em; color: #d9a441; }
+	.dash .quick { margin-top: 1.1em; }
+	.dash .quick .label { margin-top: 0; }
+	.dash .qrow { display: flex; gap: 0.6em; align-items: center; }
+	.dash .qrow .txt { flex: 1; min-width: 0; padding: 0.65em 0.9em; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); font: inherit; font-size: 0.92em; }
+	.dash .qrow .txt:focus { outline: none; border-color: var(--accent); }
+	.dash .more { display: flex; gap: 1.4em; flex-wrap: wrap; align-items: baseline; margin-top: 1.3em; padding-top: 1em; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.87em; }
+	.dash .more b { color: var(--fg); font-weight: 600; }
+	.dash .more .link { margin-left: auto; background: none; border: none; padding: 0; font: inherit; font-weight: 700; color: var(--accent); }
+	.dash .more-b[hidden] { display: none; }
+	.dash .more-b .paired { margin-top: 1.2em; }
+	.dash .more + .more-b, .dash .note + .more { margin-top: 0.6em; }
 	.dash .label { font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 1.2em 0 0.6em; }
 
 	.dash .mini-styles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5em; }
@@ -392,6 +530,7 @@ if (!userId) return Astro.redirect('/setup');
 
 	@media (max-width: 720px) {
 		.dash .dev { grid-template-columns: 1fr; }
+		.dash .switch-screen { margin-left: 0; width: 100%; }
 		.dash .dev-preview { max-width: 340px; }
 		.dash .mini-styles { grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); }
 	}

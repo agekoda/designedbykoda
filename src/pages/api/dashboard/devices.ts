@@ -3,6 +3,7 @@
 // user, so you can only ever see or change your own devices.
 import { sanitizeSchedule } from '../../../lib/eink/schedule';
 import { sanitizeCfg } from '../../../lib/messages';
+import { listDesigns } from '../../../lib/designs';
 import { isStyleId, DEFAULT_STYLE } from '../../../data/calendarStyles';
 import { sanitizeLayout, sanitizeSign } from '../../../lib/eink/builder/model';
 import { cornerPlain } from '../../../lib/eink/image';
@@ -109,6 +110,15 @@ export async function GET({ request, locals }) {
 		for (const e of mr.results ?? []) msg.set(e.id, { check: sanitizeCfg(e.msg_cfg).check, count: e.n ?? 0 });
 	} catch {}
 
+	// Your designs and when each calendar next wakes (schema-designs.sql / schema-screens.sql).
+	const designsOf = new Map<string, unknown>();
+	for (const d of rows.results ?? []) designsOf.set(d.id, (await listDesigns(db, d.id))?.map((x) => ({ id: x.id, name: x.name, layout: x.layout })) ?? null);
+	const wake = new Map<string, number>();
+	try {
+		const wr = await db.prepare('SELECT id, next_wake_at FROM devices WHERE user_id = ? AND next_wake_at IS NOT NULL').bind(userId).all();
+		for (const w of wr.results ?? []) wake.set(w.id, w.next_wake_at);
+	} catch {}
+
 	const devices = (rows.results ?? []).map((d: any) => ({
 		id: d.id,
 		name: d.name || '',
@@ -131,6 +141,8 @@ export async function GET({ request, locals }) {
 		sign: scr.get(d.id)?.sign ?? null,
 		msgCheck: msg.get(d.id)?.check ?? 0,
 		msgCount: msg.get(d.id)?.count ?? 0,
+		designs: designsOf.get(d.id) ?? null,
+		nextWakeAt: wake.get(d.id) ?? null,
 		unit: scr.get(d.id)?.unit ?? 'c',
 		shownStyle: scr.get(d.id)?.shownStyle ?? null,
 		batteryAnchorMv: scr.get(d.id)?.anchorMv ?? null,
