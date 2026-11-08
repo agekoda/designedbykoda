@@ -25,13 +25,19 @@ const choices = EXPIRY_CHOICES.filter((c) => c.id !== 'never');
 ---
 
 <Layout title={ok ? 'Send a message' : 'Link not found'} description="Leave a message on an E-Ink Calendar." noindex>
-	<div class="mlink" data-token={token}>
+	<div class={ok ? 'mlink wide' : 'mlink'} data-token={token}>
 		{
 			ok ? (
 				<>
-					<p class="kicker">E-Ink Calendar</p>
-					<h1>Send a message{name ? ` to ${name}` : ''}</h1>
-					<p class="sub">It shows up on the calendar's screen the next time it updates.</p>
+					<div class="intro">
+						<p class="kicker">E-Ink Calendar</p>
+						<h1>Send a message{name ? ` to ${name}` : ''}</h1>
+						<p class="sub">It shows up on the calendar's screen the next time it updates.</p>
+						<div class="preview">
+							<canvas id="screen" width="675" height="506" aria-label="How your message will look on the calendar" />
+							<p class="cap">How it will look on the calendar</p>
+						</div>
+					</div>
 					<form id="form">
 						<label class="fld">
 							<span class="lab">Message</span>
@@ -53,8 +59,8 @@ const choices = EXPIRY_CHOICES.filter((c) => c.id !== 'never');
 						</div>
 						<button type="submit" class="go" id="go">Send</button>
 						<p class="note" id="note" aria-live="polite" />
+						<p class="foot">Made by <a href="/projects/eink-calendar/">designedbykoda</a></p>
 					</form>
-					<p class="foot">Made by <a href="/projects/eink-calendar/">designedbykoda</a></p>
 				</>
 			) : (
 				<>
@@ -67,6 +73,7 @@ const choices = EXPIRY_CHOICES.filter((c) => c.id !== 'never');
 </Layout>
 
 <script>
+	import { renderPreview, paintScreen } from '../../lib/eink/previewKit';
 	const root = document.querySelector('.mlink') as HTMLElement;
 	const form = document.getElementById('form') as HTMLFormElement | null;
 	if (form) {
@@ -78,7 +85,33 @@ const choices = EXPIRY_CHOICES.filter((c) => c.id !== 'never');
 		try {
 			author.value = localStorage.getItem('msgAuthor') ?? '';
 		} catch {}
-		text.addEventListener('input', () => (count.textContent = `${text.value.length} / ${text.maxLength}`));
+		text.addEventListener('input', () => {
+			count.textContent = `${text.value.length} / ${text.maxLength}`;
+			drawPreview();
+		});
+		author.addEventListener('input', drawPreview);
+
+		// The Message board with this message on it, as the calendar will draw it.
+		const canvas = document.getElementById('screen') as HTMLCanvasElement;
+		let pending = false;
+		function drawPreview() {
+			if (pending || !canvas || !canvas.offsetParent) return; // hidden on phones
+			pending = true;
+			requestAnimationFrame(async () => {
+				pending = false;
+				const nowLocal = Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60;
+				const body = text.value.trim() || text.placeholder;
+				try {
+					const r = await renderPreview({ style: 'messages', dark: false, hasWeather: false, vbat: null, messages: [{ author: author.value.trim(), body, atLocal: nowLocal }] });
+					const dpr = window.devicePixelRatio || 1;
+					const k = Math.max(1, Math.floor(((canvas.parentElement as HTMLElement).clientWidth * dpr) / 675));
+					paintScreen(canvas, r.px, { mode: 'device', scale: k });
+					canvas.style.width = canvas.width / dpr + 'px';
+				} catch {}
+			});
+		}
+		drawPreview();
+		addEventListener('resize', drawPreview);
 		form.addEventListener('submit', async (e) => {
 			e.preventDefault();
 			if (!text.value.trim()) return;
@@ -108,6 +141,17 @@ const choices = EXPIRY_CHOICES.filter((c) => c.id !== 'never');
 
 <style>
 	.mlink { max-width: 460px; margin: 0 auto; padding: 0.5em 0 3em; }
+	.preview { display: none; }
+	/* desktop: the heading and a preview of the screen on the left, the form on the right */
+	@media (min-width: 900px) {
+		.mlink.wide { max-width: 1040px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 3.5em; align-items: start; padding-top: 1.5em; }
+		.mlink.wide form { padding: 1.6em 1.6em 1.2em; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 20px; }
+		.mlink.wide textarea, .mlink.wide input:not([type='radio']), .mlink.wide .seg { background: var(--bg); }
+		.mlink.wide .preview { display: block; }
+		.mlink.wide .foot { margin-top: 1.4em; }
+	}
+	.preview canvas { display: block; max-width: 100%; height: auto; border-radius: 14px; }
+	.cap { margin: 0.6em 0 0; text-align: center; font-size: 0.82em; color: var(--muted); }
 	.kicker { margin: 0; font-size: 0.75em; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
 	h1 { font-size: clamp(1.7em, 7vw, 2.3em); line-height: 1.1; margin: 0.2em 0 0.3em; }
 	.sub { color: var(--muted); margin: 0 0 1.6em; }
