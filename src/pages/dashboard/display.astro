@@ -227,6 +227,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { estimate, measured, lifeText } from '../../lib/eink/batteryLife';
 	import { batteryPercent } from '../../lib/eink/battery';
 	import { layoutNeeds } from '../../lib/eink/builder/model';
+	import { dropdown, type Dropdown } from '../../lib/dropdown';
 	import {
 		CORNER,
 		FRAME,
@@ -917,7 +918,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		schedule(false);
 	}
 
+	let slotDds: Dropdown[] = [];
 	function renderSlots() {
+		slotDds.forEach((d) => d.destroy());
+		slotDds = [];
 		// which slots win at least once in the week (a slot under a bigger one above never shows)
 		const shows = new Set<Slot>();
 		const wk = Date.UTC(2026, 0, 4) / 1000;
@@ -932,7 +936,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				const days = DAY_ORDER.map((d) => `<button type="button" class="day${(sl.days >> d) & 1 ? ' on' : ''}" data-d="${d}" aria-pressed="${!!((sl.days >> d) & 1)}" title="${DAY_NAME[d]}">${DAY_LETTER[d]}</button>`).join('');
 				const note = !shows.has(sl) ? 'Never shows: a time above it covers all of it.' : needsNote(sl.style);
 				return `<div class="slot${viewStyle === sl.style ? ' focus' : ''}" data-i="${i}">
-					<div class="sl-top"><select class="sl-style" aria-label="Layout">${opts(sl.style)}</select><button type="button" class="sl-del" aria-label="Remove">&times;</button></div>
+					<div class="sl-top"><select class="sl-style wide" aria-label="Layout">${opts(sl.style)}</select><button type="button" class="sl-del" aria-label="Remove">&times;</button></div>
 					<div class="sl-days" role="group" aria-label="Days">${days}</div>
 					<div class="sl-time">${allDay ? '<span class="muted small">All day</span>' : `<input class="txt tm sl-from" type="time" value="${minutesToHHMM(sl.from)}" aria-label="From" /><span class="muted small">to</span><input class="txt tm sl-to" type="time" value="${minutesToHHMM(sl.to)}" aria-label="To" />`}
 						<label class="mini-check"><input type="checkbox" class="sl-all"${allDay ? ' checked' : ''} /> All day</label></div>
@@ -940,6 +944,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				</div>`;
 			})
 			.join('');
+		// the same dropdown as the pre-order page (the real <select> stays, hidden, for .value and change)
+		schSlots.querySelectorAll<HTMLSelectElement>('select.sl-style').forEach((sel) => slotDds.push(dropdown(sel)));
 	}
 
 	function slotAt(el: Element): { i: number; sl: Slot } | null {
@@ -994,7 +1000,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				schChanged();
 				return;
 			}
-			if (!t.closest('input, select, label')) focusStyle(hit.sl.style);
+			if (!t.closest('input, select, label, .dd, .dd-menu')) focusStyle(hit.sl.style);
 		});
 		schSlots.addEventListener('change', (e) => {
 			const t = e.target as HTMLInputElement | HTMLSelectElement;
@@ -1377,7 +1383,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .layouts[hidden], .cust .custom-box[hidden] { display: none; }
 	.cust .layouts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8em; }
 	.cust .fonts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8em; }
-	.cust .lay-card, .cust .fnt-card { display: grid; gap: 0.5em; padding: 0.5em; border: 2px solid var(--border); border-radius: 12px; background: var(--bg); transition: border-color 0.2s, background 0.2s; cursor: pointer; }
+	.cust .lay-card, .cust .fnt-card { display: grid; gap: 0.5em; padding: 0.5em; border: 2px solid var(--border); border-radius: 12px; background: var(--bg); transition: border-color 0.2s, background 0.2s; }
 	.cust .lay-card canvas, .cust .fnt-card canvas { width: 100%; height: auto; border-radius: 6px; background: #dfdbd0; display: block; }
 	.cust .lay-card canvas { aspect-ratio: 4 / 3; }
 	.cust .fnt-card canvas { aspect-ratio: 10 / 3; }
@@ -1389,7 +1395,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 
 	.cust .seg { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
 	.cust .seg.wrap { display: grid; grid-template-columns: repeat(2, 1fr); border-radius: 16px; width: 100%; }
-	.cust .seg label span { display: block; padding: 0.45em 1em; border-radius: 999px; font-size: 0.88em; font-weight: 600; text-align: center; color: var(--muted); cursor: pointer; transition: background 0.2s, color 0.2s; }
+	.cust .seg label span { display: block; padding: 0.45em 1em; border-radius: 999px; font-size: 0.88em; font-weight: 600; text-align: center; color: var(--muted); transition: background 0.2s, color 0.2s; }
 	.cust .seg input:checked + span { background: var(--fg); color: var(--bg); }
 	.cust .seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.cust .pic-intro { margin: 0.8em 0 0; }
@@ -1397,7 +1403,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 
 	.cust #picture-tools { margin-top: 1.1em; }
 	.cust #picture-tools[hidden], .cust #editor[hidden], .cust .drop[hidden], .cust .seg[hidden], .cust .pic-intro[hidden] { display: none; }
-	.cust .drop { display: grid; place-items: center; text-align: center; min-height: 140px; padding: 1em; border: 2px dashed var(--border); border-radius: 14px; color: var(--muted); cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; }
+	.cust .drop { display: grid; place-items: center; text-align: center; min-height: 140px; padding: 1em; border: 2px dashed var(--border); border-radius: 14px; color: var(--muted); transition: border-color 0.2s, color 0.2s, background 0.2s; }
 	.cust .drop:hover, .cust .drop.over, .cust .drop:focus-visible { border-color: var(--accent); color: var(--fg); background: rgba(var(--accent-rgb), 0.06); outline: none; }
 	.cust .ed-grid { display: grid; grid-template-columns: 392px minmax(0, 1fr); gap: 1.2em; align-items: start; }
 	.cust .ed-left { width: 392px; max-width: 100%; }
@@ -1469,7 +1475,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		.cust .save-msg { display: none; }
 	}
 	/* ---- schedule ---- */
-	.cust .sch-sum { display: block; width: 100%; text-align: left; margin: 0 0 1.1em; padding: 0.75em 1em; background: rgba(var(--accent-rgb), 0.08); border: 1px dashed rgba(var(--accent-rgb), 0.5); border-radius: 12px; color: var(--muted); font: inherit; font-size: 0.86em; line-height: 1.45; cursor: pointer; }
+	.cust .sch-sum { display: block; width: 100%; text-align: left; margin: 0 0 1.1em; padding: 0.75em 1em; background: rgba(var(--accent-rgb), 0.08); border: 1px dashed rgba(var(--accent-rgb), 0.5); border-radius: 12px; color: var(--muted); font: inherit; font-size: 0.86em; line-height: 1.45; }
 	.cust .sch-sum b { color: var(--fg); }
 	.cust .sch-sum span { color: var(--accent); font-weight: 700; white-space: nowrap; margin-left: 0.3em; }
 	.cust .sch-sum:hover { border-style: solid; }
@@ -1477,21 +1483,21 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust #sch-body[hidden], .cust #cycle-box[hidden], .cust .sch-presets[hidden], .cust #sch-add[hidden], .cust .view-pill[hidden] { display: none; }
 	.cust .sch-presets { display: grid; gap: 0.5em; margin-bottom: 1em; }
 	.cust .sch-presets p { margin: 0; }
-	.cust .preset { display: grid; gap: 0.15em; text-align: left; padding: 0.7em 0.9em; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--fg); font: inherit; cursor: pointer; }
+	.cust .preset { display: grid; gap: 0.15em; text-align: left; padding: 0.7em 0.9em; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--fg); font: inherit; }
 	.cust .preset:hover { border-color: var(--accent); }
 	.cust .preset span { font-size: 0.8em; color: var(--muted); }
-	.cust .slot { padding: 0.8em 0.9em; margin-bottom: 0.6em; background: var(--bg); border: 2px solid var(--border); border-radius: 14px; display: grid; gap: 0.6em; cursor: pointer; }
+	.cust .slot { padding: 0.8em 0.9em; margin-bottom: 0.6em; background: var(--bg); border: 2px solid var(--border); border-radius: 14px; display: grid; gap: 0.6em; }
 	.cust .slot.focus { border-color: var(--accent); }
 	.cust .sl-top { display: flex; gap: 0.5em; align-items: center; }
-	.cust .sl-style { flex: 1; min-width: 0; background: var(--bg-raised); color: var(--fg); border: 1px solid var(--border); border-radius: 10px; padding: 0.45em 0.6em; font: inherit; font-weight: 700; }
-	.cust .sl-del { background: none; border: none; color: var(--muted); font-size: 1.4em; line-height: 1; padding: 0 0.2em; cursor: pointer; }
+	.cust .sl-top .dd { flex: 1; min-width: 0; }
+	.cust .sl-del { background: none; border: none; color: var(--muted); font-size: 1.4em; line-height: 1; padding: 0 0.2em; }
 	.cust .sl-del:hover { color: var(--fg); }
 	.cust .sl-days { display: flex; gap: 4px; }
-	.cust .day { width: 2.1em; height: 2.1em; border-radius: 50%; border: 1px solid var(--border); background: none; color: var(--muted); font: inherit; font-size: 0.8em; font-weight: 700; cursor: pointer; }
+	.cust .day { width: 2.1em; height: 2.1em; border-radius: 50%; border: 1px solid var(--border); background: none; color: var(--muted); font: inherit; font-size: 0.8em; font-weight: 700; }
 	.cust .day.on { background: var(--fg); border-color: var(--fg); color: var(--bg); }
 	.cust .sl-time { display: flex; gap: 0.5em; align-items: center; flex-wrap: wrap; }
 	.cust .txt.tm { width: auto; padding: 0.4em 0.6em; border-radius: 10px; }
-	.cust .mini-check { display: inline-flex; gap: 0.35em; align-items: center; font-size: 0.85em; color: var(--muted); margin-left: auto; cursor: pointer; }
+	.cust .mini-check { display: inline-flex; gap: 0.35em; align-items: center; font-size: 0.85em; color: var(--muted); margin-left: auto; }
 	.cust .sl-note { margin: 0; font-size: 0.8em; color: #d98c5f; }
 	.cust .week { display: grid; gap: 4px; }
 	.cust .wk-row { display: grid; grid-template-columns: 2.6em 1fr; align-items: center; gap: 0.5em; font-size: 0.75em; color: var(--muted); }
@@ -1501,7 +1507,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .week-key { display: flex; flex-wrap: wrap; gap: 0.4em 1em; margin-top: 0.7em; font-size: 0.8em; color: var(--muted); }
 	.cust .week-key i { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 3px; margin-right: 0.35em; vertical-align: -0.05em; }
 	.cust .chips { display: flex; flex-wrap: wrap; gap: 0.4em; }
-	.cust .chip { padding: 0.4em 0.9em; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--muted); font: inherit; font-size: 0.85em; font-weight: 600; cursor: pointer; }
+	.cust .chip { padding: 0.4em 0.9em; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--muted); font: inherit; font-size: 0.85em; font-weight: 600; }
 	.cust .chip.on { background: var(--fg); border-color: var(--fg); color: var(--bg); }
 	.cust #btn-mode { margin-bottom: 0.4em; }
 	.cust #cycle-box { margin-top: 0.4em; }

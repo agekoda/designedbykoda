@@ -54,10 +54,8 @@ export interface LayoutCtx {
 	custom?: import('./builder/model').CustomLayout | null;
 	// Meeting room / Guest welcome / Desk name plate: the words to fill in (see builder/model.ts).
 	sign?: unknown;
-	// The message board (src/lib/messages.ts): active messages, newest first, and whether the
-	// newest one should be drawn as a banner over this layout.
+	// The message board (src/lib/messages.ts): messages showing now, newest first.
 	messages?: ScreenMsg[];
-	msgBanner?: boolean;
 }
 
 export interface ScreenMsg {

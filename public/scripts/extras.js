@@ -323,8 +323,10 @@
 				const x = e.clientX - r.left, y = e.clientY - r.top;
 				card.style.setProperty('--mx', x + 'px');
 				card.style.setProperty('--my', y + 'px');
-				const rx = ((y / r.height) - 0.5) * -8;
-				const ry = ((x / r.width) - 0.5) * 8;
+				// a gentle tilt (about 2.5 degrees at the edges); big cards tilt less
+				const k = Math.min(5, 1600 / Math.max(r.width, r.height));
+				const rx = ((y / r.height) - 0.5) * -k;
+				const ry = ((x / r.width) - 0.5) * k;
 				card.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-3px)`;
 			});
 			card.addEventListener('pointerleave', () => { card.style.transform = ''; });

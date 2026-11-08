@@ -22,7 +22,7 @@ import { frame } from './frame';
 import { todo } from './todo';
 import { custom } from './custom';
 import { planner } from './planner';
-import { messages, messageBanner, mergeDrawLists } from './messages';
+import { messages } from './messages';
 import { renderCustom } from '../builder/render';
 import { sanitizeLayout, sanitizeSign, signLayout, type SignStyle } from '../builder/model';
 
@@ -76,12 +76,7 @@ export function renderLayout(styleId: string, ctx: Omit<LayoutCtx, 'family'>, fa
 	setLang(isLang(ctx.lang) ? ctx.lang : 'en');
 	setUnit(unit);
 	try {
-		const full = { ...ctx, events, tasks, family, weather: convertWeather(ctx.weather, unit) };
-		const list = entry.render(full);
-		// The newest message as a strip along the bottom (not on screens that already list messages).
-		const listsMessages = styleId === 'messages' || (styleId === 'custom' && !!ctx.custom?.widgets.some((w) => w.t === 'messages'));
-		const banner = ctx.msgBanner && !listsMessages ? messageBanner(full) : null;
-		return banner ? mergeDrawLists(list, banner) : list;
+		return entry.render({ ...ctx, events, tasks, family, weather: convertWeather(ctx.weather, unit) });
 	} finally {
 		setLang(before);
 		setUnit(beforeUnit);

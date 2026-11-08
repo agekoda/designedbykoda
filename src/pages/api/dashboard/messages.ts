@@ -1,5 +1,5 @@
 // The message board, for the calendar's owner: read the messages, send one, remove them,
-// turn the shared link on / off / renew it, and choose how messages show.
+// turn the shared link on / off / renew it, and choose how often the calendar checks.
 import { activeMessages, addMessage, cleanAuthor, cleanBody, expiresAt, isExpiry, newToken, sanitizeCfg, utcOffset } from '../../../lib/messages';
 import { markSaved } from '../../../lib/screens';
 export const prerender = false;

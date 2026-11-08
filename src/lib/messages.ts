@@ -9,13 +9,11 @@ export const MAX_AUTHOR = 20;
 export const MAX_ACTIVE = 20; // messages showing at once, per calendar
 export const LINK_PER_DAY = 25; // messages per calendar per day through the shared link
 
-// How a new message shows on the calendar.
-export type ShowMode = 'banner' | 'full' | 'off';
+// Messages show on the Message board layout, or a Messages widget in your own design.
 export interface MsgCfg {
-	show: ShowMode; // banner over any layout, the whole screen, or only on the Message board layout / widget
 	check: number; // seconds between checks for new messages during the day (0 = only when it wakes anyway)
 }
-export const DEFAULT_CFG: MsgCfg = { show: 'banner', check: 0 };
+export const DEFAULT_CFG: MsgCfg = { check: 0 };
 export const CHECK_CHOICES = [
 	{ sec: 0, label: 'When I press the button' },
 	{ sec: 7200, label: 'Every 2 hours' },
@@ -35,10 +33,7 @@ export function sanitizeCfg(input: unknown): MsgCfg {
 			raw = null;
 		}
 	}
-	return {
-		show: raw?.show === 'full' || raw?.show === 'off' ? raw.show : 'banner',
-		check: CHECK_CHOICES.some((c) => c.sec === raw?.check) ? raw.check : 0,
-	};
+	return { check: CHECK_CHOICES.some((c) => c.sec === raw?.check) ? raw.check : 0 };
 }
 
 // How long a message lasts.
