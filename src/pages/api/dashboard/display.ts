@@ -9,6 +9,7 @@ import { isLang } from '../../../lib/eink/i18n';
 import { isTempUnit } from '../../../lib/eink/units';
 import { sanitizeSchedule } from '../../../lib/eink/schedule';
 import { sanitizeCfg } from '../../../lib/messages';
+import { designIdOf, listDesigns } from '../../../lib/designs';
 import { markSaved } from '../../../lib/screens';
 import { sanitizeLayout, sanitizeSign } from '../../../lib/eink/builder/model';
 export const prerender = false;
@@ -123,6 +124,7 @@ export async function GET({ request, locals }) {
 			schedule,
 			sign,
 			msgCheck,
+			designs: (await listDesigns(db, deviceId))?.map((d) => ({ id: d.id, name: d.name, layout: d.layout })) ?? null,
 			screensReady,
 			batteryAnchor,
 			refreshSec: isRefreshSec(dev.refresh_interval_sec) ? dev.refresh_interval_sec : 86400,
@@ -157,6 +159,12 @@ export async function POST({ request, locals }) {
 	const { db } = o;
 
 	if (body.style !== undefined && !isStyleId(body.style)) return json({ error: 'Unknown layout.' }, 400);
+	// a design must be one of this calendar's
+	const wantDesign = body.style !== undefined ? designIdOf(body.style) : null;
+	if (wantDesign) {
+		const ok = await db.prepare('SELECT 1 AS ok FROM designs WHERE id = ? AND device_id = ?').bind(wantDesign, deviceId).first().catch(() => null);
+		if (!ok) return json({ error: 'That design doesn\u2019t exist any more.' }, 400);
+	}
 	if (body.font !== undefined && body.font !== null && !isFamily(body.font)) return json({ error: 'Unknown font.' }, 400);
 	if (body.refreshSec !== undefined && !isRefreshSec(body.refreshSec)) return json({ error: 'Unknown refresh option.' }, 400);
 	if (body.dark !== undefined && typeof body.dark !== 'boolean') return json({ error: 'Invalid dark mode value.' }, 400);

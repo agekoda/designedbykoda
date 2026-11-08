@@ -1,9 +1,12 @@
-// The layout builder's API: read and save a device's own design ("Your own design").
+// The layout builder's API: read and save a calendar's designs (Your designs), each with a name.
 // Everything is checked against the logged-in user, so you can only touch your own devices.
 import { isFamily } from '../../../lib/eink/fonts';
 import { cleanSettings } from '../../../lib/eink/image';
 import { MAX_JSON, sanitizeLayout } from '../../../lib/eink/builder/model';
 import { markSaved } from '../../../lib/screens';
+import { cleanName, designIdOf, designStyle, getDesign, listDesigns, MAX_DESIGNS, newDesignId } from '../../../lib/designs';
+import { isStyleId } from '../../../data/calendarStyles';
+import { sanitizeSchedule } from '../../../lib/eink/schedule';
 export const prerender = false;
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
@@ -19,7 +22,7 @@ async function owner(request: Request, locals: any, deviceId: string) {
 	return { db, userId, dev } as const;
 }
 
-export async function GET({ request, locals }) {
+export async function GET({ request, locals }: any) {
 	const deviceId = new URL(request.url).searchParams.get('deviceId') ?? '';
 	const o = await owner(request, locals, deviceId);
 	if ('error' in o) return o.error;
@@ -32,6 +35,18 @@ export async function GET({ request, locals }) {
 		custom = r?.custom_layout ? sanitizeLayout(r.custom_layout) : null;
 	} catch {
 		migrated = false; // schema-builder.sql hasn't been run yet
+	}
+	// Your designs (schema-designs.sql). Which one to open: the one asked for (?design=), else the
+	// one on the screen, else the first. ?design=new opens a blank new one.
+	const designs = await listDesigns(db, deviceId);
+	let designId: string | null = null;
+	let designName = '';
+	if (designs) {
+		const want = new URL(request.url).searchParams.get('design');
+		const pick = want === 'new' ? null : designs.find((d) => d.id === want) ?? designs.find((d) => d.id === designIdOf(dev.calendar_style)) ?? designs[0] ?? null;
+		designId = pick?.id ?? null;
+		designName = pick?.name ?? '';
+		custom = pick?.layout ?? null;
 	}
 
 	let font: string | null = null;
@@ -105,10 +120,14 @@ export async function GET({ request, locals }) {
 		countdown,
 		tasksGranted,
 		devices,
+		designs: designs ? designs.map((d) => ({ id: d.id, name: d.name })) : null,
+		designId,
+		designName,
+		onScreen: designIdOf(dev.calendar_style),
 	});
 }
 
-export async function POST({ request, locals }) {
+export async function POST({ request, locals }: any) {
 	let body: any;
 	try {
 		body = await request.json();
@@ -123,15 +142,58 @@ export async function POST({ request, locals }) {
 	if (body.font !== undefined && body.font !== null && !isFamily(body.font)) return json({ error: 'Unknown font.' }, 400);
 	if (body.dark !== undefined && typeof body.dark !== 'boolean') return json({ error: 'Invalid dark mode value.' }, 400);
 
+	const now = Math.floor(Date.now() / 1000);
+	const designs = await listDesigns(db, deviceId);
+
+	// Delete a design. If the screen (or the schedule) used it, those go back to the Agenda.
+	if (body.action === 'delete') {
+		if (!designs) return json({ error: 'Not available yet.' }, 400);
+		const id = String(body.designId ?? '');
+		if (!designs.some((d) => d.id === id)) return json({ error: 'Design not found.' }, 404);
+		await db.prepare('DELETE FROM designs WHERE id = ? AND device_id = ?').bind(id, deviceId).run();
+		const style = designStyle(id);
+		if (o.dev.calendar_style === style) await db.prepare("UPDATE devices SET calendar_style = 'agenda' WHERE id = ?").bind(deviceId).run();
+		try {
+			const r = await db.prepare('SELECT schedule FROM devices WHERE id = ?').bind(deviceId).first();
+			if (r?.schedule && String(r.schedule).includes(style)) {
+				const sch = sanitizeSchedule(r.schedule, isStyleId);
+				sch.slots = sch.slots.filter((x) => x.style !== style);
+				sch.cycle = sch.cycle.filter((x) => x !== style);
+				await db.prepare('UPDATE devices SET schedule = ? WHERE id = ?').bind(JSON.stringify(sch), deviceId).run();
+			}
+		} catch {}
+		await markSaved(db, deviceId);
+		return json({ ok: true });
+	}
+
 	const layout = sanitizeLayout(body.custom);
 	const text = JSON.stringify(layout);
 	if (text.length > MAX_JSON) return json({ error: 'That design is too big to save. Try removing a few widgets.' }, 400);
 
-	const sets = ['custom_layout = ?'];
-	const vals: unknown[] = [text];
+	// Your designs: save into the named design (or a new one), and put it on the screen if asked.
+	let savedId: string | null = null;
+	if (designs) {
+		const name = cleanName(body.name);
+		const existing = typeof body.designId === 'string' && designs.some((d) => d.id === body.designId) ? body.designId : null;
+		if (existing) {
+			await db.prepare('UPDATE designs SET name = ?, layout = ?, updated_at = ? WHERE id = ? AND device_id = ?').bind(name, text, now, existing, deviceId).run();
+			savedId = existing;
+		} else {
+			if (designs.length >= MAX_DESIGNS) return json({ error: `You can keep up to ${MAX_DESIGNS} designs. Delete one first.` }, 400);
+			savedId = newDesignId();
+			await db.prepare('INSERT INTO designs (id, device_id, name, layout, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').bind(savedId, deviceId, name, text, now, now).run();
+		}
+	}
+
+	const sets: string[] = [];
+	const vals: unknown[] = [];
+	if (!designs) {
+		sets.push('custom_layout = ?');
+		vals.push(text);
+	}
 	if (body.activate === true) {
 		sets.push('calendar_style = ?');
-		vals.push('custom');
+		vals.push(savedId ? designStyle(savedId) : 'custom');
 	}
 	if (body.font !== undefined) {
 		sets.push('layout_font = ?');
@@ -141,11 +203,13 @@ export async function POST({ request, locals }) {
 		sets.push('dark_mode = ?');
 		vals.push(body.dark ? 1 : 0);
 	}
-	try {
-		await db.prepare(`UPDATE devices SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`).bind(...vals, deviceId, o.userId).run();
-	} catch {
-		return json({ error: 'The layout builder is not enabled on the server yet (run schema-builder.sql).' }, 500);
+	if (sets.length) {
+		try {
+			await db.prepare(`UPDATE devices SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`).bind(...vals, deviceId, o.userId).run();
+		} catch {
+			return json({ error: 'The layout builder is not enabled on the server yet (run schema-builder.sql).' }, 500);
+		}
 	}
 	await markSaved(db, deviceId);
-	return json({ ok: true, widgets: layout.widgets.length });
+	return json({ ok: true, widgets: layout.widgets.length, designId: savedId });
 }

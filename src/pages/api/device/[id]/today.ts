@@ -3,7 +3,8 @@
 // needed, computing "today" correctly in the user's actual timezone
 // (handling DST automatically via Intl, which an ESP32 could never do on
 // its own), and returning a small, pre-formatted payload.
-import { viewForStyle, LIVE_STYLES, isRefreshSec } from '../../../../data/calendarStyles';
+import { viewForStyle, LIVE_STYLES, isRefreshSec, renderStyleOf } from '../../../../data/calendarStyles';
+import { designIdOf, getDesign } from '../../../../lib/designs';
 import { timelineSleep } from '../../../../lib/eink/layouts/timeline';
 import { getForecast, type Forecast } from '../../../../lib/weather';
 import { renderLayout } from '../../../../lib/eink/layouts';
@@ -391,6 +392,9 @@ export async function GET({ params, request, locals }) {
 			customLayout = r?.custom_layout ? sanitizeLayout(r.custom_layout) : null;
 		} catch {}
 	}
+	// One of Your designs (schema-designs.sql): "design:<id>".
+	const designId = designIdOf(style);
+	if (designId && proto === '2') customLayout = (await getDesign(db, deviceId, designId))?.layout ?? null;
 	const needs = style === 'planner' ? { tasks: true, countdown: false, picture: false, live: false } : layoutNeeds(customLayout);
 	// Meeting room and Desk name plate show free / busy, so they wake when meetings start and end.
 	if (style === 'room' || style === 'nameplate') needs.live = true;
@@ -492,7 +496,7 @@ export async function GET({ params, request, locals }) {
 			}
 		} catch {}
 		const nowLocal = Math.floor(effNowMs / 1000) + offsetSec;
-		const screen = renderLayout(style, {
+		const screen = renderLayout(renderStyleOf(style), {
 			nowLocal,
 			events: trimmedEvents.map((e) => ({ title: e.title, startLocal: e.startLocal, allDay: e.allDay, endLocal: e.endLocal })),
 			weather,

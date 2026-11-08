@@ -19,6 +19,13 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			<div class="tb-left">
 				<a class="back" id="back" href={`/dashboard/display?device=${encodeURIComponent(deviceId)}`}>← Customize display</a>
 				<div class="bld-title" id="title">Layout builder</div>
+				<!-- Your designs (schema-designs.sql): name, switch, new, duplicate, delete -->
+				<div class="designs" id="designs" hidden>
+					<input class="name-in" id="design-name" maxlength="30" aria-label="Design name" placeholder="Name this design" spellcheck="false" />
+					<select id="design-pick" aria-label="Your designs"></select>
+					<button type="button" class="btn ghost small" id="design-dup">Duplicate</button>
+					<button type="button" class="btn ghost small" id="design-del">Delete</button>
+				</div>
 				<select id="device-pick" class="mini" aria-label="Which display" hidden></select>
 			</div>
 			<div class="tb-right">
@@ -26,6 +33,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				<button type="button" class="btn ghost small" id="undo" disabled title="Undo (Ctrl+Z)">Undo</button>
 				<button type="button" class="btn ghost small" id="redo" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
 				<button type="button" class="btn ghost small" id="save" disabled>Save</button>
+				<span class="on-cal" id="on-cal" hidden>On the calendar now</span>
+				<button type="button" class="btn small" id="show-on" hidden>Show on calendar</button>
 				<button type="button" class="btn small" id="saveleave">Save and leave</button>
 			</div>
 		</div>
@@ -135,7 +144,13 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	let lang: 'en' | 'ja' = 'en';
 	let unit: 'c' | 'f' = 'c';
 
-	const key = () => JSON.stringify({ l: layout, f: font, d: dark });
+	// Your designs: which one this is (null = a new one, not saved yet), its name, and the list.
+	let designsOn = false; // false until schema-designs.sql has been run: then it's the old single design
+	let designId: string | null = null;
+	let designName = '';
+	let designList: { id: string; name: string }[] = [];
+	let onScreen: string | null = null; // the design id on the calendar now
+	const key = () => JSON.stringify({ l: layout, f: font, d: dark, n: designName });
 	const ser = () => JSON.stringify(layout);
 	const find = (id: string | null) => layout.widgets.find((w) => w.id === id) ?? null;
 	const name = (w: Widget) => WIDGETS[w.t]?.label ?? w.t;
@@ -1303,7 +1318,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 
 	// ---------------------------------------------------------------- loading and saving
 	async function load() {
-		const res = await fetch('/api/dashboard/builder?deviceId=' + encodeURIComponent(deviceId));
+		const want = new URLSearchParams(location.search).get('design');
+		const res = await fetch('/api/dashboard/builder?deviceId=' + encodeURIComponent(deviceId) + (want ? '&design=' + encodeURIComponent(want) : ''));
 		if (res.status === 401) return void (location.href = '/setup');
 		if (!res.ok) {
 			banner.hidden = false;
@@ -1318,6 +1334,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		lang = d.lang === 'ja' ? 'ja' : 'en';
 		unit = d.unit === 'f' ? 'f' : 'c';
 		layout = sanitizeLayout(d.custom);
+		designsOn = Array.isArray(d.designs);
+		designList = d.designs ?? [];
+		designId = d.designId ?? null;
+		designName = d.designName || (designsOn ? (designList.length ? 'New design' : 'My design') : '');
+		onScreen = d.onScreen ?? null;
 		if (!info.migrated) {
 			banner.hidden = false;
 			banner.textContent = 'The layout builder isn’t switched on on the server yet (schema-builder.sql needs running). You can design here, but saving won’t work until then.';
@@ -1345,6 +1366,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		hist = [ser()];
 		hi = 0;
 		savedKey = key();
+		if (designsOn) $('title').textContent = d.name || 'Layout builder';
 		// "Edit the layout in the builder" on Customize display: start from that layout, filled in,
 		// as an unsaved change (so Undo goes back to the saved design, and nothing changes until Save).
 		if (new URLSearchParams(location.search).get('seed') === '1') {
@@ -1353,7 +1375,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				const seed = JSON.parse(sessionStorage.getItem(k) || 'null');
 				sessionStorage.removeItem(k);
 				// Already have a design? Ask before swapping it (Undo would bring it back, but people shouldn't have to know that).
-				const use = seed?.layout && (!layout.widgets.length || (await ask(`Your current design is replaced when you save. You can still undo it.`, { title: `Start from your ${seed.label || 'layout'} instead?`, ok: `Use ${seed.label || 'it'}`, cancel: 'Keep my design' })));
+				if (seed?.layout && designsOn) {
+					designId = null;
+					designName = seed.label || 'New design';
+				}
+				const use = seed?.layout && (designsOn || !layout.widgets.length || (await ask(`Your current design is replaced when you save. You can still undo it.`, { title: `Start from your ${seed.label || 'layout'} instead?`, ok: `Use ${seed.label || 'it'}`, cancel: 'Keep my design' })));
 				if (use) {
 					layout = sanitizeLayout(seed.layout);
 					commit();
@@ -1363,6 +1389,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			} catch {}
 			history.replaceState(null, '', '/dashboard/builder?device=' + encodeURIComponent(deviceId));
 		}
+		syncDesigns();
 		everything();
 		fonts = await loadFonts().catch(() => null);
 		redraw();
@@ -1372,11 +1399,15 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 
 	let leaving = false;
 	const leave = () => (leaving = true, location.href = `/dashboard/display?device=${encodeURIComponent(deviceId)}`);
-	async function save(thenLeave = false) {
+	async function save(thenLeave = false, showIt = false) {
 		flushCommit();
-		if (!isDirty()) {
+		if (!isDirty() && !(showIt && designId === null) && !(showIt && designsOn)) {
 			if (thenLeave) leave();
 			return;
+		}
+		if (showIt && designsOn && designId && !isDirty()) {
+			// nothing to save, just put it on the screen
+			return void showOnCalendar();
 		}
 		if (saveBtn.disabled && !thenLeave) return;
 		saveBtn.disabled = true;
@@ -1386,12 +1417,23 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			const res = await fetch('/api/dashboard/builder', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ deviceId, custom: layout, activate: true, font, dark }),
+				// With Your designs, saving doesn't change what the calendar shows (Show on calendar does).
+				body: JSON.stringify({ deviceId, custom: layout, font, dark, designId, name: designName, activate: designsOn ? showIt : true }),
 			});
 			const data = await res.json().catch(() => ({}));
 			if (!res.ok) throw new Error(data.error || 'Could not save.');
 			savedKey = key();
-			flash('Saved. Your display picks it up the next time it refreshes.');
+			if (designsOn && data.designId) {
+				const isNew = designId !== data.designId;
+				designId = data.designId;
+				if (showIt) onScreen = designId;
+				const i = designList.findIndex((x) => x.id === designId);
+				if (i >= 0) designList[i].name = designName;
+				else designList.push({ id: designId!, name: designName });
+				if (isNew) history.replaceState(null, '', '/dashboard/builder?device=' + encodeURIComponent(deviceId) + '&design=' + designId);
+				syncDesigns();
+			}
+			flash(designsOn && !showIt && onScreen !== designId ? 'Saved. Press "Show on calendar" to put it on the screen.' : 'Saved. Your display picks it up the next time it refreshes.');
 			refreshChrome();
 			saveBtn.disabled = true;
 			leaveBtn.disabled = false;
@@ -1405,6 +1447,79 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			leaveBtn.disabled = false;
 		}
 	}
+
+	// ---------------------------------------------------------------- Your designs
+	const designsEl = $('designs');
+	const nameIn = $<HTMLInputElement>('design-name');
+	const designPick = $<HTMLSelectElement>('design-pick');
+	const showOnBtn = $<HTMLButtonElement>('show-on');
+	const onCalEl = $('on-cal');
+	let designPickDd: Dropdown | null = null;
+	function syncDesigns() {
+		designsEl.hidden = !designsOn;
+		if (!designsOn) return;
+		if (document.activeElement !== nameIn) nameIn.value = designName;
+		const opts = designList.map((x) => `<option value="${x.id}"${x.id === designId ? ' selected' : ''}>${esc(x.name)}${x.id === onScreen ? ' (on the calendar)' : ''}</option>`);
+		if (designId === null) opts.push(`<option value="" selected>${esc(designName || 'New design')} (not saved yet)</option>`);
+		opts.push('<option value="__new">+ New design</option>');
+		designPick.innerHTML = opts.join('');
+		if (designPickDd) designPickDd.sync();
+		else designPickDd = dropdown(designPick);
+		$('design-del').hidden = designId === null;
+		$('design-dup').hidden = designId === null;
+		const live = designId !== null && designId === onScreen;
+		onCalEl.hidden = !live;
+		showOnBtn.hidden = live;
+	}
+	nameIn.addEventListener('input', () => {
+		designName = nameIn.value;
+		refreshChrome();
+	});
+	nameIn.addEventListener('change', () => {
+		designName = nameIn.value.trim() || 'Untitled design';
+		syncDesigns();
+		refreshChrome();
+	});
+	const openDesign = (id: string | 'new') => {
+		leaving = true;
+		location.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId) + '&design=' + id;
+	};
+	designPick.addEventListener('change', async () => {
+		const to = designPick.value;
+		if (to === (designId ?? '')) return;
+		if (isDirty() && !(await ask('Your changes to this design will be lost.', { title: 'Switch without saving?', ok: 'Switch', danger: true }))) {
+			designPick.value = designId ?? '';
+			designPickDd?.sync();
+			return;
+		}
+		openDesign(to === '__new' ? 'new' : to);
+	});
+	$('design-dup').addEventListener('click', () => {
+		// the same widgets as a new, unsaved design
+		designId = null;
+		designName = ('Copy of ' + designName).slice(0, 30);
+		history.replaceState(null, '', '/dashboard/builder?device=' + encodeURIComponent(deviceId) + '&design=new');
+		syncDesigns();
+		refreshChrome();
+		flash('This is a copy. Save it to keep it.');
+	});
+	$('design-del').addEventListener('click', async () => {
+		if (!designId) return;
+		const onCal = designId === onScreen;
+		if (!(await ask(onCal ? 'It\u2019s on the calendar now, so the calendar goes back to the Agenda.' : 'This can\u2019t be undone.', { title: `Delete "${designName}"?`, ok: 'Delete it', danger: true }))) return;
+		const r = await fetch('/api/dashboard/builder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceId, action: 'delete', designId }) });
+		if (!r.ok) return flash('Couldn\u2019t delete it. Try again.', true);
+		const next = designList.find((x) => x.id !== designId);
+		openDesign(next ? next.id : 'new');
+	});
+	async function showOnCalendar() {
+		const r = await fetch('/api/dashboard/display', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceId, style: 'design:' + designId }) });
+		if (!r.ok) return flash('Couldn\u2019t put it on the calendar. Try again.', true);
+		onScreen = designId;
+		syncDesigns();
+		flash('It\u2019s on the calendar. Press its button to see it now.');
+	}
+	showOnBtn.addEventListener('click', () => save(false, true));
 
 	saveBtn.addEventListener('click', () => save(false));
 	leaveBtn.addEventListener('click', () => save(true));
@@ -1447,6 +1562,13 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .back:hover { color: var(--fg); }
 	.bld .bld-title { font-size: 1.25em; font-weight: 800; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.bld .tb-right { display: flex; align-items: center; gap: 0.5em; margin-left: auto; }
+	.bld .designs { display: flex; align-items: center; gap: 0.45em; flex-wrap: wrap; }
+	.bld .designs[hidden] { display: none; }
+	.bld .name-in { width: 13em; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 999px; padding: 0.45em 0.9em; font: inherit; font-weight: 700; font-size: 0.9em; }
+	.bld .name-in:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.bld .designs .dd { min-width: 11em; }
+	.bld .on-cal { font-size: 0.82em; font-weight: 700; color: #69b98a; white-space: nowrap; }
+	.bld .on-cal[hidden], .bld #show-on[hidden] { display: none; }
 	.bld .save-msg { font-size: 0.84em; color: var(--muted); margin-right: 0.4em; }
 	.bld .save-msg.is-dirty { color: #d9a441; }
 	.bld .save-msg.is-error { color: #e08a8a; }
