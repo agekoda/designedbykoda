@@ -52,87 +52,16 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			</div>
 
 			<div class="right">
-				<div class="tabs" role="tablist" aria-label="Display settings">
-					<button type="button" role="tab" class="tab on" data-tab="layout">Layout</button>
-					<button type="button" role="tab" class="tab" data-tab="schedule">Schedule</button>
-					<button type="button" role="tab" class="tab" data-tab="font">Font</button>
-					<button type="button" role="tab" class="tab" data-tab="display">Display</button>
-					<button type="button" role="tab" class="tab" data-tab="picture" id="tab-picture-btn" hidden>Picture</button>
-					<button type="button" role="tab" class="tab" data-tab="options" id="tab-options-btn" hidden>Options</button>
-				</div>
+				<!-- the screen, and everything that screen needs, right under it -->
+				<section class="box screen-box">
+					<div class="label" id="screen-label">Screen</div>
+					<div class="cur">
+						<canvas id="cur-thumb" width="400" height="300" aria-hidden="true"></canvas>
+						<div class="cur-t"><div class="cur-name" id="cur-name"></div><div class="cur-note" id="cur-note"></div></div>
+						<button type="button" class="btn" id="change-screen" aria-haspopup="dialog">Change screen</button>
+					</div>
+					<div class="details" id="details">
 
-				<section class="tabpanel" data-panel="layout">
-					<div class="modes" id="modes" role="radiogroup" aria-label="How do you want to set up the screen?">
-						<button type="button" class="mode" data-mode="preset" role="radio"><span class="mode-t">Ready-made layouts</span><span class="mode-n">Pick one and you are done</span></button>
-						<button type="button" class="mode" data-mode="custom" role="radio"><span class="mode-t">Design your own</span><span class="mode-n">Drag, drop and resize widgets</span></button>
-					</div>
-					<button type="button" class="sch-sum" id="sch-sum"></button>
-					<div class="layouts" id="layouts" role="radiogroup" aria-label="Layout"></div>
-					<div class="custom-box" id="custom-box" hidden>
-						<p class="muted" id="custom-status"></p>
-						<a class="btn" id="custom-open" href="#">Open the layout builder</a>
-						<p class="muted small hint">Start from a template or a blank screen, then drag widgets anywhere.</p>
-					</div>
-				</section>
-
-				<section class="tabpanel" data-panel="schedule" hidden>
-					<label class="switch">
-						<input type="checkbox" id="sch-on" />
-						<span class="track" aria-hidden="true"></span>
-						<span class="switch-text">Change the screen at set times</span>
-					</label>
-					<div id="sch-body" hidden>
-						<div class="sch-presets" id="sch-presets"></div>
-						<div id="sch-slots"></div>
-						<button type="button" class="btn ghost small" id="sch-add">+ Add a time</button>
-						<p class="muted small hint" id="sch-rest"></p>
-						<div class="label sub" style="margin-top:1.4em">Your week</div>
-						<div class="week" id="sch-week"></div>
-						<div class="week-key" id="sch-key"></div>
-					</div>
-
-					<div class="label sub" style="margin-top:1.8em">The button on the calendar</div>
-					<div class="seg" id="btn-mode" role="radiogroup" aria-label="What the button does">
-						<label><input type="radio" name="btnmode" value="refresh" /><span>Refreshes</span></label>
-						<label><input type="radio" name="btnmode" value="next" /><span>Flips to the next screen</span></label>
-					</div>
-					<div id="cycle-box" hidden>
-						<p class="muted small hint">Screens it flips through, after your main layout:</p>
-						<div class="chips" id="cycle-chips"></div>
-					</div>
-					<p class="muted small hint" id="btn-hint"></p>
-					<p class="banner small" id="sch-banner" hidden>Schedules need a one-off database update on the server (schema-screens.sql) before they can be saved.</p>
-				</section>
-
-				<section class="tabpanel" data-panel="font" hidden>
-					<div class="fonts" id="fonts" role="radiogroup" aria-label="Font"></div>
-				</section>
-
-				<section class="tabpanel" data-panel="display" hidden>
-					<label class="switch">
-						<input type="checkbox" id="dark" />
-						<span class="track" aria-hidden="true"></span>
-						<span class="switch-text">Dark mode <small>white on black</small></span>
-					</label>
-					<div class="label sub" style="margin-top:1.6em">Language</div>
-					<div class="seg" id="lang" role="radiogroup" aria-label="Language">
-						<label><input type="radio" name="lang" value="en" /><span>English</span></label>
-						<label><input type="radio" name="lang" value="ja" /><span>日本語</span></label>
-					</div>
-					<p class="muted small hint">Changes the screen's labels. Event names stay as they are.</p>
-					<div class="label sub" style="margin-top:1.6em">Temperature</div>
-					<div class="seg" id="unit" role="radiogroup" aria-label="Temperature unit">
-						<label><input type="radio" name="unit" value="c" /><span>°C Celsius</span></label>
-						<label><input type="radio" name="unit" value="f" /><span>°F Fahrenheit</span></label>
-					</div>
-					<div id="refresh-box" hidden>
-						<div class="label sub" style="margin-top:1.6em">How often it updates</div>
-						<div class="seg wrap" id="refreshes" role="radiogroup" aria-label="How often the Timeline updates"></div>
-						<p class="muted small hint" id="refresh-hint"></p>
-					</div>
-				</section>
-
-				<section class="tabpanel" data-panel="options" hidden>
 					<div id="opt-countdown" hidden>
 						<div class="label sub">What are you counting down to?</div>
 						<input class="txt" id="cd-title" type="text" maxlength="40" placeholder="Japan trip" autocomplete="off" />
@@ -141,22 +70,32 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						<p class="muted small hint">Counts down each morning, and says "Today!" on the day.</p>
 					</div>
 					<div id="opt-msgs" hidden>
-						<p class="muted small">Send messages, share a link so family can send them from their phone, and choose how they show.</p>
+						<p class="muted small">Send messages, or share a link so others can send them from their phone.</p>
 						<a class="btn small" id="msgs-open" href="#">Open Messages</a>
 					</div>
 					<div id="opt-sign" hidden>
 						<div id="sign-fields"></div>
 						<a class="btn small ghost" id="sign-builder" href="#">Edit the layout in the builder</a>
-						<p class="muted small hint">Opens it in the layout builder, where you can move things around and add widgets. Saving there makes it your own design.</p>
+						<p class="muted small hint">Opens it in the layout builder as a new design of your own, where you can move things around and add widgets.</p>
 					</div>
 					<div id="opt-todo" hidden>
 						<p class="muted" id="todo-status"></p>
 						<a class="btn small" id="todo-connect" href="/api/auth/google/start?tasks=1">Connect Google Tasks</a>
 						<p class="muted small hint">Shows your default Google Tasks list. Tick tasks off in Google Tasks or Google Calendar.</p>
 					</div>
-				</section>
 
-				<section class="tabpanel" data-panel="picture" hidden>
+						<div id="opt-design" hidden>
+							<a class="btn small" id="design-edit" href="#">Edit this design</a>
+							<p class="muted small hint">Opens it in the layout builder.</p>
+						</div>
+					<div id="refresh-box" hidden>
+						<div class="label sub">How often it updates</div>
+						<div class="seg wrap" id="refreshes" role="radiogroup" aria-label="How often the Timeline updates"></div>
+						<p class="muted small hint" id="refresh-hint"></p>
+					</div>
+
+						<div id="pic-box" hidden>
+
 					<div class="seg" id="corner-seg" role="radiogroup" aria-label="Top right of the Agenda">
 						<label><input type="radio" name="corner" value="calendar" checked /><span>Mini calendar</span></label>
 						<label><input type="radio" name="corner" value="image" /><span>Picture</span></label>
@@ -198,7 +137,105 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 									<p class="muted small hint">Cut-off: right for more black, left for more white.</p>
 						</div>
 					</div>
+
+						</div>
+					</div>
 				</section>
+
+				<!-- everything else, always in the same order, each showing what it's set to -->
+				<section class="box rows">
+					<details class="row" id="row-look">
+						<summary><span class="ico" aria-hidden="true">Aa</span><span class="rt">Look</span><span class="sum" id="sum-look"></span></summary>
+						<div class="row-b">
+							<div class="label sub">Font</div>
+							<div class="fonts" id="fonts" role="radiogroup" aria-label="Font"></div>
+							<div style="margin-top:1.2em">
+
+					<label class="switch">
+						<input type="checkbox" id="dark" />
+						<span class="track" aria-hidden="true"></span>
+						<span class="switch-text">Dark mode <small>white on black</small></span>
+					</label>
+
+							</div>
+						</div>
+					</details>
+					<details class="row" id="row-when">
+						<summary><span class="ico" aria-hidden="true">↻</span><span class="rt">When it changes</span><span class="sum" id="sum-when"></span></summary>
+						<div class="row-b">
+
+					<label class="switch">
+						<input type="checkbox" id="sch-on" />
+						<span class="track" aria-hidden="true"></span>
+						<span class="switch-text">Change the screen at set times</span>
+					</label>
+					<div id="sch-body" hidden>
+						<div class="sch-presets" id="sch-presets"></div>
+						<div id="sch-slots"></div>
+						<button type="button" class="btn ghost small" id="sch-add">+ Add a time</button>
+						<p class="muted small hint" id="sch-rest"></p>
+						<div class="label sub" style="margin-top:1.4em">Your week</div>
+						<div class="week" id="sch-week"></div>
+						<div class="week-key" id="sch-key"></div>
+					</div>
+
+					<div class="label sub" style="margin-top:1.8em">The button on the calendar</div>
+					<div class="seg" id="btn-mode" role="radiogroup" aria-label="What the button does">
+						<label><input type="radio" name="btnmode" value="refresh" /><span>Refreshes</span></label>
+						<label><input type="radio" name="btnmode" value="next" /><span>Flips to the next screen</span></label>
+					</div>
+					<div id="cycle-box" hidden>
+						<p class="muted small hint">Screens it flips through, after your main layout:</p>
+						<div class="chips" id="cycle-chips"></div>
+					</div>
+					<p class="muted small hint" id="btn-hint"></p>
+					<p class="banner small" id="sch-banner" hidden>Schedules need a one-off database update on the server (schema-screens.sql) before they can be saved.</p>
+
+						</div>
+					</details>
+					<a class="row row-link" id="row-msgs" href={`/dashboard/messages?device=${encodeURIComponent(deviceId)}`}>
+						<span class="ico" aria-hidden="true">✉</span><span class="rt">Messages</span><span class="sum" id="sum-msgs"></span><span class="go" aria-hidden="true">›</span>
+					</a>
+					<details class="row" id="row-lang">
+						<summary><span class="ico" aria-hidden="true">文</span><span class="rt">Language and units</span><span class="sum" id="sum-lang"></span></summary>
+						<div class="row-b">
+					<div class="label sub">Language</div>
+					<div class="seg" id="lang" role="radiogroup" aria-label="Language">
+						<label><input type="radio" name="lang" value="en" /><span>English</span></label>
+						<label><input type="radio" name="lang" value="ja" /><span>日本語</span></label>
+					</div>
+					<p class="muted small hint">Changes the screen's labels. Event names stay as they are.</p>
+					<div class="label sub" style="margin-top:1.6em">Temperature</div>
+					<div class="seg" id="unit" role="radiogroup" aria-label="Temperature unit">
+						<label><input type="radio" name="unit" value="c" /><span>°C Celsius</span></label>
+						<label><input type="radio" name="unit" value="f" /><span>°F Fahrenheit</span></label>
+					</div>
+
+						</div>
+					</details>
+				</section>
+			</div>
+		</div>
+
+		<!-- Change screen: slides in from the right, so the preview stays in view -->
+		<div class="picker-back" id="picker" hidden>
+			<div class="picker" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+				<div class="picker-h">
+					<div><div class="picker-t" id="picker-title">Choose a screen</div><div class="muted small">Click one to preview it. Nothing changes until you save.</div></div>
+					<button type="button" class="btn small" id="picker-done">Done</button>
+				</div>
+				<div class="cats" id="cats" role="tablist" aria-label="Show">
+					<button type="button" class="cat on" data-f="all">All</button>
+					<button type="button" class="cat" data-f="cal">Calendar</button>
+					<button type="button" class="cat" data-f="sign">Signs</button>
+					<button type="button" class="cat" data-f="glance">At a glance</button>
+					<button type="button" class="cat" data-f="mine">Your designs</button>
+				</div>
+				<div class="picker-scroll">
+					<div class="layouts" id="layouts" role="radiogroup" aria-label="Screen"></div>
+					<div class="gname" id="mine-head">Your designs</div>
+					<div class="layouts" id="design-cards"></div>
+				</div>
 			</div>
 		</div>
 
@@ -240,7 +277,22 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	} from '../../lib/eink/image';
 
 	const root = document.querySelector('.cust') as HTMLElement;
-	const styles: { id: string; label: string; note: string; corner: boolean; frame: boolean; builder: boolean }[] = JSON.parse(root.dataset.styles!);
+	type StyleInfo = { id: string; label: string; note: string; corner: boolean; frame: boolean; builder: boolean; design?: boolean };
+	const baseStyles: StyleInfo[] = JSON.parse(root.dataset.styles!);
+	// every screen there is: the ready-made ones, then Your designs ("design:<id>"). Rebuilt when designs load.
+	let styles: StyleInfo[] = baseStyles;
+	let designs: { id: string; name: string; layout: any }[] | null = null; // null until schema-designs.sql is run
+	function rebuildStyles() {
+		const ready = baseStyles.filter((x) => !x.builder || designs === null);
+		const mine = (designs ?? []).map((d) => ({ id: 'design:' + d.id, label: d.name, note: 'Your design', corner: false, frame: false, builder: false, design: true }));
+		styles = [...ready, ...mine];
+	}
+	const isDesign = (id: string) => id.startsWith('design:');
+	const designOf = (id: string) => (isDesign(id) ? designs?.find((d) => 'design:' + d.id === id) ?? null : null);
+	const layoutOf = (id: string) => (id === 'custom' ? customLayout : designOf(id)?.layout ?? null);
+	const renderId = (id: string) => (isDesign(id) ? 'custom' : id);
+	// which group each ready-made screen sits in, for the picker's filters
+	const GROUP: Record<string, string> = { agenda: 'cal', month: 'cal', week: 'cal', bigdate: 'cal', timeline: 'cal', nextup: 'cal', planner: 'cal', room: 'sign', guest: 'sign', nameplate: 'sign', messages: 'glance', moon: 'glance', quote: 'glance', countdown: 'glance', todo: 'glance', frame: 'glance', custom: 'mine' };
 	const families: { id: string; label: string }[] = JSON.parse(root.dataset.families!);
 	const dithers: { id: string; label: string; note: string }[] = JSON.parse(root.dataset.dithers!);
 	const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -251,8 +303,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const darkBox = $<HTMLInputElement>('dark');
 	const langEl = $('lang');
 	const unitEl = $('unit');
-	const tabPicBtn = $('tab-picture-btn');
-	const tabOptBtn = $('tab-options-btn');
+	const picBox = $('pic-box');
+	const optDesign = $('opt-design');
+	const designEdit = $<HTMLAnchorElement>('design-edit');
+	const picker = $('picker');
+	const designCards = $('design-cards');
 	const cornerSeg = $('corner-seg');
 	const picIntro = $('pic-intro');
 	const edNote = $('ed-note');
@@ -262,10 +317,6 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const optMsgs = $('opt-msgs');
 	const signFields = $('sign-fields');
 	const signBuilder = $<HTMLAnchorElement>('sign-builder');
-	const customBox = $('custom-box');
-	const modesEl = $('modes');
-	const customStatus = $('custom-status');
-	const customOpen = $('custom-open') as HTMLAnchorElement;
 	const cdTitle = $<HTMLInputElement>('cd-title');
 	const cdDate = $<HTMLInputElement>('cd-date');
 	const todoStatus = $('todo-status');
@@ -296,7 +347,6 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const schRest = $('sch-rest');
 	const schWeek = $('sch-week');
 	const schKey = $('sch-key');
-	const schSum = $('sch-sum');
 	const schBanner = $('sch-banner');
 	const btnModeEl = $('btn-mode');
 	const cycleBox = $('cycle-box');
@@ -344,7 +394,6 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	let loc: { lat: number; lon: number } | null = null;
 	let tasksGranted = false;
 	let customLayout: any = null;
-	let lastPreset = 'agenda';
 	let vbat: number | null = null;
 	let st: State = {
 		style: 'agenda',
@@ -407,7 +456,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			frameImage: s?.frame ? (pics.frame.bytes ?? (thumb ? sampleFrameBytes() : null)) : null,
 			loc,
 			countdown: styleId === 'countdown' ? cd : null,
-			custom: styleId === 'custom' ? (thumb && !customLayout?.widgets?.length ? sanitizeLayout(TEMPLATES.find((x) => x.id === 'sky')!.build()) : customLayout) : null,
+			custom: styleId === 'custom' ? (thumb && !customLayout?.widgets?.length ? sanitizeLayout(TEMPLATES.find((x) => x.id === 'sky')!.build()) : customLayout) : isDesign(styleId) ? layoutOf(styleId) : null,
 			tasksState: (thumb || tasksGranted ? 'ok' : 'needs_permission') as 'ok' | 'needs_permission',
 			sign: st.sign,
 		};
@@ -526,7 +575,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	async function redraw() {
 		const common = { font: effFont(), dark: st.dark, lang: st.lang, unit: st.unit, hasWeather, vbat: vbat ?? 4.12, refreshSec: st.refreshSec };
 		try {
-			const r = await renderPreview({ ...common, style: fs(), ...extras(fs(), false), refreshSec: fs() === 'timeline' ? st.refreshSec : 86400 });
+			const r = await renderPreview({ ...common, style: renderId(fs()), ...extras(fs(), false), refreshSec: fs() === 'timeline' ? st.refreshSec : 86400 });
+			paintScreen($<HTMLCanvasElement>('cur-thumb'), r.px, { mode: 'screen', scale: 1 });
 			const dpr = window.devicePixelRatio || 1;
 			// whole-number panel pixels (each dot = k x k real screen pixels) so the dithering stays crisp
 			const avail = (screen.parentElement as HTMLElement).clientWidth * dpr;
@@ -536,9 +586,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			if (thumbsDirty) {
 				thumbsDirty = false;
 				for (const s of styles) {
-					const cv = layoutsEl.querySelector<HTMLCanvasElement>(`canvas[data-sid="${s.id}"]`);
+					const cv = picker.querySelector<HTMLCanvasElement>(`canvas[data-sid="${s.id}"]`);
 					if (!cv) continue;
-					const t = await renderPreview({ ...common, style: s.id, ...extras(s.id, true) });
+					const t = await renderPreview({ ...common, style: renderId(s.id), ...extras(s.id, true) });
 					paintScreen(cv, t.px, { mode: 'screen', scale: 1 });
 				}
 				const fonts = await loadFonts();
@@ -561,23 +611,71 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		}
 	}
 
-	// ---------------------------------------------------------------- tabs
-	let activeTab = 'layout';
-	function showTab(name: string) {
-		activeTab = name;
-		document.querySelectorAll<HTMLElement>('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === name));
-		document.querySelectorAll<HTMLElement>('.tabpanel').forEach((p) => (p.hidden = p.dataset.panel !== name));
+	// ---------------------------------------------------------------- the rows, and the screen picker
+	const openRow = (id: string) => (($(id) as HTMLDetailsElement).open = true);
+	let pickerFilter = 'all';
+	function openPicker() {
+		picker.hidden = false;
+		document.body.classList.add('picker-open');
+		thumbsDirty = true;
+		schedule();
+		(picker.querySelector<HTMLInputElement>('input[name="layout"]:checked') ?? picker.querySelector('input'))?.focus();
 	}
-	document.querySelectorAll<HTMLElement>('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab!)));
+	function closePicker() {
+		picker.hidden = true;
+		document.body.classList.remove('picker-open');
+		$('change-screen').focus();
+	}
+	function filterPicker(f: string) {
+		pickerFilter = f;
+		$('cats').querySelectorAll<HTMLElement>('.cat').forEach((c) => c.classList.toggle('on', c.dataset.f === f));
+		// All: one grid in the usual order, then Your designs. A filter shows just that group.
+		layoutsEl.querySelectorAll<HTMLElement>('.lay').forEach((l) => (l.hidden = f !== 'all' && l.dataset.g !== f));
+		layoutsEl.hidden = f === 'mine' && !layoutsEl.querySelector('.lay[data-g="mine"]');
+		const showMine = f === 'all' || f === 'mine';
+		designCards.hidden = !showMine || designs === null;
+		$('mine-head').hidden = !showMine || designs === null || f === 'mine';
+		picker.querySelector('.picker-scroll')!.scrollTop = 0;
+	}
+	picker.classList.add('cust');
+	document.body.appendChild(picker);
+	$('change-screen').addEventListener('click', openPicker);
+	$('picker-done').addEventListener('click', closePicker);
+	$('cats').addEventListener('click', (e) => {
+		const c = (e.target as HTMLElement).closest<HTMLElement>('.cat');
+		if (c) filterPicker(c.dataset.f!);
+	});
+	picker.addEventListener('pointerdown', (e) => e.target === picker && closePicker());
+	document.addEventListener('keydown', (e) => e.key === 'Escape' && !picker.hidden && !document.querySelector('.x-dlg-back, .dd-menu:not([hidden])') && closePicker());
+	const card = (s: StyleInfo) =>
+		`<label class="lay" data-g="${GROUP[s.id] ?? 'mine'}"><input type="radio" name="layout" value="${s.id}" /><span class="lay-card"><canvas data-sid="${s.id}" width="400" height="300"></canvas><span class="lay-name">${escHtml(s.label)}</span><span class="lay-note">${escHtml(s.note)}</span>${s.design ? `<a class="lay-edit" data-builder="1" data-design="${s.id.slice(7)}" href="/dashboard/builder?device=${encodeURIComponent(deviceId)}&design=${s.id.slice(7)}">Edit</a>` : ''}</span></label>`;
+	function buildPicker() {
+		layoutsEl.innerHTML = styles.filter((x) => !x.design).map(card).join('');
+		designCards.innerHTML =
+			styles.filter((x) => x.design).map(card).join('') +
+			`<a class="lay lay-new" data-builder="1" data-design="new" href="/dashboard/builder?device=${encodeURIComponent(deviceId)}&design=new"><span class="lay-card"><span class="plus">+</span><span class="lay-name">New design</span><span class="lay-note">Drag and drop your own</span></span></a>`;
+		filterPicker(pickerFilter);
+		thumbsDirty = true;
+	}
+	function pick(id: string) {
+		viewStyle = null;
+		st.style = id;
+		syncControls();
+		schedule(false);
+		changed();
+	}
+	picker.addEventListener('change', (e) => {
+		const t = e.target as HTMLInputElement;
+		if (t.name === 'layout') pick(t.value);
+	});
+	picker.addEventListener('click', (e) => {
+		const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-design]');
+		if (a) openBuilder(e, false, a.dataset.design!);
+	});
 
 	// ---------------------------------------------------------------- controls
 	function buildControls() {
-		layoutsEl.innerHTML = styles
-			.filter((s) => !s.builder)
-			.map(
-				(s) => `<label class="lay"><input type="radio" name="layout" value="${s.id}" /><span class="lay-card"><canvas data-sid="${s.id}" width="400" height="300"></canvas><span class="lay-name">${s.label}</span><span class="lay-note">${s.note}</span></span></label>`
-			)
-			.join('');
+		buildPicker();
 		fontsEl.innerHTML = families
 			.map(
 				(f) => `<label class="fnt"><input type="radio" name="font" value="${f.id}" /><span class="fnt-card"><canvas data-fid="${f.id}" width="400" height="120"></canvas><span class="fnt-name">${f.label}</span></span></label>`
@@ -596,24 +694,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			.map((d) => `<label title="${d.note}"><input type="radio" name="dither" value="${d.id}" /><span>${d.label}</span></label>`)
 			.join('');
 
-		modesEl.addEventListener('click', (e) => {
-			const m = (e.target as HTMLElement).closest<HTMLElement>('.mode');
-			if (!m) return;
-			const to = m.dataset.mode === 'custom' ? 'custom' : lastPreset === 'custom' ? 'agenda' : lastPreset;
-			if (to === st.style) return;
-			viewStyle = null;
-			st.style = to;
-			syncControls();
-			schedule();
-			changed();
-		});
-		layoutsEl.addEventListener('change', (e) => {
-			viewStyle = null;
-			st.style = (e.target as HTMLInputElement).value;
-			syncControls();
-			schedule();
-			changed();
-		});
+
 		fontsEl.addEventListener('change', (e) => {
 			st.font = (e.target as HTMLInputElement).value;
 			syncControls();
@@ -761,7 +842,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		schedule(false);
 		// only the Agenda's (or the Photo frame's) thumbnail changes when the picture does
 		const sid = isFrame() ? 'frame' : 'agenda';
-		const cv = layoutsEl.querySelector<HTMLCanvasElement>(`canvas[data-sid="${sid}"]`);
+		const cv = picker.querySelector<HTMLCanvasElement>(`canvas[data-sid="${sid}"]`);
 		if (cv)
 			renderPreview({ style: sid, font: effFont(), dark: st.dark, lang: st.lang, unit: st.unit, hasWeather, vbat: vbat ?? 4.12, ...extras(sid, true) }).then((r) => paintScreen(cv, r.px, { mode: 'screen', scale: 1 }));
 		changed();
@@ -782,7 +863,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	function syncControls() {
-		layoutsEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.style));
+		picker.querySelectorAll<HTMLInputElement>('input[name="layout"]').forEach((i) => (i.checked = i.value === st.style));
+		syncScreenBox();
 		syncSchedule();
 		syncBattery();
 		fontsEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === effFont()));
@@ -794,8 +876,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		refreshHint.textContent = REFRESH_HINTS[st.refreshSec] ?? '';
 
 		// Picture tab: the Agenda's corner picture, or the Photo frame's whole-screen one
-		tabPicBtn.hidden = !(supportsCorner() || isFrame());
-		if (tabPicBtn.hidden && activeTab === 'picture') showTab('layout');
+		picBox.hidden = !(supportsCorner() || isFrame());
 		cornerSeg.hidden = isFrame();
 		picIntro.hidden = isFrame();
 		document.querySelectorAll<HTMLInputElement>('input[name="corner"]').forEach((r) => (r.checked = r.value === st.cornerMode));
@@ -810,29 +891,22 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 
 		// Options tab: the Countdown's name and date, or connecting Google Tasks
 		const opt = fs() === 'countdown' ? 'countdown' : (fs() === 'todo' || fs() === 'planner') ? 'todo' : isSignStyle(fs()) ? 'sign' : fs() === 'messages' ? 'msgs' : null;
-		tabOptBtn.hidden = !opt;
-		tabOptBtn.textContent = opt === 'countdown' ? 'Countdown' : opt === 'todo' ? 'Tasks' : opt === 'sign' ? 'Words' : opt === 'msgs' ? 'Messages' : 'Options';
-		if (!opt && activeTab === 'options') showTab('layout');
 		optCountdown.hidden = opt !== 'countdown';
 		optTodo.hidden = opt !== 'todo';
 		optSign.hidden = opt !== 'sign';
 		optMsgs.hidden = opt !== 'msgs';
 		($('msgs-open') as HTMLAnchorElement).href = '/dashboard/messages?device=' + encodeURIComponent(deviceId);
 		if (opt === 'sign') syncSignFields();
-		const isCustom = st.style === 'custom';
-		customBox.hidden = !isCustom;
-		layoutsEl.hidden = isCustom;
-		modesEl.querySelectorAll<HTMLElement>('.mode').forEach((m) => {
-			const on = (m.dataset.mode === 'custom') === isCustom;
-			m.classList.toggle('on', on);
-			m.setAttribute('aria-checked', String(on));
-		});
-		if (!isCustom) lastPreset = st.style;
-		const nW = customLayout?.widgets?.length ?? 0;
-		customStatus.textContent = nW ? `Your design has ${nW} widget${nW === 1 ? '' : 's'}.` : 'You haven\u2019t designed a screen yet.';
-		customOpen.textContent = nW ? 'Edit your design' : 'Start designing';
-		customOpen.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId);
-		customOpen.dataset.builder = '1';
+		// your own design: a button to edit it
+		const mineNow = isDesign(fs()) || fs() === 'custom';
+		optDesign.hidden = !mineNow;
+		designEdit.textContent = fs() === 'custom' && !customLayout?.widgets?.length ? 'Start designing' : 'Edit this design';
+		designEdit.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId) + (isDesign(fs()) ? '&design=' + fs().slice(7) : '');
+		designEdit.dataset.builder = '1';
+		// nothing to set up for this screen? say so, rather than leave an empty box
+		const detailsEl = $('details');
+		detailsEl.classList.toggle('empty', [...detailsEl.children].every((c) => (c as HTMLElement).hidden));
+		syncSums();
 		if (cdTitle.value !== st.countdown.title) cdTitle.value = st.countdown.title;
 		if (cdDate.value !== st.countdown.date) cdDate.value = st.countdown.date;
 		todoStatus.textContent = tasksGranted ? 'Google Tasks is connected.' : 'To show your tasks, allow this calendar to read your Google Tasks.';
@@ -891,8 +965,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	// changes?" on the way to the builder made no sense to people (they hadn't typed anything), so
 	// these buttons just save what's chosen and go. From a sign layout, the builder opens with that
 	// layout filled in (seed=1 picks it up from sessionStorage).
-	async function openBuilder(e: Event, fromSign: boolean) {
+	async function openBuilder(e: Event, fromSign: boolean, design?: string) {
 		e.preventDefault();
+		e.stopPropagation();
 		const id = fs();
 		const seed = fromSign && isSignStyle(id);
 		if (seed) {
@@ -905,10 +980,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			if (isDirty()) return; // save() has already said what went wrong
 		}
 		skipUnload = true;
-		location.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId) + (seed ? '&seed=1' : '');
+		location.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId) + (seed ? '&seed=1&design=new' : design ? '&design=' + design : isDesign(id) ? '&design=' + id.slice(7) : '');
 	}
 	signBuilder.addEventListener('click', (e) => openBuilder(e, true));
-	customOpen.addEventListener('click', (e) => openBuilder(e, false));
+	designEdit.addEventListener('click', (e) => openBuilder(e, false));
 
 	// ---------------------------------------------------------------- schedule
 	const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday first
@@ -917,10 +992,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const escHtml = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 	// what each scheduled layout still needs before it can show anything useful
 	function needsNote(id: string): string {
-		if (id === 'frame' && !pics.frame.img) return 'Needs a photo: open the Picture tab.';
-		if (id === 'countdown' && !(st.countdown.title.trim() && st.countdown.date)) return 'Needs a name and date: open the Countdown tab.';
-		if (id === 'custom' && !customLayout?.widgets?.length) return 'You haven’t designed a screen yet.';
-		if ((id === 'todo' || id === 'planner') && !tasksGranted) return 'Needs Google Tasks: open the Tasks tab.';
+		if (id === 'frame' && !pics.frame.img) return 'Needs a photo: click it to add one.';
+		if (id === 'countdown' && !(st.countdown.title.trim() && st.countdown.date)) return 'Needs a name and date: click it to add them.';
+		if ((id === 'custom' || isDesign(id)) && !layoutOf(id)?.widgets?.length) return 'This design is empty.';
+		if ((id === 'todo' || id === 'planner') && !tasksGranted) return 'Needs Google Tasks: click it to connect.';
 		return '';
 	}
 	function schChanged(redrawThumbs = false) {
@@ -1103,11 +1178,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 					? `Each press shows the next one: ${inCycle.map(labelOf).join(' → ')}. ${st.sch.on && st.sch.slots.length ? 'It goes back to the schedule at the next change.' : 'It stays until you press again.'}`
 					: 'Pick at least one more screen to flip to.'
 				: 'Each press updates the screen straight away.';
-		// summary on the Layout tab, so the schedule is easy to find
-		const n = st.sch.on ? st.sch.slots.length : 0;
-		schSum.innerHTML = n
-			? `<b>Schedule on</b> · ${st.sch.slots.map((x) => `${escHtml(labelOf(x.style))} ${x.from === x.to ? escHtml(daysText(x.days).toLowerCase()) : `${minutesToHHMM(x.from)}–${minutesToHHMM(x.to)}`}`).join(', ')} <span>Edit</span>`
-			: `<b>Want it to change through the day?</b> Show a photo at night, the month on weekends… <span>Set a schedule</span>`;
+		syncSums();
+		syncScreenBox();
 		// the pill over the preview
 		viewPill.hidden = !viewStyle;
 		if (viewStyle) {
@@ -1116,9 +1188,42 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		}
 	}
 
+	// ---------------------------------------------------------------- the Screen box and the row summaries
+	function syncScreenBox() {
+		const id = fs();
+		$('screen-label').textContent = viewStyle ? 'From your schedule' : 'Screen';
+		$('cur-name').textContent = labelOf(id);
+		const note = needsNote(id);
+		const info = styles.find((x) => x.id === id);
+		$('cur-note').textContent = note || (info?.note ?? '');
+		$('cur-note').classList.toggle('warn', !!note);
+	}
+	let msgSum = '';
+	function syncSums() {
+		const fam = families.find((f) => f.id === st.font)?.label ?? 'Layout font';
+		$('sum-look').textContent = `${fam} · ${st.dark ? 'Dark' : 'Light'}`;
+		const n = st.sch.on ? st.sch.slots.length : 0;
+		const parts: string[] = [];
+		parts.push(n ? `${n} time${n === 1 ? '' : 's'} set` : 'Always this screen');
+		if (st.sch.button === 'next') parts.push('button cycles');
+		$('sum-when').textContent = parts.join(' · ');
+		$('sum-msgs').textContent = msgSum;
+		$('sum-lang').textContent = `${st.lang === 'ja' ? '日本語' : 'English'} · °${st.unit.toUpperCase()}`;
+	}
+	async function loadMsgSum() {
+		try {
+			const r = await fetch('/api/dashboard/messages?deviceId=' + encodeURIComponent(deviceId));
+			if (!r.ok) return;
+			const j = await r.json();
+			const k = Array.isArray(j.messages) ? j.messages.length : 0;
+			msgSum = k ? `${k} on the calendar` : 'None yet';
+			syncSums();
+		} catch {}
+	}
+
 	// ---------------------------------------------------------------- battery
 	function syncBattery() {
-		const live = usedStyles().includes('custom') && layoutNeeds(customLayout).live;
+		const live = usedStyles().some((id) => (id === 'custom' || isDesign(id)) && layoutNeeds(layoutOf(id)).live);
 		const full = estimate({ style: st.style, refreshSec: st.refreshSec, schedule: st.sch, live, msgCheck });
 		const parts: string[] = [];
 		if (vbat !== null) parts.push(`<b>Battery ${batteryPercent(vbat)}%</b>`);
@@ -1127,7 +1232,6 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		if (m) parts.push(`At its current rate: ${lifeText(m.left)} left`);
 		battLine.innerHTML = parts.join(' · ');
 	}
-	schSum.addEventListener('click', () => showTab('schedule'));
 
 	// ---------------------------------------------------------------- saving
 	function flash(text: string, err = false) {
@@ -1145,7 +1249,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		if (dirty) {
 			flash('Unsaved changes');
 			saveMsg.classList.add('is-dirty');
-		}
+		} else if (saveMsg.classList.contains('is-dirty')) flash('');
 	}
 
 	async function save() {
@@ -1301,6 +1405,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			loc = typeof info.lat === 'number' && typeof info.lon === 'number' ? { lat: info.lat, lon: info.lon } : null;
 			tasksGranted = !!info.tasksGranted;
 			customLayout = info.custom ?? null;
+			designs = info.designs ?? null;
+			loadMsgSum();
+			$<HTMLAnchorElement>('row-msgs').href = '/dashboard/messages?device=' + encodeURIComponent(deviceId);
+			rebuildStyles();
+			buildPicker();
 			vbat = info.batteryMv ? info.batteryMv / 1000 : null;
 			if (!info.migrated) {
 				banner.hidden = false;
@@ -1353,6 +1462,64 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 </script>
 
 <style is:global>
+
+	/* the screen box: what's on the calendar, and what that screen needs */
+	.cust .box { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; padding: 1.2em; }
+	.cust .box + .box { margin-top: 1em; }
+	.cust .cur { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: 1em; align-items: center; }
+	.cust #cur-thumb { width: 112px; height: auto; aspect-ratio: 4 / 3; border-radius: 6px; background: #dfdbd0; display: block; }
+	.cust .cur-name { font-weight: 800; font-size: 1.15em; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.cust .cur-note { font-size: 0.85em; color: var(--muted); line-height: 1.35; margin-top: 0.15em; }
+	.cust .cur-note.warn { color: #d9a441; }
+	.cust .details { margin-top: 1.2em; padding-top: 1.2em; border-top: 1px solid var(--border); display: grid; gap: 1.4em; }
+	.cust .details.empty { display: none; }
+	.cust .details > [hidden] { display: none; }
+	.cust .details .btn.small { display: inline-block; margin-top: 0.6em; }
+
+	/* the rows: always the same order, each says what it's set to */
+	.cust .rows { padding: 0.3em 1.2em; }
+	.cust .row { display: block; border-bottom: 1px solid var(--border); }
+	.cust .row:last-child { border-bottom: none; }
+	.cust .row > summary, .cust .row-link { display: grid; grid-template-columns: 1.6em auto minmax(0, 1fr) auto; align-items: center; gap: 0.7em; padding: 1em 0; list-style: none; color: var(--fg); text-decoration: none; }
+	.cust .row > summary::-webkit-details-marker { display: none; }
+	.cust .row > summary::after { content: '›'; color: var(--muted); font-size: 1.3em; line-height: 1; transition: transform 0.2s; }
+	.cust .row[open] > summary::after { transform: rotate(90deg); }
+	.cust .row .ico { color: var(--muted); text-align: center; font-weight: 700; }
+	.cust .row .rt { font-weight: 700; }
+	.cust .row .sum { color: var(--muted); font-size: 0.88em; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.cust .row-link .go { color: var(--muted); font-size: 1.3em; line-height: 1; }
+	.cust .row > summary:hover .rt, .cust .row-link:hover .rt { color: var(--accent); }
+	.cust .row-b { padding: 0.2em 0 1.4em; }
+
+	/* Change screen: a drawer on the right, so the preview stays in view */
+	.picker-back.cust { position: fixed; inset: 0; left: 0; width: auto; transform: none; margin: 0; padding: 0; z-index: 9500; background: rgba(0, 0, 0, 0.35); }
+	.picker-back[hidden] { display: none; }
+	body.picker-open { overflow: hidden; }
+	.cust .picker { position: absolute; top: 0; right: 0; bottom: 0; width: min(760px, 58vw); display: flex; flex-direction: column; background: var(--bg-raised); border-left: 1px solid var(--border); box-shadow: -20px 0 60px rgba(0, 0, 0, 0.35); animation: pickerIn 0.25s ease-out; }
+	@keyframes pickerIn { from { transform: translateX(40px); opacity: 0; } }
+	.cust .picker-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 1em; padding: 1.3em 1.4em 0.8em; }
+	.cust .picker-t { font-size: 1.3em; font-weight: 800; color: var(--fg); margin-bottom: 0.2em; }
+	.cust .cats { display: flex; gap: 0.4em; flex-wrap: wrap; padding: 0 1.4em 1em; border-bottom: 1px solid var(--border); }
+	.cust .cat { background: var(--bg); border: 1px solid var(--border); color: var(--muted); font: inherit; font-weight: 700; font-size: 0.85em; padding: 0.45em 1em; border-radius: 999px; transition: background 0.2s, color 0.2s, border-color 0.2s; }
+	.cust .cat:hover { color: var(--fg); border-color: var(--muted); }
+	.cust .cat.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+	.cust .picker-scroll { flex: 1; overflow-y: auto; padding: 1.2em 1.4em 2em; }
+	.cust .picker .lay[hidden], .cust #mine-head[hidden], .cust #design-cards[hidden] { display: none; }
+	.cust .gname { font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 1.8em 0 0.8em; }
+	.cust .lay { position: relative; display: block; }
+	.cust .lay-edit { position: absolute; top: 0.9em; right: 0.9em; background: var(--fg); color: var(--bg); font-size: 0.75em; font-weight: 700; padding: 0.25em 0.75em; border-radius: 999px; text-decoration: none; opacity: 0; transition: opacity 0.2s; }
+	.cust .lay:hover .lay-edit, .cust .lay-edit:focus-visible, .cust input:checked + .lay-card .lay-edit { opacity: 1; }
+	.cust .lay-new { text-decoration: none; }
+	.cust .lay-new .lay-card { border-style: dashed; height: 100%; align-content: center; }
+	.cust .lay-new:hover .lay-card { border-color: var(--muted); }
+	.cust .lay-new .plus { display: grid; place-items: center; aspect-ratio: 4 / 3; font-size: 2.4em; color: var(--muted); }
+	@media (max-width: 760px) {
+		.cust .picker { width: 100vw; border-left: none; }
+		.cust .picker .layouts { grid-template-columns: repeat(2, 1fr); }
+		.cust .cur { grid-template-columns: 84px minmax(0, 1fr); }
+		.cust #cur-thumb { width: 84px; }
+		.cust #change-screen { grid-column: 1 / -1; }
+	}
 	.cust { position: relative; left: 50%; width: min(1400px, 100vw - 3em); transform: translateX(-50%); margin-top: -1.8em; padding: 0.6em 0 3em; }
 	.cust .muted { color: var(--muted); margin: 0; }
 	.cust .small { font-size: 0.9em; }
