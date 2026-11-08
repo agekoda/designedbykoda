@@ -6,14 +6,15 @@ import { batteryPercent } from './battery';
 import { activeStyle, changesPerDay, type Schedule } from './schedule';
 
 // ---- tune these to the real hardware ----
-// Chosen so a once-a-day calendar lasts months and an hourly Timeline lasts weeks.
-// Replace with measured numbers: capacity from the cell, sleepMahPerDay = sleep current (mA) x 24,
+// 450 mAh cell (102025; measured cells hold 520-545 mAh, so this is conservative).
+// Sleep current is still to be measured (estimated 100-200 uA); 150 uA is used here.
+// Once measured: sleepMahPerDay = sleep current (mA) x 24, and
 // wakeMah = average current while awake (mA) x seconds awake / 3600.
 export const BATTERY = {
-	capacityMah: 1000,
-	usable: 0.85, // the share of the capacity used before the calendar asks for a charge
-	sleepMahPerDay: 2.5, // ~105 uA asleep
-	wakeMah: 1.5, // one wake: Wi-Fi, download, full e-ink refresh
+	capacityMah: 450,
+	usable: 0.9, // the share of the capacity used before the calendar asks for a charge
+	sleepMahPerDay: 3.6, // 150 uA asleep
+	wakeMah: 0.3, // one wake: Wi-Fi, download, full e-ink refresh (~10 s at ~100 mA)
 	pressesPerDay: 1, // button presses we assume, on average
 	liveEdgesPerDay: 6, // extra wakes for a "Free or busy" screen (meetings starting and ending)
 	timelineHours: 10, // hours a day an hourly Timeline is awake for (it sleeps overnight)
