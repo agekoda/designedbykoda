@@ -7,6 +7,18 @@ import { EARLY_PRICES, STANDARD_PRICES, CURRENCIES } from '../../../data/preorde
 import { CALENDAR_STYLES } from '../../../data/calendarStyles';
 import drawing from '../../../assets/eink-calendar-drawing.svg?raw';
 
+// The drawing: one SVG holding all three views side by side. Each view is shown as its own
+// <svg> with a viewBox around just that view, so every view is at the same scale (1 unit = 1 mm),
+// lines stay a crisp 1 px at any size, and captions are real text.
+const drawingInner = drawing.slice(drawing.indexOf('>', drawing.indexOf('<svg')) + 1, drawing.lastIndexOf('</svg>'));
+const VIEWS = [
+	{ label: 'Front', x: -0.5, w: 98.5 },
+	{ label: 'Side', x: 135.5, w: 65 },
+	{ label: 'Back', x: 238, w: 113.5 },
+];
+const VIEW_Y = -0.5;
+const VIEW_H = 97.6;
+
 const VERSION = '1.0';
 const UPDATED = '8 November 2026';
 const SUPPORT = 'support@designedbykoda.com';
@@ -113,7 +125,7 @@ const SECTIONS: Section[] = [
 			['Communication', 'One-way (device-initiated only)'],
 			['Calendar access', 'Read-only'],
 			['Event storage', 'None'],
-			['Encryption', 'TLS 1.2+'],
+			['Encryption', 'TLS 1.2, 1.3'],
 		],
 	},
 	{
@@ -174,7 +186,16 @@ const num = (i: number) => String(i).padStart(2, '0');
 			</div>
 		</header>
 
-		<figure class="drawing" set:html={drawing} />
+		<figure class="drawing" aria-label="Line drawings of the calendar from the front, the side with the kickstand out, and the back">
+			{
+				VIEWS.map((v) => (
+					<div class="view" style={`flex: ${v.w} 1 0`}>
+						<svg viewBox={`${v.x} ${VIEW_Y} ${v.w} ${VIEW_H}`} aria-hidden="true" set:html={drawingInner} />
+						<figcaption>{v.label}</figcaption>
+					</div>
+				))
+			}
+		</figure>
 
 		{
 			SECTIONS.map((s, i) => (
@@ -235,9 +256,17 @@ const num = (i: number) => String(i).padStart(2, '0');
 	.sbtn.ghost { background: none; color: var(--fg); border-color: var(--border); }
 	.sbtn:hover { opacity: 0.85; }
 
-	.drawing { margin: 2em 0 1em; padding: 1.2em; border: 1px solid var(--border); border-radius: 16px; background: var(--bg-raised); }
-	.drawing { color: var(--fg); }
-	.drawing :global(svg) { display: block; width: 100%; margin: 0 auto; }
+	.drawing { display: flex; align-items: flex-end; gap: clamp(1.2em, 5vw, 3.5em); margin: 2.4em 0 1.2em; padding: 0 clamp(0em, 3vw, 2em); color: var(--fg); }
+	.view { min-width: 0; display: flex; flex-direction: column; align-items: center; }
+	.view svg { display: block; width: 100%; height: auto; overflow: hidden; }
+	/* 1 px lines whatever size the drawing is shown at */
+	.view svg :global(*) { vector-effect: non-scaling-stroke; }
+	.view svg :global(g) { stroke-width: 1px; }
+	figcaption { white-space: nowrap; margin-top: 1em; font-size: 0.72em; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); text-align: center; }
+	@media (max-width: 560px) {
+		.drawing { gap: 0.8em; }
+		figcaption { font-size: 0.6em; letter-spacing: 0.08em; }
+	}
 
 	.sec { padding: 1.8em 0 0.6em; border-bottom: 1px solid var(--border); }
 	.sec h2, .grp h3 { break-after: avoid; }
@@ -266,7 +295,8 @@ const num = (i: number) => String(i).padStart(2, '0');
 		.spec { max-width: none; color: #000; --fg: #000; --muted: #444; --muted-dim: #888; --border: #ccc; --accent: #000; --bg-raised: #fff; }
 		.crumbs, .head-actions { display: none; }
 		.spec-head { border-color: #000; }
-		.drawing { border-color: #ccc; }
+		.drawing { padding: 0 6mm; }
+		.view svg :global(g) { stroke-width: 0.6pt; }
 		.sec { padding-top: 1.1em; }
 		@page { margin: 14mm; }
 	}
