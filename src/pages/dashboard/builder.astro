@@ -14,6 +14,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 ---
 
 <Layout title="Layout builder — designedbykoda" description="Design your own E-Ink Calendar screen by dragging, dropping and resizing widgets.">
+	<div class="bld-mobile">
+		<div class="bld-mobile-t">Use a computer for this</div>
+		<p>The layout builder needs a bigger screen and a mouse. Open this page on a desktop or laptop to design your own screen.</p>
+		<a class="btn" href={`/dashboard/display?device=${encodeURIComponent(deviceId)}`}>Back to Customize display</a>
+	</div>
 	<div class="bld" data-device={deviceId} data-families={JSON.stringify(families)}>
 		<div class="topbar">
 			<div class="tb-left">
@@ -1527,7 +1532,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	redoBtn.addEventListener('click', () => restore(hi + 1));
 	outlinesBox.addEventListener('change', () => stage.classList.toggle('no-outlines', !outlinesBox.checked));
 	window.addEventListener('beforeunload', (e) => {
-		if (isDirty() && !leaving) e.preventDefault();
+		if (isDirty() && !leaving && !matchMedia('(max-width: 820px)').matches) e.preventDefault();
 	});
 	document.getElementById('back')!.addEventListener('click', async (e) => {
 		if (!isDirty()) return;
@@ -1546,6 +1551,14 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 </script>
 
 <style is:global>
+	.bld-mobile { display: none; max-width: 30em; margin: 3em auto; padding: 1.6em; text-align: center; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 18px; }
+	.bld-mobile-t { font-size: 1.4em; font-weight: 800; margin-bottom: 0.5em; }
+	.bld-mobile p { color: var(--muted); line-height: 1.5; margin: 0 0 1.4em; }
+	.bld-mobile .btn { display: inline-block; padding: 0.75em 1.5em; border-radius: 999px; background: var(--fg); color: var(--bg); font-weight: 700; text-decoration: none; }
+	@media (max-width: 820px) {
+		.bld-mobile { display: block; }
+		.bld { display: none !important; }
+	}
 	html.bld-open, html.bld-open body { overflow: hidden; }
 	/* The builder takes the whole window, so the screen can always be shown big without scrolling. */
 	.bld { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: flex; flex-direction: column; gap: 0.8em; padding: 0.8em 1em 0.9em; min-height: 0; }
