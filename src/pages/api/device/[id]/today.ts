@@ -245,14 +245,13 @@ export async function GET({ params, request, locals }) {
 	const screens = await pickScreen(db, deviceId, style, Math.floor(rightNow.getTime() / 1000) + getUtcOffsetSeconds(tzPick, rightNow), now, reqUrl.searchParams.get('w'));
 	style = screens.style;
 
-	// The message board (schema-messages.sql): messages showing now, and how they show.
+	// The message board (schema-messages.sql): messages showing now, and how often to check for new ones.
 	let msgCfg = sanitizeCfg(null);
 	try {
 		const mc = await db.prepare('SELECT msg_cfg FROM devices WHERE id = ?').bind(deviceId).first();
 		msgCfg = sanitizeCfg(mc?.msg_cfg);
 	} catch {}
 	const msgs = proto === '2' ? await activeMessages(db, deviceId, now) : [];
-	if (msgCfg.show === 'full' && msgs.length) style = 'messages';
 
 	// How often this calendar wakes: only the Timeline can wake more than once a day.
 	const intervalSec = LIVE_STYLES.includes(style) && isRefreshSec(device.refresh_interval_sec) ? device.refresh_interval_sec : 86400;
@@ -513,7 +512,6 @@ export async function GET({ params, request, locals }) {
 			custom: customLayout,
 			sign,
 			messages: msgs.map((m) => ({ author: m.author, body: m.body, atLocal: m.createdAt + offsetSec })),
-			msgBanner: msgCfg.show === 'banner',
 		}, fontChoice ?? undefined);
 		// How long to sleep: the layout's own answer, but wake sooner for a scheduled screen change,
 		// and (for a "Free or busy" widget) when a meeting starts or ends.

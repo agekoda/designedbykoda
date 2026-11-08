@@ -100,7 +100,6 @@ export interface PreviewOptions {
 	custom?: CustomLayout | null; // Your own design (layout builder)
 	sign?: unknown; // Meeting room / Guest welcome / Desk name plate words
 	messages?: { author: string; body: string; atLocal: number }[]; // message board, newest first
-	msgBanner?: boolean; // draw the newest message as a strip along the bottom
 }
 
 export function drawListFor(o: PreviewOptions): string {
@@ -130,7 +129,6 @@ export function drawListFor(o: PreviewOptions): string {
 			custom: o.custom ?? null,
 			sign: o.sign ?? null,
 			messages: o.messages ?? [],
-			msgBanner: !!o.msgBanner,
 		},
 		o.font ?? undefined
 	);
