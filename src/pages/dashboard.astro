@@ -144,8 +144,10 @@ if (!userId) return Astro.redirect('/setup');
 		el.innerHTML = `
 			<div class="dev-left">
 				<a class="dev-preview" data-preview href="/dashboard/display?device=${encodeURIComponent(d.id)}" aria-label="Customize this display"><canvas data-canvas width="800" height="600"></canvas><span class="dev-preview-cap">Preview</span></a>
-				<div class="label">Calendars</div>
-				<div class="cal-list" data-cals><p class="muted small">Loading calendars…</p></div>
+				<div class="cals">
+					<div class="label">Calendars</div>
+					<div class="cal-list" data-cals><p class="muted small">Loading calendars…</p></div>
+				</div>
 			</div>
 			<div class="dev-body">
 				<input class="dev-name" maxlength="40" value="${esc(d.name)}" placeholder="E-Ink Calendar${index ? ' ' + (index + 1) : ''}" aria-label="Device name" />
@@ -478,6 +480,13 @@ if (!userId) return Astro.redirect('/setup');
 
 	@media (max-width: 720px) {
 		.dash .dev { grid-template-columns: 1fr; }
+		/* phones: preview, then the name and buttons, then calendars, then weather */
+		.dash .dev:not(.gone) { display: flex; flex-direction: column; gap: 0; }
+		.dash .dev-left, .dash .dev-body { display: contents; }
+		.dash .dev-preview { order: 0; margin-bottom: 1.4em; }
+		.dash .dev-body > * { order: 1; }
+		.dash .cals { order: 2; }
+		.dash .dev-body > .weather, .dash .dev-body > .dev-foot { order: 3; }
 		.dash .dev-preview { max-width: 340px; }
 		.dash .mini-styles { grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); }
 	}
