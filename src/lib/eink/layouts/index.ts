@@ -8,6 +8,7 @@ import { DEFAULT_FAMILY, isFamily, type Family } from '../fonts';
 import type { LayoutCtx } from '../context';
 import { cleanText, cleanTitle, toAscii } from '../draw';
 import { getLang, isLang, setLang } from '../i18n';
+import { convertWeather, getUnit, isTempUnit, setUnit } from '../units';
 import { agenda } from './agenda';
 import { month } from './month';
 import { bigdate } from './bigdate';
@@ -60,10 +61,14 @@ export function renderLayout(styleId: string, ctx: Omit<LayoutCtx, 'family'>, fa
 	const events = ctx.events.map((e) => ({ ...e, title: JAPANESE_EVENT_TITLES ? cleanText(e.title, true) || '(event)' : cleanTitle(e.title) }));
 	const tasks = ctx.tasks ? ctx.tasks.map((t) => ({ ...t, title: JAPANESE_EVENT_TITLES ? cleanText(t.title, true) : toAscii(t.title, true) })) : ctx.tasks;
 	const before = getLang();
+	const beforeUnit = getUnit();
+	const unit = isTempUnit(ctx.unit) ? ctx.unit : 'c';
 	setLang(isLang(ctx.lang) ? ctx.lang : 'en');
+	setUnit(unit);
 	try {
-		return entry.render({ ...ctx, events, tasks, family });
+		return entry.render({ ...ctx, events, tasks, family, weather: convertWeather(ctx.weather, unit) });
 	} finally {
 		setLang(before);
+		setUnit(beforeUnit);
 	}
 }

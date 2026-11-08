@@ -1,5 +1,6 @@
 // Month: the whole month as a grid, a small square under each day that has
 // events (up to three), and the next event along the bottom.
+import { deg } from '../units';
 import { Draw, PAPER } from '../draw';
 import { firstThatFits, measure } from '../measure';
 import { daysInMonth, dayShort, evTimeStr, monthName, monthShort, round0, tmOf, upcoming, type LayoutCtx } from '../context';
@@ -14,7 +15,7 @@ export function month(ctx: LayoutCtx): string {
 	const titles = [monthYear(now), monthYear(now, true)];
 	const hi = ctx.weather ? round0(ctx.weather.high) : '';
 	const lo = ctx.weather ? round0(ctx.weather.low) : '';
-	const wx = ctx.weather ? [`High ${hi}C  Low ${lo}C`, `${hi}C / ${lo}C`, `${hi}C`] : ['---'];
+	const wx = ctx.weather ? [`High ${hi}${deg()}  Low ${lo}${deg()}`, `${hi}${deg()} / ${lo}${deg()}`, `${hi}${deg()}`] : ['---'];
 	let title = titles[titles.length - 1];
 	let wxText = wx[wx.length - 1];
 	let best = Infinity;

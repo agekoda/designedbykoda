@@ -41,14 +41,20 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 
 		<div class="stage">
 			<div class="left">
+				<div class="view-pill" id="view-pill" hidden>
+					<span id="view-text"></span>
+					<button type="button" class="link" id="view-back">Show the main layout</button>
+				</div>
 				<div class="screen-wrap" id="screen-wrap">
 					<canvas id="screen" width="675" height="506" aria-label="Preview of your calendar screen"></canvas>
 				</div>
+				<div class="batt-line" id="batt-line" aria-live="polite"></div>
 			</div>
 
 			<div class="right">
 				<div class="tabs" role="tablist" aria-label="Display settings">
 					<button type="button" role="tab" class="tab on" data-tab="layout">Layout</button>
+					<button type="button" role="tab" class="tab" data-tab="schedule">Schedule</button>
 					<button type="button" role="tab" class="tab" data-tab="font">Font</button>
 					<button type="button" role="tab" class="tab" data-tab="display">Display</button>
 					<button type="button" role="tab" class="tab" data-tab="picture" id="tab-picture-btn" hidden>Picture</button>
@@ -60,12 +66,42 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						<button type="button" class="mode" data-mode="preset" role="radio"><span class="mode-t">Ready-made layouts</span><span class="mode-n">Pick one and you are done</span></button>
 						<button type="button" class="mode" data-mode="custom" role="radio"><span class="mode-t">Design your own</span><span class="mode-n">Drag, drop and resize widgets</span></button>
 					</div>
+					<button type="button" class="sch-sum" id="sch-sum"></button>
 					<div class="layouts" id="layouts" role="radiogroup" aria-label="Layout"></div>
 					<div class="custom-box" id="custom-box" hidden>
 						<p class="muted" id="custom-status"></p>
 						<a class="btn" id="custom-open" href="#">Open the layout builder</a>
-						<p class="muted small hint">Start from a template or a blank screen, then add dates, events, weather, the moon, quotes, countdowns, tasks and more. Move them anywhere and resize them. The preview on the left shows your design as it is now.</p>
+						<p class="muted small hint">Start from a template or a blank screen, then drag widgets anywhere.</p>
 					</div>
+				</section>
+
+				<section class="tabpanel" data-panel="schedule" hidden>
+					<label class="switch">
+						<input type="checkbox" id="sch-on" />
+						<span class="track" aria-hidden="true"></span>
+						<span class="switch-text">Change the screen at set times</span>
+					</label>
+					<div id="sch-body" hidden>
+						<div class="sch-presets" id="sch-presets"></div>
+						<div id="sch-slots"></div>
+						<button type="button" class="btn ghost small" id="sch-add">+ Add a time</button>
+						<p class="muted small hint" id="sch-rest"></p>
+						<div class="label sub" style="margin-top:1.4em">Your week</div>
+						<div class="week" id="sch-week"></div>
+						<div class="week-key" id="sch-key"></div>
+					</div>
+
+					<div class="label sub" style="margin-top:1.8em">The button on the calendar</div>
+					<div class="seg" id="btn-mode" role="radiogroup" aria-label="What the button does">
+						<label><input type="radio" name="btnmode" value="refresh" /><span>Refreshes</span></label>
+						<label><input type="radio" name="btnmode" value="next" /><span>Flips to the next screen</span></label>
+					</div>
+					<div id="cycle-box" hidden>
+						<p class="muted small hint">Screens it flips through, after your main layout:</p>
+						<div class="chips" id="cycle-chips"></div>
+					</div>
+					<p class="muted small hint" id="btn-hint"></p>
+					<p class="banner small" id="sch-banner" hidden>Schedules need a one-off database update on the server (schema-screens.sql) before they can be saved.</p>
 				</section>
 
 				<section class="tabpanel" data-panel="font" hidden>
@@ -83,13 +119,17 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						<label><input type="radio" name="lang" value="en" /><span>English</span></label>
 						<label><input type="radio" name="lang" value="ja" /><span>日本語</span></label>
 					</div>
-					<p class="muted small hint">Japanese writes the weekdays, months, headings and messages on the screen in Japanese. Event and task names stay as they are in your calendar, in plain English letters. Text you type yourself (a countdown name, the layout builder's text boxes) can be Japanese.</p>
+					<p class="muted small hint">Changes the screen's labels. Event names stay as they are.</p>
+					<div class="label sub" style="margin-top:1.6em">Temperature</div>
+					<div class="seg" id="unit" role="radiogroup" aria-label="Temperature unit">
+						<label><input type="radio" name="unit" value="c" /><span>°C Celsius</span></label>
+						<label><input type="radio" name="unit" value="f" /><span>°F Fahrenheit</span></label>
+					</div>
 					<div id="refresh-box" hidden>
 						<div class="label sub" style="margin-top:1.6em">How often it updates</div>
 						<div class="seg wrap" id="refreshes" role="radiogroup" aria-label="How often the Timeline updates"></div>
 						<p class="muted small hint" id="refresh-hint"></p>
 					</div>
-					<p class="muted small hint">Dark mode swaps the colours: white text on a black screen. The pairing and reconnect screens always stay black on white.</p>
 				</section>
 
 				<section class="tabpanel" data-panel="options" hidden>
@@ -98,12 +138,12 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						<input class="txt" id="cd-title" type="text" maxlength="40" placeholder="Japan trip" autocomplete="off" />
 						<div class="label sub" style="margin-top:1.3em">On this date</div>
 						<input class="txt" id="cd-date" type="date" />
-						<p class="muted small hint">Shows how many days are left. The number goes down each morning, and it says "Today!" on the day.</p>
+						<p class="muted small hint">Counts down each morning, and says "Today!" on the day.</p>
 					</div>
 					<div id="opt-todo" hidden>
 						<p class="muted" id="todo-status"></p>
 						<a class="btn small" id="todo-connect" href="/api/auth/google/start?tasks=1">Connect Google Tasks</a>
-						<p class="muted small hint">Shows your default Google Tasks list: open tasks first (soonest due first), then anything you ticked off in the last day. Tick tasks off in Google Tasks or in the side panel of Google Calendar. The calendar updates each morning.</p>
+						<p class="muted small hint">Shows your default Google Tasks list. Tick tasks off in Google Tasks or Google Calendar.</p>
 					</div>
 				</section>
 
@@ -146,7 +186,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 										<label class="slider"><span>Contrast</span><input type="range" id="s-contrast" min="-100" max="100" step="1" /><output id="o-contrast"></output></label>
 										<label class="slider"><span>Cut-off</span><input type="range" id="s-threshold" min="0" max="255" step="1" /><output id="o-threshold"></output></label>
 									</div>
-									<p class="muted small hint">Cut-off decides how bright a spot has to be to print as white: right for more black, left for more white.</p>
+									<p class="muted small hint">Cut-off: right for more black, left for more white.</p>
 						</div>
 					</div>
 				</section>
@@ -174,6 +214,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { TEMPLATES, sanitizeLayout } from '../../lib/eink/builder/model';
 	import { renderDrawList } from '../../lib/eink/preview';
 	import { sampleFrameBytes } from '../../lib/eink/sampleFrame';
+	import { EMPTY_SCHEDULE, SCHEDULE_PRESETS, ALL_DAYS, WEEKDAYS, MAX_SLOTS, activeSlot, activeStyle, cycleList, daysText, minutesToHHMM, hhmmToMinutes, type Schedule, type Slot } from '../../lib/eink/schedule';
+	import { estimate, measured, lifeText } from '../../lib/eink/batteryLife';
+	import { batteryPercent } from '../../lib/eink/battery';
+	import { layoutNeeds } from '../../lib/eink/builder/model';
 	import {
 		CORNER,
 		FRAME,
@@ -196,6 +240,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const fontsEl = $('fonts');
 	const darkBox = $<HTMLInputElement>('dark');
 	const langEl = $('lang');
+	const unitEl = $('unit');
 	const tabPicBtn = $('tab-picture-btn');
 	const tabOptBtn = $('tab-options-btn');
 	const cornerSeg = $('corner-seg');
@@ -223,12 +268,29 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const refreshHint = $('refresh-hint');
 	const refreshes: { sec: number; label: string }[] = JSON.parse(root.dataset.refreshes!);
 	const REFRESH_HINTS: Record<number, string> = {
-		86400: 'Updates once a day, at midnight. Best battery life. The timeline stays as it was; press the button on the calendar to refresh sooner.',
-		43200: 'Twice a day, while the day is happening. Good battery life.',
-		14400: 'Every 4 hours, only while the day is happening. The "now" bar moves along the timeline. Medium battery life.',
-		7200: 'Every 2 hours, only while the day is happening. The "now" bar moves along the timeline. Shorter battery life.',
-		3600: 'Every hour, only while the day is happening, and it sleeps overnight. The shortest battery life: weeks rather than months.',
+		86400: 'At midnight. Press the button to refresh sooner.',
+		43200: 'Twice a day.',
+		14400: 'Every 4 hours during the day. The "now" bar moves.',
+		7200: 'Every 2 hours during the day. The "now" bar moves.',
+		3600: 'Hourly during the day, asleep overnight.',
 	};
+	const schOn = $<HTMLInputElement>('sch-on');
+	const schBody = $('sch-body');
+	const schSlots = $('sch-slots');
+	const schAdd = $<HTMLButtonElement>('sch-add');
+	const schPresets = $('sch-presets');
+	const schRest = $('sch-rest');
+	const schWeek = $('sch-week');
+	const schKey = $('sch-key');
+	const schSum = $('sch-sum');
+	const schBanner = $('sch-banner');
+	const btnModeEl = $('btn-mode');
+	const cycleBox = $('cycle-box');
+	const cycleChips = $('cycle-chips');
+	const btnHint = $('btn-hint');
+	const viewPill = $('view-pill');
+	const viewText = $('view-text');
+	const battLine = $('batt-line');
 	const saveBtn = $<HTMLButtonElement>('save');
 	const revertBtn = $<HTMLButtonElement>('revert');
 	const saveMsg = $('save-msg');
@@ -240,6 +302,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		font: string | null; // null = the layout's own font
 		dark: boolean;
 		lang: 'en' | 'ja';
+		unit: 'c' | 'f';
 		refreshSec: number;
 		cornerMode: 'calendar' | 'image';
 		cfg: ImageSettings; // the Agenda's picture settings
@@ -247,6 +310,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		fcfg: ImageSettings; // the Photo frame's picture settings
 		fsrc: string | null; // the Photo frame's photo
 		countdown: { title: string; date: string };
+		sch: Schedule;
 	}
 	// The picture editor works on one of two pictures: the Agenda's corner picture, or the Photo frame's full-screen one.
 	type PicKey = 'corner' | 'frame';
@@ -272,6 +336,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		font: null,
 		dark: false,
 		lang: 'en',
+		unit: 'c',
 		refreshSec: 86400,
 		cornerMode: 'calendar',
 		cfg: { ...DEFAULT_IMAGE_SETTINGS },
@@ -279,12 +344,28 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		fcfg: { ...DEFAULT_IMAGE_SETTINGS },
 		fsrc: null,
 		countdown: { title: '', date: '' },
+		sch: { ...EMPTY_SCHEDULE },
 	};
-	let base = JSON.stringify(st); // what is saved on the server
+	let base = JSON.stringify(st);
+	// A layout picked in the Schedule tab is previewed (and its Picture / Options tabs shown)
+	// without becoming the main layout. null = the main layout.
+	let viewStyle: string | null = null;
+	let screensReady = true;
+	let battAnchor: { mv: number; at: number } | null = null;
+	let battAt: number | null = null;
+	const fs = () => viewStyle ?? st.style; // the layout the page is focused on
+	const labelOf = (id: string) => styles.find((x) => x.id === id)?.label ?? id;
+	// every layout this device will show: the main one, the scheduled ones, the button's ones
+	const usedStyles = () => {
+		const out = new Set<string>([st.style]);
+		if (st.sch.on) st.sch.slots.forEach((x) => out.add(x.style));
+		if (st.sch.button === 'next') cycleList(st.sch, st.style).forEach((x) => out.add(x));
+		return [...out];
+	}; // what is saved on the server
 
-	const effFont = () => st.font ?? defaultFontFor(st.style);
-	const supportsCorner = () => !!styles.find((s) => s.id === st.style)?.corner;
-	const isFrame = () => !!styles.find((s) => s.id === st.style)?.frame;
+	const effFont = () => st.font ?? defaultFontFor(fs());
+	const supportsCorner = () => !!styles.find((s) => s.id === fs())?.corner;
+	const isFrame = () => !!styles.find((s) => s.id === fs())?.frame;
 	const pkey = (): PicKey => (isFrame() ? 'frame' : 'corner');
 	const P = () => pics[pkey()];
 	const dimsOf = (k: PicKey) => (k === 'frame' ? FRAME : CORNER);
@@ -425,9 +506,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	async function redraw() {
-		const common = { font: effFont(), dark: st.dark, lang: st.lang, hasWeather, vbat: vbat ?? 4.12, refreshSec: st.refreshSec };
+		const common = { font: effFont(), dark: st.dark, lang: st.lang, unit: st.unit, hasWeather, vbat: vbat ?? 4.12, refreshSec: st.refreshSec };
 		try {
-			const r = await renderPreview({ ...common, style: st.style, ...extras(st.style, false) });
+			const r = await renderPreview({ ...common, style: fs(), ...extras(fs(), false), refreshSec: fs() === 'timeline' ? st.refreshSec : 86400 });
 			const dpr = window.devicePixelRatio || 1;
 			// whole-number panel pixels (each dot = k x k real screen pixels) so the dithering stays crisp
 			const avail = (screen.parentElement as HTMLElement).clientWidth * dpr;
@@ -502,12 +583,14 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			if (!m) return;
 			const to = m.dataset.mode === 'custom' ? 'custom' : lastPreset === 'custom' ? 'agenda' : lastPreset;
 			if (to === st.style) return;
+			viewStyle = null;
 			st.style = to;
 			syncControls();
 			schedule();
 			changed();
 		});
 		layoutsEl.addEventListener('change', (e) => {
+			viewStyle = null;
 			st.style = (e.target as HTMLInputElement).value;
 			syncControls();
 			schedule();
@@ -531,6 +614,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		});
 		langEl.addEventListener('change', (e) => {
 			st.lang = (e.target as HTMLInputElement).value === 'ja' ? 'ja' : 'en';
+			schedule();
+			changed();
+		});
+		unitEl.addEventListener('change', (e) => {
+			st.unit = (e.target as HTMLInputElement).value === 'f' ? 'f' : 'c';
 			schedule();
 			changed();
 		});
@@ -657,7 +745,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const sid = isFrame() ? 'frame' : 'agenda';
 		const cv = layoutsEl.querySelector<HTMLCanvasElement>(`canvas[data-sid="${sid}"]`);
 		if (cv)
-			renderPreview({ style: sid, font: effFont(), dark: st.dark, lang: st.lang, hasWeather, vbat: vbat ?? 4.12, ...extras(sid, true) }).then((r) => paintScreen(cv, r.px, { mode: 'screen', scale: 1 }));
+			renderPreview({ style: sid, font: effFont(), dark: st.dark, lang: st.lang, unit: st.unit, hasWeather, vbat: vbat ?? 4.12, ...extras(sid, true) }).then((r) => paintScreen(cv, r.px, { mode: 'screen', scale: 1 }));
 		changed();
 	}
 
@@ -677,10 +765,13 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 
 	function syncControls() {
 		layoutsEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.style));
+		syncSchedule();
+		syncBattery();
 		fontsEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === effFont()));
 		darkBox.checked = st.dark;
 		langEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.lang));
-		refreshBox.hidden = st.style !== 'timeline';
+		unitEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.unit));
+		refreshBox.hidden = !usedStyles().includes('timeline');
 		refreshEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = parseInt(i.value, 10) === st.refreshSec));
 		refreshHint.textContent = REFRESH_HINTS[st.refreshSec] ?? '';
 
@@ -700,7 +791,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		paintEditor();
 
 		// Options tab: the Countdown's name and date, or connecting Google Tasks
-		const opt = st.style === 'countdown' ? 'countdown' : (st.style === 'todo' || st.style === 'planner') ? 'todo' : null;
+		const opt = fs() === 'countdown' ? 'countdown' : (fs() === 'todo' || fs() === 'planner') ? 'todo' : null;
 		tabOptBtn.hidden = !opt;
 		tabOptBtn.textContent = opt === 'countdown' ? 'Countdown' : opt === 'todo' ? 'Tasks' : 'Options';
 		if (!opt && activeTab === 'options') showTab('layout');
@@ -726,6 +817,220 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		todoConnect.href = '/api/auth/google/start?tasks=1&return=' + encodeURIComponent('/dashboard/display?device=' + deviceId);
 	}
 
+	// ---------------------------------------------------------------- schedule
+	const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday first
+	const DAY_LETTER = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+	const DAY_NAME = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+	const escHtml = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+	// what each scheduled layout still needs before it can show anything useful
+	function needsNote(id: string): string {
+		if (id === 'frame' && !pics.frame.img) return 'Needs a photo: open the Picture tab.';
+		if (id === 'countdown' && !(st.countdown.title.trim() && st.countdown.date)) return 'Needs a name and date: open the Countdown tab.';
+		if (id === 'custom' && !customLayout?.widgets?.length) return 'You haven’t designed a screen yet.';
+		if ((id === 'todo' || id === 'planner') && !tasksGranted) return 'Needs Google Tasks: open the Tasks tab.';
+		return '';
+	}
+	function schChanged(redrawThumbs = false) {
+		syncControls();
+		schedule(redrawThumbs);
+		changed();
+	}
+	function focusStyle(id: string | null) {
+		viewStyle = id && id !== st.style ? id : null;
+		syncControls();
+		schedule(false);
+	}
+
+	function renderSlots() {
+		// which slots win at least once in the week (a slot under a bigger one above never shows)
+		const shows = new Set<Slot>();
+		const wk = Date.UTC(2026, 0, 4) / 1000;
+		for (let q = 0; q < 7 * 96; q++) {
+			const a = activeSlot(st.sch.on ? st.sch : { ...st.sch, on: true }, wk + q * 900);
+			if (a) shows.add(a);
+		}
+		const opts = (sel: string) => styles.map((x) => `<option value="${x.id}"${x.id === sel ? ' selected' : ''}>${escHtml(x.label)}</option>`).join('');
+		schSlots.innerHTML = st.sch.slots
+			.map((sl, i) => {
+				const allDay = sl.from === sl.to;
+				const days = DAY_ORDER.map((d) => `<button type="button" class="day${(sl.days >> d) & 1 ? ' on' : ''}" data-d="${d}" aria-pressed="${!!((sl.days >> d) & 1)}" title="${DAY_NAME[d]}">${DAY_LETTER[d]}</button>`).join('');
+				const note = !shows.has(sl) ? 'Never shows: a time above it covers all of it.' : needsNote(sl.style);
+				return `<div class="slot${viewStyle === sl.style ? ' focus' : ''}" data-i="${i}">
+					<div class="sl-top"><select class="sl-style" aria-label="Layout">${opts(sl.style)}</select><button type="button" class="sl-del" aria-label="Remove">&times;</button></div>
+					<div class="sl-days" role="group" aria-label="Days">${days}</div>
+					<div class="sl-time">${allDay ? '<span class="muted small">All day</span>' : `<input class="txt tm sl-from" type="time" value="${minutesToHHMM(sl.from)}" aria-label="From" /><span class="muted small">to</span><input class="txt tm sl-to" type="time" value="${minutesToHHMM(sl.to)}" aria-label="To" />`}
+						<label class="mini-check"><input type="checkbox" class="sl-all"${allDay ? ' checked' : ''} /> All day</label></div>
+					${note ? `<p class="sl-note">${escHtml(note)}</p>` : ''}
+				</div>`;
+			})
+			.join('');
+	}
+
+	function slotAt(el: Element): { i: number; sl: Slot } | null {
+		const row = el.closest<HTMLElement>('.slot');
+		if (!row) return null;
+		const i = parseInt(row.dataset.i!, 10);
+		return { i, sl: st.sch.slots[i] };
+	}
+
+	function buildScheduleControls() {
+		schPresets.innerHTML =
+			'<p class="muted small">Quick start:</p>' +
+			SCHEDULE_PRESETS.map((p) => `<button type="button" class="preset" data-p="${p.id}"><b>${escHtml(p.label)}</b><span>${escHtml(p.note)}</span></button>`).join('');
+		schPresets.addEventListener('click', (e) => {
+			const b = (e.target as HTMLElement).closest<HTMLElement>('.preset');
+			if (!b) return;
+			const p = SCHEDULE_PRESETS.find((x) => x.id === b.dataset.p)!;
+			st.sch = { ...st.sch, on: true, slots: [...st.sch.slots, ...p.slots(st.style)].slice(0, MAX_SLOTS) };
+			focusStyle(st.sch.slots[st.sch.slots.length - 1].style);
+			schChanged();
+		});
+		schOn.addEventListener('change', () => {
+			st.sch = { ...st.sch, on: schOn.checked };
+			if (!schOn.checked) viewStyle = null;
+			schChanged();
+		});
+		schAdd.addEventListener('click', () => {
+			// a layout not used yet, at a time that doesn't clash with the first slot's evening default
+			const taken = new Set([st.style, ...st.sch.slots.map((x) => x.style)]);
+			const other = styles.find((x) => !taken.has(x.id) && !x.builder && !x.frame)?.id ?? 'month';
+			const first = !st.sch.slots.length;
+			st.sch = { ...st.sch, slots: [...st.sch.slots, first ? { style: other, days: ALL_DAYS, from: 18 * 60, to: 7 * 60 } : { style: other, days: WEEKDAYS, from: 7 * 60, to: 9 * 60 }] };
+			focusStyle(other);
+			schChanged();
+		});
+		schSlots.addEventListener('click', (e) => {
+			const t = e.target as HTMLElement;
+			const hit = slotAt(t);
+			if (!hit) return;
+			if (t.closest('.sl-del')) {
+				st.sch = { ...st.sch, slots: st.sch.slots.filter((_, j) => j !== hit.i) };
+				if (!st.sch.slots.some((x) => x.style === viewStyle)) viewStyle = null;
+				schChanged();
+				return;
+			}
+			const day = t.closest<HTMLElement>('.day');
+			if (day) {
+				const d = parseInt(day.dataset.d!, 10);
+				const days = hit.sl.days ^ (1 << d);
+				if (!days) return; // keep at least one day
+				hit.sl.days = days;
+				schChanged();
+				return;
+			}
+			if (!t.closest('input, select, label')) focusStyle(hit.sl.style);
+		});
+		schSlots.addEventListener('change', (e) => {
+			const t = e.target as HTMLInputElement | HTMLSelectElement;
+			const hit = slotAt(t);
+			if (!hit) return;
+			if (t.classList.contains('sl-style')) {
+				hit.sl.style = t.value;
+				focusStyle(t.value);
+			} else if (t.classList.contains('sl-all')) {
+				if ((t as HTMLInputElement).checked) hit.sl.from = hit.sl.to = 0;
+				else {
+					hit.sl.from = 18 * 60;
+					hit.sl.to = 7 * 60;
+				}
+			} else if (t.classList.contains('sl-from') || t.classList.contains('sl-to')) {
+				const m = hhmmToMinutes(t.value);
+				if (m === null) return;
+				if (t.classList.contains('sl-from')) hit.sl.from = m;
+				else hit.sl.to = m;
+				if (hit.sl.from === hit.sl.to) hit.sl.to = (hit.sl.to + 60) % 1440; // equal would mean all day
+			}
+			schChanged();
+		});
+		btnModeEl.addEventListener('change', (e) => {
+			st.sch = { ...st.sch, button: (e.target as HTMLInputElement).value === 'next' ? 'next' : 'refresh' };
+			schChanged();
+		});
+		cycleChips.addEventListener('click', (e) => {
+			const b = (e.target as HTMLElement).closest<HTMLElement>('.chip');
+			if (!b) return;
+			const id = b.dataset.s!;
+			const cur = st.sch.cycle.length ? st.sch.cycle : cycleList(st.sch, st.style).slice(1);
+			const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+			st.sch = { ...st.sch, cycle: next };
+			focusStyle(cur.includes(id) ? null : id);
+			schChanged();
+		});
+		$('view-back').addEventListener('click', () => focusStyle(null));
+	}
+
+	// Seven bars, Monday to Sunday, coloured by which layout is on.
+	const SHADES = ['var(--accent)', '#d98c5f', '#69b98a', '#b48ad6', '#d6c35f', '#d66f8f', '#5fc3c9'];
+	function renderWeek() {
+		const shown = [st.style, ...st.sch.slots.map((x) => x.style)].filter((v, i, a) => a.indexOf(v) === i);
+		const colour = (id: string) => (id === st.style ? 'var(--border)' : SHADES[(shown.indexOf(id) - 1) % SHADES.length]);
+		const base = Date.UTC(2026, 0, 4) / 1000; // a Sunday
+		const rows = DAY_ORDER.map((d) => {
+			const segs: { id: string; n: number }[] = [];
+			for (let q = 0; q < 96; q++) {
+				const id = activeStyle(st.sch, st.style, base + d * 86400 + q * 900);
+				if (segs.length && segs[segs.length - 1].id === id) segs[segs.length - 1].n++;
+				else segs.push({ id, n: 1 });
+			}
+			const bar = segs.map((g) => `<i style="flex:${g.n};background:${colour(g.id)}" title="${escHtml(labelOf(g.id))}"></i>`).join('');
+			return `<div class="wk-row"><span class="wk-d">${DAY_NAME[d].slice(0, 3)}</span><div class="wk-bar">${bar}</div></div>`;
+		}).join('');
+		schWeek.innerHTML = rows + '<div class="wk-row wk-axis"><span></span><div><span>0:00</span><span>6:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div></div>';
+		schKey.innerHTML = shown.map((id) => `<span><i style="background:${colour(id)}"></i>${escHtml(labelOf(id))}${id === st.style ? ' (main)' : ''}</span>`).join('');
+	}
+
+	function syncSchedule() {
+		schOn.checked = st.sch.on;
+		schBody.hidden = !st.sch.on;
+		schPresets.hidden = st.sch.slots.length > 0;
+		schAdd.hidden = st.sch.slots.length >= MAX_SLOTS;
+		schBanner.hidden = screensReady;
+		const typing = document.activeElement instanceof HTMLInputElement && document.activeElement.type === 'time' && schSlots.contains(document.activeElement);
+		if (typing) {
+			// don't rebuild under the user's cursor; just refresh the focus outline and notes
+			schSlots.querySelectorAll<HTMLElement>('.slot').forEach((r, i) => r.classList.toggle('focus', st.sch.slots[i]?.style === viewStyle));
+		} else renderSlots();
+		schRest.textContent = st.sch.slots.length ? `The rest of the time: ${labelOf(st.style)}, your main layout. If two times overlap, the higher one wins.` : '';
+		renderWeek();
+		btnModeEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.sch.button));
+		cycleBox.hidden = st.sch.button !== 'next';
+		const inCycle = cycleList(st.sch, st.style);
+		cycleChips.innerHTML = styles
+			.filter((x) => x.id !== st.style)
+			.map((x) => `<button type="button" class="chip${inCycle.includes(x.id) ? ' on' : ''}" data-s="${x.id}" aria-pressed="${inCycle.includes(x.id)}">${escHtml(x.label)}</button>`)
+			.join('');
+		btnHint.textContent =
+			st.sch.button === 'next'
+				? inCycle.length > 1
+					? `Each press shows the next one: ${inCycle.map(labelOf).join(' → ')}. ${st.sch.on && st.sch.slots.length ? 'It goes back to the schedule at the next change.' : 'It stays until you press again.'}`
+					: 'Pick at least one more screen to flip to.'
+				: 'Each press updates the screen straight away.';
+		// summary on the Layout tab, so the schedule is easy to find
+		const n = st.sch.on ? st.sch.slots.length : 0;
+		schSum.innerHTML = n
+			? `<b>Schedule on</b> · ${st.sch.slots.map((x) => `${escHtml(labelOf(x.style))} ${x.from === x.to ? escHtml(daysText(x.days).toLowerCase()) : `${minutesToHHMM(x.from)}–${minutesToHHMM(x.to)}`}`).join(', ')} <span>Edit</span>`
+			: `<b>Want it to change through the day?</b> Show a photo at night, the month on weekends… <span>Set a schedule</span>`;
+		// the pill over the preview
+		viewPill.hidden = !viewStyle;
+		if (viewStyle) {
+			const sl = st.sch.slots.find((x) => x.style === viewStyle);
+			viewText.textContent = `Previewing ${labelOf(viewStyle)}${sl ? ` · ${daysText(sl.days)}${sl.from === sl.to ? '' : ` ${minutesToHHMM(sl.from)}–${minutesToHHMM(sl.to)}`}` : ' · on the button'}`;
+		}
+	}
+
+	// ---------------------------------------------------------------- battery
+	function syncBattery() {
+		const live = usedStyles().includes('custom') && layoutNeeds(customLayout).live;
+		const full = estimate({ style: st.style, refreshSec: st.refreshSec, schedule: st.sch, live });
+		const parts: string[] = [];
+		if (vbat !== null) parts.push(`<b>Battery ${batteryPercent(vbat)}%</b>`);
+		parts.push(`With these settings a full charge lasts <b>${lifeText(full)}</b>`);
+		const m = measured(battAnchor?.mv ?? null, battAnchor?.at ?? null, vbat !== null ? Math.round(vbat * 1000) : null, battAt);
+		if (m) parts.push(`At its current rate: ${lifeText(m.left)} left`);
+		battLine.innerHTML = parts.join(' · ');
+	}
+	schSum.addEventListener('click', () => showTab('schedule'));
+
 	// ---------------------------------------------------------------- saving
 	function flash(text: string, err = false) {
 		saveMsg.textContent = text;
@@ -746,19 +1051,23 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	async function save() {
-		if (st.cornerMode === 'image' && supportsCorner() && !pics.corner.img) {
+		const used = usedStyles();
+		const anyCorner = used.some((id) => styles.find((x) => x.id === id)?.corner);
+		if (st.cornerMode === 'image' && anyCorner && !pics.corner.img) {
 			flash('Choose a picture first, or switch back to the mini calendar.', true);
 			return;
 		}
-		if (isFrame() && !pics.frame.img) {
-			flash('Choose a photo first, or pick another layout.', true);
+		if (used.includes('frame') && !pics.frame.img) {
+			flash(st.style === 'frame' ? 'Choose a photo first, or pick another layout.' : 'Your schedule shows Photo frame: add its photo in the Picture tab first.', true);
 			return;
 		}
 		saveBtn.disabled = true;
 		flash('Saving…');
 		const body: any = { deviceId, style: st.style, font: st.font, dark: st.dark, lang: st.lang, refreshSec: st.refreshSec, countdown: st.countdown };
 		const baseState = JSON.parse(base);
-		if (supportsCorner() || st.cornerMode === 'image') {
+		if (JSON.stringify(st.sch) !== JSON.stringify(baseState.sch)) body.schedule = st.sch;
+		if (st.unit !== baseState.unit) body.unit = st.unit; // only when changed, so a server without schema-screens.sql still saves the rest
+		if (anyCorner || st.cornerMode === 'image') {
 			body.corner = { mode: st.cornerMode };
 			if (st.cornerMode === 'image' && pics.corner.img && pics.corner.bytes && (pics.corner.changed || baseState.cornerMode !== 'image')) {
 				body.corner.bits = bytesToB64(pics.corner.bytes);
@@ -791,6 +1100,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 
 	async function revert() {
 		st = JSON.parse(base);
+		viewStyle = null;
 		st.cfg = cleanSettings(st.cfg);
 		st.fcfg = cleanSettings(st.fcfg);
 		pics.corner.changed = false;
@@ -868,6 +1178,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	// ---------------------------------------------------------------- start
 	async function start() {
 		buildControls();
+		buildScheduleControls();
 		try {
 			if (!deviceId) {
 				const list = await (await fetch('/api/dashboard/devices')).json();
@@ -901,6 +1212,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				font: info.font,
 				dark: !!info.dark,
 				lang: info.lang === 'ja' ? 'ja' : 'en',
+				unit: info.unit === 'f' ? 'f' : 'c',
 				refreshSec: info.refreshSec || 86400,
 				cornerMode: info.cornerMode,
 				cfg: cleanSettings(info.cornerCfg),
@@ -908,7 +1220,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				fcfg: cleanSettings(info.frameCfg),
 				fsrc: info.frameSrc,
 				countdown: info.countdown ?? { title: '', date: '' },
+				sch: info.schedule ?? { ...EMPTY_SCHEDULE },
 			};
+			screensReady = info.screensReady !== false;
+			battAnchor = info.batteryAnchor ?? null;
+			battAt = info.batteryAt ?? null;
 			if (st.src) {
 				try {
 					await loadSource(st.src, 'corner');
@@ -1073,4 +1389,44 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		.cust .topbar { border-radius: 16px; }
 		.cust .save-msg { display: none; }
 	}
+	/* ---- schedule ---- */
+	.cust .sch-sum { display: block; width: 100%; text-align: left; margin: 0 0 1.1em; padding: 0.75em 1em; background: rgba(var(--accent-rgb), 0.08); border: 1px dashed rgba(var(--accent-rgb), 0.5); border-radius: 12px; color: var(--muted); font: inherit; font-size: 0.86em; line-height: 1.45; cursor: pointer; }
+	.cust .sch-sum b { color: var(--fg); }
+	.cust .sch-sum span { color: var(--accent); font-weight: 700; white-space: nowrap; margin-left: 0.3em; }
+	.cust .sch-sum:hover { border-style: solid; }
+	.cust #sch-body { margin-top: 1.2em; }
+	.cust #sch-body[hidden], .cust #cycle-box[hidden], .cust .sch-presets[hidden], .cust #sch-add[hidden], .cust .view-pill[hidden] { display: none; }
+	.cust .sch-presets { display: grid; gap: 0.5em; margin-bottom: 1em; }
+	.cust .sch-presets p { margin: 0; }
+	.cust .preset { display: grid; gap: 0.15em; text-align: left; padding: 0.7em 0.9em; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--fg); font: inherit; cursor: pointer; }
+	.cust .preset:hover { border-color: var(--accent); }
+	.cust .preset span { font-size: 0.8em; color: var(--muted); }
+	.cust .slot { padding: 0.8em 0.9em; margin-bottom: 0.6em; background: var(--bg); border: 2px solid var(--border); border-radius: 14px; display: grid; gap: 0.6em; cursor: pointer; }
+	.cust .slot.focus { border-color: var(--accent); }
+	.cust .sl-top { display: flex; gap: 0.5em; align-items: center; }
+	.cust .sl-style { flex: 1; min-width: 0; background: var(--bg-raised); color: var(--fg); border: 1px solid var(--border); border-radius: 10px; padding: 0.45em 0.6em; font: inherit; font-weight: 700; }
+	.cust .sl-del { background: none; border: none; color: var(--muted); font-size: 1.4em; line-height: 1; padding: 0 0.2em; cursor: pointer; }
+	.cust .sl-del:hover { color: var(--fg); }
+	.cust .sl-days { display: flex; gap: 4px; }
+	.cust .day { width: 2.1em; height: 2.1em; border-radius: 50%; border: 1px solid var(--border); background: none; color: var(--muted); font: inherit; font-size: 0.8em; font-weight: 700; cursor: pointer; }
+	.cust .day.on { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+	.cust .sl-time { display: flex; gap: 0.5em; align-items: center; flex-wrap: wrap; }
+	.cust .txt.tm { width: auto; padding: 0.4em 0.6em; border-radius: 10px; }
+	.cust .mini-check { display: inline-flex; gap: 0.35em; align-items: center; font-size: 0.85em; color: var(--muted); margin-left: auto; cursor: pointer; }
+	.cust .sl-note { margin: 0; font-size: 0.8em; color: #d98c5f; }
+	.cust .week { display: grid; gap: 4px; }
+	.cust .wk-row { display: grid; grid-template-columns: 2.6em 1fr; align-items: center; gap: 0.5em; font-size: 0.75em; color: var(--muted); }
+	.cust .wk-bar { display: flex; height: 14px; border-radius: 4px; overflow: hidden; }
+	.cust .wk-bar i { display: block; height: 100%; }
+	.cust .wk-axis div { display: flex; justify-content: space-between; font-size: 0.9em; color: var(--muted-dim); }
+	.cust .week-key { display: flex; flex-wrap: wrap; gap: 0.4em 1em; margin-top: 0.7em; font-size: 0.8em; color: var(--muted); }
+	.cust .week-key i { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 3px; margin-right: 0.35em; vertical-align: -0.05em; }
+	.cust .chips { display: flex; flex-wrap: wrap; gap: 0.4em; }
+	.cust .chip { padding: 0.4em 0.9em; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--muted); font: inherit; font-size: 0.85em; font-weight: 600; cursor: pointer; }
+	.cust .chip.on { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+	.cust #btn-mode { margin-bottom: 0.4em; }
+	.cust #cycle-box { margin-top: 0.4em; }
+	.cust .view-pill { display: flex; gap: 0.6em; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.6em; padding: 0.5em 0.9em; border-radius: 999px; background: rgba(var(--accent-rgb), 0.12); color: var(--fg); font-size: 0.85em; font-weight: 600; }
+	.cust .batt-line { margin-top: 0.7em; font-size: 0.85em; color: var(--muted); line-height: 1.5; }
+	.cust .batt-line b { color: var(--fg); }
 </style>

@@ -1,4 +1,5 @@
 // Next up: the very next event in huge type, then the four after it.
+import { deg } from '../units';
 import { Draw, PAPER } from '../draw';
 import { firstThatFits, measure } from '../measure';
 import { dayIdx, dayShort, evTimeStr, monthShort, relDayText, round0, tmOf, upcoming, type LayoutCtx } from '../context';
@@ -43,7 +44,7 @@ export function nextup(ctx: LayoutCtx): string {
 	const batW = batteryIconWidth(ctx);
 	const hi = ctx.weather ? round0(ctx.weather.high) : '';
 	const lo = ctx.weather ? round0(ctx.weather.low) : '';
-	d.text(10, 290, 's', ctx.weather ? firstThatFits(ctx.family, 's', [`High ${hi}C   Low ${lo}C`, `High ${hi}C  Low ${lo}C`, `${hi}C / ${lo}C`], 392 - batW - 20 - 10) : '---');
+	d.text(10, 290, 's', ctx.weather ? firstThatFits(ctx.family, 's', [`High ${hi}${deg()}   Low ${lo}${deg()}`, `High ${hi}${deg()}  Low ${lo}${deg()}`, `${hi}${deg()} / ${lo}${deg()}`], 392 - batW - 20 - 10) : '---');
 	batteryIcon(d, ctx, 392, 274, 'right');
 	return d.toString();
 }

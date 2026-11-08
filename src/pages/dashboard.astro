@@ -42,6 +42,8 @@ if (!userId) return Astro.redirect('/setup');
 	import { createCitySearch } from '../lib/citySearch';
 	import { renderPreview, paintScreen } from '../lib/eink/previewKit';
 	import { batteryPercent } from '../lib/eink/battery';
+	import { estimate, measured, lifeText } from '../lib/eink/batteryLife';
+	import { layoutNeeds } from '../lib/eink/builder/model';
 	const list = document.getElementById('devices')!;
 
 	const esc = (v: string) =>
@@ -102,7 +104,12 @@ if (!userId) return Astro.redirect('/setup');
 			const v = d.batteryMv / 1000;
 			const pct = batteryPercent(v);
 			const needs = pct <= 10;
-			battery = `<span class="sep">·</span><span class="batt${needs ? ' needs' : ''}" title="Battery level${d.batteryAt ? ', ' + ago(d.batteryAt) : ''}"><span class="batt-icon ${pct < 20 ? 'low' : ''}"><i style="width:${Math.max(6, pct)}%"></i></span>${pct}%${needs ? ' · Needs charging' : ''}</span>`;
+			// days left: from real use once there's enough of it, else from the settings
+			const real = measured(d.batteryAnchorMv, d.batteryAnchorAt, d.batteryMv, d.batteryAt);
+			const live = d.style === 'custom' && layoutNeeds(d.custom).live;
+			const left = real ? real.left : (estimate({ style: d.style, refreshSec: d.refreshIntervalSec, schedule: d.schedule, live }) * pct) / 100;
+			const leftText = needs ? ' · Needs charging' : pct >= 99 && !real ? '' : ` · ${lifeText(left)} left`;
+			battery = `<span class="sep">·</span><span class="batt${needs ? ' needs' : ''}" title="Battery level${d.batteryAt ? ', ' + ago(d.batteryAt) : ''}${real ? '. Time left is from how fast it has actually been using its battery.' : '. Time left is an estimate from its settings.'}"><span class="batt-icon ${pct < 20 ? 'low' : ''}"><i style="width:${Math.max(6, pct)}%"></i></span>${pct}%${leftText}</span>`;
 		}
 		const paired = d.createdAt ? new Date(d.createdAt * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 		el.innerHTML = `
@@ -138,13 +145,14 @@ if (!userId) return Astro.redirect('/setup');
 				cornerImage = Uint8Array.from(bin, (c) => c.charCodeAt(0));
 			} catch {}
 		}
+		const onScreen = d.shownStyle ?? d.style; // the schedule or the button may be showing another layout
 		let frameImage: Uint8Array | null = null;
-		if (d.frameBits && d.style === 'frame') {
+		if (d.frameBits && onScreen === 'frame') {
 			try {
 				frameImage = Uint8Array.from(atob(d.frameBits), (c) => c.charCodeAt(0));
 			} catch {}
 		}
-		renderPreview({ style: d.style, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null, cornerImage, refreshSec: d.style === 'timeline' ? d.refreshIntervalSec : 86400, loc: d.location ? { lat: d.location.lat, lon: d.location.lon } : null, countdown: d.countdown ?? null, frameImage, custom: d.style === 'custom' ? d.custom ?? null : null })
+		renderPreview({ style: onScreen, unit: d.unit, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null, cornerImage, refreshSec: onScreen === 'timeline' ? d.refreshIntervalSec : 86400, loc: d.location ? { lat: d.location.lat, lon: d.location.lon } : null, countdown: d.countdown ?? null, frameImage, custom: onScreen === 'custom' ? d.custom ?? null : null })
 			.then((r) => paintScreen(canvas, r.px, { mode: 'screen', scale: 2 }))
 			.catch(() => {});
 

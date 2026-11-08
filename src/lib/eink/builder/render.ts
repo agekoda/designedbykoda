@@ -2,6 +2,7 @@
 // Text always fits its box (it shrinks or wraps rather than spilling out), so whatever size
 // someone drags a widget to, the result is a valid, tidy screen. Used by the server for the
 // real display and by the editor for the live preview, so they always match.
+import { deg, windText } from '../units';
 import { Draw, PAPER, INK, type Align, type Color } from '../draw';
 import { fontId, type Family, type Role } from '../fonts';
 import { measure, wrapText } from '../measure';
@@ -18,6 +19,8 @@ import {
 import { isJa, tr } from '../i18n';
 import { DAY_NAMES } from '../context';
 import { withDefaults, type CustomLayout, type Widget } from './model';
+import { linkPayload, qrBits, qrMatrix, wifiPayload, type WifiSecurity } from '../qr';
+import { toAscii } from '../draw';
 
 interface Env {
 	d: Draw;
@@ -277,8 +280,8 @@ function weatherWidget(env: Env, w: Widget, o: Opts) {
 	if (!wx) return textWidget(env, w, o, '---');
 	const hi = round0(wx.high);
 	const lo = round0(wx.low);
-	const text = o.show === 'high' ? `High ${hi}C` : o.show === 'low' ? `Low ${lo}C` : `High ${hi}C  Low ${lo}C`;
-	const short = o.show === 'high' ? `${hi}C` : o.show === 'low' ? `${lo}C` : `${hi}C / ${lo}C`;
+	const text = o.show === 'high' ? `High ${hi}${deg()}` : o.show === 'low' ? `Low ${lo}${deg()}` : `High ${hi}${deg()}  Low ${lo}${deg()}`;
+	const short = o.show === 'high' ? `${hi}${deg()}` : o.show === 'low' ? `${lo}${deg()}` : `${hi}${deg()} / ${lo}${deg()}`;
 	// the long wording at the biggest size that fits; if even the smallest overflows, the short wording
 	const { inner } = { inner: { w: w.w - (o.invert === true || o.border === true ? 10 : 0) } };
 	const sized = facesFor(o.size);
@@ -303,7 +306,7 @@ function weatherSummaryWidget(env: Env, w: Widget, o: Opts) {
 	if (!wx || wx.code === undefined) return textWidget(env, w, o, '---');
 	const bits: string[] = [];
 	if (o.rain === true && wx.rain !== null && wx.rain !== undefined) bits.push(`Rain ${wx.rain}%`);
-	if (o.wind === true && wx.wind !== null && wx.wind !== undefined) bits.push(`Wind ${wx.wind} km/h`);
+	if (o.wind === true && wx.wind !== null && wx.wind !== undefined) bits.push(windText(wx.wind));
 	const sub = bits.join('   ');
 	const { inner, color } = chrome(env, w, o);
 	const small = FACES.s;
@@ -618,6 +621,186 @@ function batteryWidget(env: Env, w: Widget, o: Opts) {
 	batteryIcon(env.d, env.ctx, x, w.y, a, o.invert === true ? PAPER : INK);
 }
 
+// ---- QR code ----
+function qrPayload(o: Opts): string {
+	if (o.mode === 'wifi') return String(o.ssid ?? '') ? wifiPayload(String(o.ssid), String(o.pass ?? ''), (String(o.sec) as WifiSecurity) || 'WPA', o.hidden === true) : '';
+	if (o.mode === 'text') return String(o.data ?? '');
+	return linkPayload(String(o.url ?? ''));
+}
+
+function qrWidget(env: Env, w: Widget, o: Opts) {
+	const { d, ctx } = env;
+	let box: Box = { x: w.x, y: w.y, w: w.w, h: w.h };
+	if (o.border === true) {
+		d.round(w.x, w.y, w.w, w.h, 3, INK);
+		d.round(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 2, INK);
+		box = { x: w.x + 6, y: w.y + 6, w: Math.max(1, w.w - 12), h: Math.max(1, w.h - 12) };
+	}
+	const caption = String(o.caption ?? '').trim();
+	const wantDetails = o.mode === 'wifi' && o.details === true && !!String(o.ssid ?? '');
+	const beside = o.pos === 'right' && (!!caption || wantDetails);
+	// width the words get: the whole box below the code, or what's left beside it
+	const textW = beside ? Math.max(10, box.w - Math.min(box.h, Math.floor(box.w * 0.55)) - 8) : box.w;
+	const lines: string[] = [];
+	if (caption) lines.push(caption);
+	// "Label: value" on one line if it fits, else the value gets a line of its own
+	const pair = (label: string, value: string) => {
+		const one = toAscii(`${label}: ${value}`);
+		if (measure(env.fam, 's', one).w <= textW) lines.push(one);
+		else lines.push(label + ':', toAscii(value));
+	};
+	if (wantDetails) {
+		pair('Wi-Fi', String(o.ssid));
+		if (o.sec !== 'nopass' && String(o.pass ?? '')) pair('Password', String(o.pass));
+	}
+	const m = qrMatrix(qrPayload(o));
+	const capFace = withBold(FACES.s, o.bold === true);
+	const sv = vm(env, FACES.s);
+	// room left for the code itself
+	const textH = !beside && lines.length ? (lines.length - 1) * sv.lh + sv.asc + sv.desc + 6 : 0;
+	const side = beside ? Math.min(box.h, Math.floor(box.w * 0.55)) : Math.min(box.w, box.h - textH);
+	if (!m) {
+		drawLines(env, box, [qrPayload(o) ? 'Too much text for a QR code' : o.mode === 'wifi' ? 'Type your Wi-Fi name' : 'Type a link or some text'], FACES.s, 'center', 'middle', INK);
+		return;
+	}
+	const QUIET = 2; // white modules round the code, so a phone can find its edge
+	const scale = Math.floor(side / (m.size + QUIET * 2));
+	if (scale < 2) {
+		drawLines(env, box, ['Make this bigger', 'to fit the code'], FACES.s, 'center', 'middle', INK);
+		return;
+	}
+	const { w: qw, bytes } = qrBits(m, scale);
+	const full = qw + QUIET * 2 * scale;
+	const qx = beside ? box.x : box.x + Math.floor((box.w - full) / 2);
+	const qy = beside ? box.y + Math.floor((box.h - full) / 2) : box.y;
+	// Always black on white, even in dark mode (dark mode swaps ink and paper on the device),
+	// because not every phone camera reads a white-on-black code.
+	const bg: Color = ctx.dark ? INK : PAPER;
+	const fg: Color = ctx.dark ? PAPER : INK;
+	d.fill(qx, qy, full, full, bg);
+	d.bitmapBytes(qx + QUIET * scale, qy + QUIET * scale, qw, qw, bytes, fg);
+	if (!lines.length) return;
+	if (beside) {
+		const tb: Box = { x: qx + full + 8, y: box.y, w: Math.max(10, box.x + box.w - (qx + full + 8)), h: box.h };
+		listLines(env, tb, lines, capFace, 'left', 'middle', INK);
+	} else {
+		const tb: Box = { x: box.x, y: qy + full + 4, w: box.w, h: Math.max(10, box.y + box.h - (qy + full + 4)) };
+		listLines(env, tb, lines, capFace, 'center', 'top', INK);
+	}
+}
+
+// Several short lines (the first one in `first` face, the rest regular), each cut with ".." if too wide.
+function listLines(env: Env, box: Box, lines: string[], first: Face, align: Align, valign: 'top' | 'middle', color: Color) {
+	const v = vm(env, FACES.s);
+	const max = Math.max(1, Math.floor((box.h - v.asc - v.desc) / v.lh) + 1);
+	const shown = lines.slice(0, max);
+	const bh = (shown.length - 1) * v.lh + v.asc + v.desc;
+	const top = valign === 'top' ? box.y : box.y + (box.h - bh) / 2;
+	const x = align === 'center' ? box.x + box.w / 2 : box.x;
+	shown.forEach((ln, i) => env.d.text(x, top + v.asc + i * v.lh, i === 0 ? first.role : 's', ln, { align, color, maxW: box.w }));
+}
+
+// ---- list ----
+function listWidget(env: Env, w: Widget, o: Opts) {
+	const { inner, color } = chrome(env, w, o);
+	const items = String(o.items ?? '')
+		.split('\n')
+		.map((s) => s.trim())
+		.filter(Boolean);
+	if (!items.length) return;
+	const sizes = o.size === 's' ? ['s'] : o.size === 'm' ? ['m'] : o.size === 'l' ? ['l'] : ['l', 'm', 's'];
+	const kind = String(o.bullet);
+	// lay the list out at each size, biggest first, and keep the first one that fits
+	let plan: { face: Face; rows: { lines: string[]; n: number }[]; indent: number } | null = null;
+	for (const key of sizes) {
+		const face = withBold(FACES[key], o.bold === true);
+		const v = vm(env, face);
+		const indent = kind === 'none' ? 0 : kind === 'num' ? measure(env.fam, face.role, `${items.length}.`, face.scale).w + 6 : kind === 'box' ? Math.round(v.cap) + 8 : Math.round(v.cap * 0.6) + 8;
+		const rows = items.map((it, i) => ({ lines: wrapText(env.fam, face.role, it, Math.max(10, inner.w - indent), face.scale), n: i + 1 }));
+		const total = rows.reduce((a, r) => a + r.lines.length, 0);
+		const h = (total - 1) * v.lh + (rows.length - 1) * Math.round(v.lh * 0.25) + v.asc + v.desc;
+		plan = { face, rows, indent };
+		if (h <= inner.h) break;
+	}
+	if (!plan) return;
+	const { face, rows, indent } = plan;
+	const v = vm(env, face);
+	const gap = Math.round(v.lh * 0.25);
+	let y = inner.y + v.asc;
+	for (const r of rows) {
+		if (y + v.desc > inner.y + inner.h + 1) break;
+		const midY = Math.round(y - v.cap / 2);
+		if (kind === 'dot') env.d.disc(inner.x + Math.max(2, Math.round(v.cap * 0.18)), midY, Math.max(2, Math.round(v.cap * 0.18)), color);
+		else if (kind === 'dash') env.d.fill(inner.x, midY, Math.max(4, Math.round(v.cap * 0.5)), Math.max(1, Math.round(v.cap / 8)), color);
+		else if (kind === 'num') env.d.text(inner.x, y, face.role, `${r.n}.`, { scale: face.scale, color });
+		else if (kind === 'box') {
+			const b = Math.round(v.cap);
+			env.d.round(inner.x, Math.round(y - v.cap), b, b, 2, color);
+		}
+		for (const ln of r.lines) {
+			if (y + v.desc > inner.y + inner.h + 1) break;
+			env.d.text(inner.x + indent, y, face.role, ln, { scale: face.scale, color, maxW: Math.max(10, inner.w - indent) });
+			y += v.lh;
+		}
+		y += gap;
+	}
+}
+
+// ---- free or busy ----
+// The timed event happening right now, if any (all-day events don't make you busy).
+function currentEvent(ctx: LayoutCtx): CalEvent | null {
+	for (const e of ctx.events) {
+		if (e.allDay) continue;
+		const end = e.endLocal ?? e.startLocal + 1800;
+		if (e.startLocal <= ctx.nowLocal + 60 && end > ctx.nowLocal + 60) return e;
+	}
+	return null;
+}
+const hm = (local: number) => {
+	const t = tmOf(local);
+	return `${pad2(t.hour)}:${pad2(t.min)}`;
+};
+
+function roomStatusWidget(env: Env, w: Widget, o: Opts) {
+	const { d, ctx } = env;
+	const now = currentEvent(ctx);
+	const busy = !!now;
+	let color: Color = INK;
+	if (busy && o.black === true) {
+		d.fillRound(w.x, w.y, w.w, w.h, 4, INK);
+		color = PAPER;
+	} else if (o.border === true) {
+		d.round(w.x, w.y, w.w, w.h, 4, INK);
+		d.round(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 3, INK);
+	}
+	const pad = (busy && o.black === true) || o.border === true ? 8 : 0;
+	const inner: Box = { x: w.x + pad, y: w.y + pad, w: Math.max(1, w.w - pad * 2), h: Math.max(1, w.h - pad * 2) };
+	const detail: string[] = [];
+	if (o.detail === true) {
+		const today = dayIdx(ctx.nowLocal);
+		if (now) {
+			if (o.title === true) detail.push(now.title);
+			const end = now.endLocal ?? now.startLocal + 1800;
+			detail.push(`until ${hm(end)}`);
+		} else {
+			const next = ctx.events.find((e) => !e.allDay && e.startLocal > ctx.nowLocal && dayIdx(e.startLocal) === today);
+			detail.push(next ? (o.title === true ? `Next ${hm(next.startLocal)}  ${next.title}` : `until ${hm(next.startLocal)}`) : 'for the rest of the day');
+		}
+	}
+	const sv = vm(env, FACES.s);
+	const detailH = detail.length ? detail.length * sv.lh + 2 : 0;
+	const word = String((busy ? o.busy : o.free) ?? '') || (busy ? 'Busy' : 'Free');
+	const bigBox: Box = { x: inner.x, y: inner.y, w: inner.w, h: Math.max(14, inner.h - detailH) };
+	const fit = fitText(env, word, bigBox.w, bigBox.h, ORDER, true);
+	drawLines(env, bigBox, fit.lines, fit.face, o.align, 'middle', color);
+	if (detail.length) {
+		const a: Align = o.align === 'center' ? 'center' : o.align === 'right' ? 'right' : 'left';
+		const x = a === 'center' ? inner.x + inner.w / 2 : a === 'right' ? inner.x + inner.w : inner.x;
+		const top = inner.y + inner.h - detail.length * sv.lh + sv.asc - sv.desc + 2;
+		detail.forEach((ln, i) => d.text(x, top + i * sv.lh, i === 0 && busy && o.title === true ? 'sb' : 's', ln, { align: a, color, maxW: inner.w }));
+	}
+}
+
 // ---- one widget ----
 function drawWidget(env: Env, w: Widget) {
 	const o = withDefaults(w);
@@ -679,6 +862,14 @@ function drawWidget(env: Env, w: Widget) {
 			return boxWidget(env, w, o);
 		case 'line':
 			return lineWidget(env, w, o);
+		case 'qr':
+			return qrWidget(env, w, o);
+		case 'list':
+			return listWidget(env, w, o);
+		case 'room_status':
+			return roomStatusWidget(env, w, o);
+		case 'updated':
+			return textWidget(env, w, o, `${String(o.prefix ?? '').trim()} ${hm(env.ctx.nowLocal)}`.trim());
 	}
 }
 

@@ -1,5 +1,6 @@
 // Week: Monday to Sunday as rows, with today's label inverted and the events
 // after this week listed along the bottom.
+import { deg } from '../units';
 import { Draw, PAPER } from '../draw';
 import { measure } from '../measure';
 import { dayIdx, dayName, dayShort, evTimeStr, monthName, monthShort, round0, tmFromDayIdx, tmOf, type LayoutCtx } from '../context';
@@ -28,7 +29,7 @@ export function week(ctx: LayoutCtx): string {
 		: [`${range} ${monthName(en)} ${en.year}`, `${range} ${monthShort(en)} ${en.year}`, `${range} ${monthShort(en)}`];
 	const hi = ctx.weather ? round0(ctx.weather.high) : '';
 	const lo = ctx.weather ? round0(ctx.weather.low) : '';
-	const wx = ctx.weather ? [`High ${hi}C  Low ${lo}C`, `${hi}C / ${lo}C`, `${hi}C`] : ['---'];
+	const wx = ctx.weather ? [`High ${hi}${deg()}  Low ${lo}${deg()}`, `${hi}${deg()} / ${lo}${deg()}`, `${hi}${deg()}`] : ['---'];
 	let title = titles[titles.length - 1];
 	let wxText = wx[wx.length - 1];
 	let best = Infinity;

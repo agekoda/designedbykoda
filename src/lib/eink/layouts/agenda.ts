@@ -1,5 +1,6 @@
 // Agenda: today's date and weather on the left, a mini month on the right,
 // then the next events grouped by day underneath.
+import { deg } from '../units';
 import { Draw } from '../draw';
 import { CORNER, fitBits } from '../image';
 import { firstThatFits, measure } from '../measure';
@@ -18,7 +19,7 @@ export function agenda(ctx: LayoutCtx): string {
 	const hi = ctx.weather ? round0(ctx.weather.high) : '';
 	const lo = ctx.weather ? round0(ctx.weather.low) : '';
 	const weatherText = ctx.weather
-		? firstThatFits(ctx.family, 's', [`High:${hi}C   Low:${lo}C`, `High:${hi}C Low:${lo}C`, `H:${hi}C  L:${lo}C`, `${hi}C / ${lo}C`], 188)
+		? firstThatFits(ctx.family, 's', [`High:${hi}${deg()}   Low:${lo}${deg()}`, `High:${hi}${deg()} Low:${lo}${deg()}`, `H:${hi}${deg()}  L:${lo}${deg()}`, `${hi}${deg()} / ${lo}${deg()}`], 188)
 		: '---';
 	d.text(80, 15, 's', weatherText, { align: 'box', maxW: 40 });
 	d.text(80, 70, 'bb', String(now.mday), { align: 'box', maxW: 40 });

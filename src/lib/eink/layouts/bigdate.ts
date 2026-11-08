@@ -1,4 +1,5 @@
 // Big date: a huge date on the left, the upcoming list on the right.
+import { deg } from '../units';
 import { Draw } from '../draw';
 import { firstThatFits, measure } from '../measure';
 import { dayName, dayShort, evTimeStr, monthName, monthShort, round0, tmOf, upcoming, type LayoutCtx } from '../context';
@@ -16,8 +17,8 @@ export function bigdate(ctx: LayoutCtx): string {
 	d.text(78, 174, 's', firstThatFits(ctx.family, 's', [monthYear(now), monthYear(now, true)], 146), { align: 'center' });
 
 	if (ctx.weather) {
-		d.text(14, 240, 's', `High ${round0(ctx.weather.high)}C`);
-		d.text(14, 258, 's', `Low  ${round0(ctx.weather.low)}C`);
+		d.text(14, 240, 's', `High ${round0(ctx.weather.high)}${deg()}`);
+		d.text(14, 258, 's', `Low  ${round0(ctx.weather.low)}${deg()}`);
 	} else {
 		d.text(14, 240, 's', '---');
 	}
