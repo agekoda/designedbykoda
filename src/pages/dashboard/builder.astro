@@ -87,6 +87,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { renderDrawList } from '../../lib/eink/preview';
 	import { bytesToB64, decodePic, encodePic, DEFAULT_IMAGE_SETTINGS, DITHERS, ditherGray, packBits, type ImageSettings } from '../../lib/eink/image';
 	import { dropdown, type Dropdown } from '../../lib/dropdown';
+	import { ask } from '../../lib/dialog';
 
 	const root = document.querySelector('.bld') as HTMLElement;
 	// Move to <body> so nothing in the page wrapper (animations, transforms) can interfere with covering the window.
@@ -533,10 +534,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		if (def.kind === 'text') commitSoon();
 		else (commit(), buildInspector());
 	}
-	function applyTemplate(id: string) {
+	async function applyTemplate(id: string) {
 		const t = TEMPLATES.find((x) => x.id === id);
 		if (!t) return;
-		if (layout.widgets.length && !confirm('Replace your current design with this starting point? You can undo it.')) return;
+		if (layout.widgets.length && !(await ask('You can undo it.', { title: 'Replace your design with this starting point?', ok: 'Replace it' }))) return;
 		layout = sanitizeLayout(t.build());
 		sel = null;
 		commit();
@@ -1146,8 +1147,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			const clr = document.createElement('div');
 			clr.className = 'row';
 			clr.appendChild(
-				button('Clear everything', () => {
-					if (!confirm('Remove every widget? You can undo it.')) return;
+				button('Clear everything', async () => {
+					if (!(await ask('You can undo it.', { title: 'Remove every widget?', ok: 'Remove them', danger: true }))) return;
 					layout = { v: 1, widgets: [] };
 					sel = null;
 					commit();
@@ -1334,9 +1335,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			const pickDd = dropdown(pick);
 			staticDds.push(pickDd);
 			dds.push(pickDd);
-			pick.addEventListener('change', () => {
-				if (isDirty() && !confirm('You have unsaved changes. Leave without saving?')) return void ((pick.value = deviceId), pickDd.sync());
-				location.href = '/dashboard/builder?device=' + encodeURIComponent(pick.value);
+			pick.addEventListener('change', async () => {
+				const to = pick.value;
+				if (isDirty() && !(await ask('Your changes to this design will be lost.', { title: 'Leave without saving?', ok: 'Leave', danger: true }))) return void ((pick.value = deviceId), pickDd.sync());
+				leaving = true;
+				location.href = '/dashboard/builder?device=' + encodeURIComponent(to);
 			});
 		}
 		hist = [ser()];
@@ -1409,8 +1412,13 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	window.addEventListener('beforeunload', (e) => {
 		if (isDirty() && !leaving) e.preventDefault();
 	});
-	document.getElementById('back')!.addEventListener('click', (e) => {
-		if (isDirty() && !confirm('You have unsaved changes. Leave without saving?')) e.preventDefault();
+	document.getElementById('back')!.addEventListener('click', async (e) => {
+		if (!isDirty()) return;
+		e.preventDefault();
+		const href = (e.currentTarget as HTMLAnchorElement).href;
+		if (!(await ask('Your changes to this design will be lost.', { title: 'Leave without saving?', ok: 'Leave', danger: true }))) return;
+		leaving = true;
+		location.href = href;
 	});
 
 	staticDds.push(dropdown(gridSel));

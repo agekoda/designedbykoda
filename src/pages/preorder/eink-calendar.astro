@@ -258,6 +258,7 @@ const shipping = [
 </Layout>
 
 <script>
+	import { tell } from '../../lib/dialog';
 	// ---------- Gallery: swipeable track, smooth slide between photos ----------
 	const stage = document.getElementById('stage') as HTMLElement;
 	const track = document.getElementById('track') as HTMLElement;
@@ -587,12 +588,12 @@ const shipping = [
 			if (res.ok && data.url) {
 				window.location.href = data.url;
 			} else {
-				alert(data.error || 'Could not start checkout. Please try again.');
+				tell(data.error || 'Could not start checkout. Please try again.');
 				preorderBtn.disabled = false;
 				preorderBtn.textContent = originalText;
 			}
 		} catch {
-			alert('Could not start checkout. Please try again.');
+			tell('Could not start checkout. Please try again.');
 			preorderBtn.disabled = false;
 			preorderBtn.textContent = originalText;
 		}

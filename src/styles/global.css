@@ -536,3 +536,24 @@ html.has-custom-cursor .lightbox-overlay model-viewer {
 .dd-opt:hover, .dd-opt:focus-visible { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--fg); outline: none; }
 .dd-opt[aria-selected='true'] { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--fg); }
 html.has-custom-cursor .dd, html.has-custom-cursor .dd *, html.has-custom-cursor .dd-menu, html.has-custom-cursor .dd-menu * { cursor: none !important; }
+
+/* ---------- In-page dialogs (src/lib/dialog.ts) ---------- */
+/* Used instead of the browser's confirm() / alert(), which freeze the custom cursor. */
+.x-dlg-back { position: fixed; inset: 0; z-index: 15000; display: grid; place-items: center; padding: 1.2em; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: x-dlg-fade 0.14s ease-out; }
+.x-dlg-back.out { opacity: 0; transition: opacity 0.12s; }
+.x-dlg { width: min(420px, 100%); box-sizing: border-box; padding: 1.4em 1.4em 1.2em; background: var(--bg-raised); color: var(--fg); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--box-shadow); animation: x-dlg-in 0.16s cubic-bezier(0.16, 1, 0.3, 1); }
+.x-dlg-title { font-weight: 800; font-size: 1.1em; margin-bottom: 0.4em; }
+.x-dlg-text { margin: 0 0 1.2em; line-height: 1.5; color: var(--fg); }
+.x-dlg-field { width: 100%; box-sizing: border-box; margin: -0.4em 0 1.2em; padding: 0.65em 0.8em; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 0.85em; }
+.x-dlg-row { display: flex; justify-content: flex-end; gap: 0.6em; flex-wrap: wrap; }
+.x-dlg-row button { padding: 0.6em 1.3em; border-radius: 999px; font: inherit; font-weight: 700; font-size: 0.92em; border: 1px solid transparent; }
+.x-dlg-ok { background: var(--fg); color: var(--bg); }
+.x-dlg-ok:hover { background: var(--accent); }
+.x-dlg-ok.danger { background: #c75a5a; color: #fff; }
+.x-dlg-ok.danger:hover { background: #d96a6a; }
+.x-dlg-cancel { background: transparent; color: var(--muted); border-color: var(--border) !important; }
+.x-dlg-cancel:hover { color: var(--fg); border-color: var(--muted) !important; }
+.x-dlg-row button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@keyframes x-dlg-fade { from { opacity: 0; } }
+@keyframes x-dlg-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { .x-dlg-back, .x-dlg { animation: none; } }
