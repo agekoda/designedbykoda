@@ -108,6 +108,7 @@ const deviceId = Astro.url.searchParams.get('device') ?? '';
 	import { CALENDAR_STYLES } from '../../data/calendarStyles';
 	import { DAY_FROM, DAY_TO, secondsToNextCheck } from '../../lib/messages';
 	import { dropdown } from '../../lib/dropdown';
+	import { ask } from '../../lib/dialog';
 
 	const root = document.querySelector('.msgs') as HTMLElement;
 	const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -217,7 +218,7 @@ const deviceId = Astro.url.searchParams.get('device') ?? '';
 		}
 	});
 	$('clear').addEventListener('click', async () => {
-		if (!confirm('Remove every message from the calendar?')) return;
+		if (!(await ask('Remove every message from the calendar?', { ok: 'Remove all', danger: true }))) return;
 		await api({ action: 'clear' }).catch(() => {});
 		msgs = [];
 		renderList();
@@ -299,11 +300,11 @@ const deviceId = Astro.url.searchParams.get('device') ?? '';
 	}
 	$('link-make').addEventListener('click', async () => setLink((await api({ action: 'link', on: true }).catch((e) => (flash(e.message, true), {} as any))).link ?? null));
 	$('link-new').addEventListener('click', async () => {
-		if (!confirm('Make a new link? The old one stops working, so anyone using it will need the new one.')) return;
+		if (!(await ask('The old link stops working, so anyone using it will need the new one.', { title: 'Make a new link?', ok: 'Make a new link' }))) return;
 		setLink((await api({ action: 'link', on: true })).link);
 	});
 	$('link-stop').addEventListener('click', async () => {
-		if (!confirm('Turn the link off? Nobody will be able to send messages with it.')) return;
+		if (!(await ask('Nobody will be able to send messages with it. You can make a new one later.', { title: 'Turn the link off?', ok: 'Turn it off', danger: true }))) return;
 		await api({ action: 'link', on: false });
 		setLink(null);
 	});
@@ -383,10 +384,10 @@ const deviceId = Astro.url.searchParams.get('device') ?? '';
 		shareBtn.classList.toggle('on', open);
 	}
 	shareBtn.addEventListener('click', () => toggleShare());
-	document.addEventListener('keydown', (e) => e.key === 'Escape' && toggleShare(false));
+	document.addEventListener('keydown', (e) => e.key === 'Escape' && !document.querySelector('.x-dlg-back') && toggleShare(false));
 	document.addEventListener('click', (e) => {
 		const t = e.target as HTMLElement;
-		if (!$('share').hidden && !t.closest('#share, #share-btn')) toggleShare(false);
+		if (!$('share').hidden && !t.closest('#share, #share-btn, .x-dlg-back')) toggleShare(false);
 	});
 	dropdown(expires);
 

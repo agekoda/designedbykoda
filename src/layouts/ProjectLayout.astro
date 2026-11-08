@@ -161,6 +161,7 @@ const portrait = rw > 0 && rh > 0 && rw < rh;
 </Layout>
 
 <script>
+	import { showCopy } from '../lib/dialog';
 	// Share: use the phone/OS share sheet where there is one, otherwise copy
 	// the link and say so on the button.
 	document.querySelectorAll<HTMLButtonElement>('.share-btn').forEach((btn) => {
@@ -189,7 +190,7 @@ const portrait = rw > 0 && rh > 0 && rw < rh;
 				await navigator.clipboard.writeText(url);
 				flash('Link copied');
 			} catch {
-				window.prompt('Copy this link:', url);
+				showCopy('Copy this link:', url);
 			}
 		});
 	});
