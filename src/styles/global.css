@@ -566,3 +566,12 @@ html.has-custom-cursor .dd, html.has-custom-cursor .dd *, html.has-custom-cursor
 @keyframes x-dlg-fade { from { opacity: 0; } }
 @keyframes x-dlg-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
 @media (prefers-reduced-motion: reduce) { .x-dlg-back, .x-dlg { animation: none; } }
+
+/* builder: the "This design" dialog (rename, duplicate, delete) */
+.dz-edit { margin: -0.5em 0 1.3em; }
+.dz-edit .x-dlg-field { width: 100%; }
+.dz-acts { display: flex; gap: 1.4em; margin-top: 0.9em; }
+.dz-acts:empty { display: none; }
+.dz-acts .link { background: none; border: none; padding: 0; font: inherit; font-size: 0.9em; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.dz-acts .link:hover { color: var(--fg); }
+.dz-acts .link.danger { color: #e08a8a; }

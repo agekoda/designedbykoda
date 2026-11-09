@@ -443,6 +443,12 @@ export async function GET({ params, request, locals }) {
 		const uq = await db.prepare('SELECT temp_unit FROM devices WHERE id = ?').bind(deviceId).first();
 		unit = uq?.temp_unit === 'f' ? 'f' : 'c';
 	} catch {}
+	// 12- or 24-hour times (schema-clock.sql).
+	let clock: '12' | '24' = '24';
+	try {
+		const cq = await db.prepare('SELECT clock FROM devices WHERE id = ?').bind(deviceId).first();
+		clock = cq?.clock === '12' ? '12' : '24';
+	} catch {}
 
 	// The calendar tells us its battery voltage on every refresh (?v=). Save it
 	// next to last_seen_at (same write, so no extra work) for the dashboard.
@@ -522,6 +528,7 @@ export async function GET({ params, request, locals }) {
 			dark,
 			lang,
 			unit,
+			clock,
 			cornerImage,
 			cornerSize,
 			refreshSec: intervalSec,

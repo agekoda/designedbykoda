@@ -119,6 +119,12 @@ export async function GET({ request, locals }) {
 		for (const e of mr.results ?? []) msg.set(e.id, { check: sanitizeCfg(e.msg_cfg).check, count: e.n ?? 0 });
 	} catch {}
 
+	// 12-hour clock (schema-clock.sql), for the previews.
+	const clocks = new Map<string, string>();
+	try {
+		const cr = await db.prepare('SELECT id, clock FROM devices WHERE user_id = ?').bind(userId).all();
+		for (const e of cr.results ?? []) clocks.set(e.id, e.clock === '12' ? '12' : '24');
+	} catch {}
 	// Repeating reminders (schema-reminders.sql), for the previews.
 	const rems = new Map<string, unknown>();
 	try {
@@ -146,6 +152,7 @@ export async function GET({ request, locals }) {
 		style,
 		nextStyle,
 		reminders: rems.get(d.id) ?? [],
+		clock: clocks.get(d.id) ?? '24',
 		calendarIds: parseIds(d.selected_calendar_ids) ?? parseIds(user?.selected_calendar_ids) ?? [],
 		lastSeenAt: d.last_seen_at ?? null,
 		createdAt: pairedAt.get(d.id) ?? d.created_at ?? null,

@@ -17,6 +17,8 @@ interface AskOpts {
 }
 
 let current: (() => void) | null = null;
+// Closes the open dialog as if Cancel was pressed (for buttons inside a dialog's body).
+export const closeDialog = () => current?.();
 
 export function ask(text: string, o: AskOpts = {}): Promise<boolean> {
 	current?.(); // only one at a time

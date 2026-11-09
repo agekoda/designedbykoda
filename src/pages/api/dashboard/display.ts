@@ -59,6 +59,11 @@ export async function GET({ request, locals }) {
 		const uq = await db.prepare('SELECT temp_unit FROM devices WHERE id = ?').bind(deviceId).first();
 		unit = uq?.temp_unit === 'f' ? 'f' : 'c';
 	} catch {} // temp_unit comes from schema-screens.sql
+	let clock = '24';
+	try {
+		const cq = await db.prepare('SELECT clock FROM devices WHERE id = ?').bind(deviceId).first();
+		clock = cq?.clock === '12' ? '12' : '24';
+	} catch {} // schema-clock.sql
 	let schedule: unknown = null;
 	let sign: unknown = sanitizeSign(null);
 	let msgCheck = 0;
@@ -130,6 +135,7 @@ export async function GET({ request, locals }) {
 			dark: dev.dark_mode === 1,
 			lang,
 			unit,
+			clock,
 			schedule,
 			sign,
 			msgCheck,
@@ -181,6 +187,7 @@ export async function POST({ request, locals }) {
 	if (body.dark !== undefined && typeof body.dark !== 'boolean') return json({ error: 'Invalid dark mode value.' }, 400);
 	if (body.lang !== undefined && !isLang(body.lang)) return json({ error: 'Unknown language.' }, 400);
 	if (body.unit !== undefined && !isTempUnit(body.unit)) return json({ error: 'Unknown temperature unit.' }, 400);
+	if (body.clock !== undefined && body.clock !== '12' && body.clock !== '24') return json({ error: 'Unknown clock.' }, 400);
 
 	const sets: string[] = [];
 	const vals: unknown[] = [];
@@ -294,6 +301,13 @@ export async function POST({ request, locals }) {
 			await db.prepare('UPDATE devices SET temp_unit = ? WHERE id = ? AND user_id = ?').bind(body.unit, deviceId, o.userId).run();
 		} catch {
 			return json({ error: 'Fahrenheit is not enabled on the server yet (run schema-screens.sql).' }, 500);
+		}
+	}
+	if (body.clock !== undefined) {
+		try {
+			await db.prepare('UPDATE devices SET clock = ? WHERE id = ? AND user_id = ?').bind(body.clock, deviceId, o.userId).run();
+		} catch {
+			return json({ error: 'The 12-hour clock needs a one-off database update on the server (schema-clock.sql).' }, 500);
 		}
 	}
 	if (!sets.length) return json({ ok: true }, 200);

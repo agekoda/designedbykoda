@@ -1,6 +1,7 @@
 // Moon & Sun: tonight's moon, drawn as it really looks (and the right way up for where you
 // live), with sunrise, sunset and the length of the day.
 import { Draw, PAPER } from '../draw';
+import { minutesShort } from '../clock';
 import { dayIdx, dayShort, monthShort, tmOf, type LayoutCtx } from '../context';
 import { batteryIcon } from '../batteryIcon';
 import { tr } from '../i18n';
@@ -13,8 +14,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 
 function hhmm(ms: number, off: number): string {
 	const t = Math.round((ms / 1000 + off) / 60); // minutes since local epoch midnight
-	const m = ((t % 1440) + 1440) % 1440;
-	return `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
+	return minutesShort(t); // the labels say Sunrise / Sunset, so no am/pm (it wouldn't fit)
 }
 
 export function moon(ctx: LayoutCtx): string {

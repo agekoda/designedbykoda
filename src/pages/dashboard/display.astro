@@ -173,7 +173,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 					<label class="switch">
 						<input type="checkbox" id="sch-on" />
 						<span class="track" aria-hidden="true"></span>
-						<span class="switch-text">Show other screens at set times <small>like a photo at night, or the month on weekends</small></span>
+						<span class="switch-text">Show other screens at set times</span>
 					</label>
 					<div id="sch-body" hidden>
 						<div class="sch-presets" id="sch-presets"></div>
@@ -215,6 +215,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 					<div class="seg" id="unit" role="radiogroup" aria-label="Temperature unit">
 						<label><input type="radio" name="unit" value="c" /><span>°C Celsius</span></label>
 						<label><input type="radio" name="unit" value="f" /><span>°F Fahrenheit</span></label>
+					</div>
+					<div class="label sub" style="margin-top:1.6em">Clock</div>
+					<div class="seg" id="clock" role="radiogroup" aria-label="Clock">
+						<label><input type="radio" name="clock" value="24" /><span>24-hour (14:00)</span></label>
+						<label><input type="radio" name="clock" value="12" /><span>12-hour (2:00pm)</span></label>
 					</div>
 
 						</div>
@@ -310,6 +315,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const darkBox = $<HTMLInputElement>('dark');
 	const langEl = $('lang');
 	const unitEl = $('unit');
+	const clockEl = $('clock');
 	const picBox = $('pic-box');
 	const optDesign = $('opt-design');
 	const designEdit = $<HTMLAnchorElement>('design-edit');
@@ -376,6 +382,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		dark: boolean;
 		lang: 'en' | 'ja';
 		unit: 'c' | 'f';
+		clock: '12' | '24';
 		refreshSec: number;
 		cornerMode: 'calendar' | 'image';
 		cfg: ImageSettings; // the Agenda's picture settings
@@ -411,6 +418,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		dark: false,
 		lang: 'en',
 		unit: 'c',
+		clock: '24',
 		refreshSec: 86400,
 		cornerMode: 'calendar',
 		cfg: { ...DEFAULT_IMAGE_SETTINGS },
@@ -585,7 +593,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	async function redraw() {
-		const common = { font: effFont(), dark: st.dark, lang: st.lang, unit: st.unit, hasWeather, vbat: vbat ?? 4.12, refreshSec: st.refreshSec };
+		const common = { font: effFont(), dark: st.dark, lang: st.lang, unit: st.unit, clock: st.clock, hasWeather, vbat: vbat ?? 4.12, refreshSec: st.refreshSec };
 		try {
 			const r = await renderPreview({ ...common, style: renderId(fs()), ...extras(fs(), false), refreshSec: fs() === 'timeline' ? st.refreshSec : 86400 });
 			paintScreen($<HTMLCanvasElement>('cur-thumb'), r.px, { mode: 'screen', scale: 1 });
@@ -725,11 +733,20 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		});
 		langEl.addEventListener('change', (e) => {
 			st.lang = (e.target as HTMLInputElement).value === 'ja' ? 'ja' : 'en';
+			syncSums();
 			schedule();
 			changed();
 		});
 		unitEl.addEventListener('change', (e) => {
 			st.unit = (e.target as HTMLInputElement).value === 'f' ? 'f' : 'c';
+			syncSums();
+			schedule();
+			changed();
+		});
+		clockEl.addEventListener('change', (e) => {
+			st.clock = (e.target as HTMLInputElement).value === '12' ? '12' : '24';
+			thumbsDirty = true;
+			syncSums();
 			schedule();
 			changed();
 		});
@@ -856,7 +873,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const sid = isFrame() ? 'frame' : 'agenda';
 		const cv = picker.querySelector<HTMLCanvasElement>(`canvas[data-sid="${sid}"]`);
 		if (cv)
-			renderPreview({ style: sid, font: effFont(), dark: st.dark, lang: st.lang, unit: st.unit, hasWeather, vbat: vbat ?? 4.12, ...extras(sid, true) }).then((r) => paintScreen(cv, r.px, { mode: 'screen', scale: 1 }));
+			renderPreview({ style: sid, font: effFont(), dark: st.dark, lang: st.lang, unit: st.unit, clock: st.clock, hasWeather, vbat: vbat ?? 4.12, ...extras(sid, true) }).then((r) => paintScreen(cv, r.px, { mode: 'screen', scale: 1 }));
 		changed();
 	}
 
@@ -883,6 +900,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		darkBox.checked = st.dark;
 		langEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.lang));
 		unitEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.unit));
+		clockEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.clock));
 		refreshBox.hidden = !usedStyles().includes('timeline');
 		refreshEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = parseInt(i.value, 10) === st.refreshSec));
 		refreshHint.textContent = REFRESH_HINTS[st.refreshSec] ?? '';
@@ -1316,7 +1334,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		if (st.sch.button === 'next') parts.push('button cycles');
 		$('sum-when').textContent = parts.join(' · ');
 		$('sum-msgs').textContent = msgSum;
-		$('sum-lang').textContent = `${st.lang === 'ja' ? '日本語' : 'English'} · °${st.unit.toUpperCase()}`;
+		$('sum-lang').textContent = `${st.lang === 'ja' ? '日本語' : 'English'} · °${st.unit.toUpperCase()} · ${st.clock}-hour`;
 	}
 	async function loadMsgSum() {
 		try {
@@ -1378,6 +1396,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		if (JSON.stringify(st.sch) !== JSON.stringify(baseState.sch)) body.schedule = st.sch;
 		if (JSON.stringify(st.sign) !== JSON.stringify(baseState.sign)) body.sign = st.sign;
 		if (JSON.stringify(st.reminders) !== JSON.stringify(baseState.reminders)) body.reminders = st.reminders.filter((r) => r.text.trim());
+		if (st.clock !== baseState.clock) body.clock = st.clock;
 		if (st.unit !== baseState.unit) body.unit = st.unit; // only when changed, so a server without schema-screens.sql still saves the rest
 		if (anyCorner || st.cornerMode === 'image') {
 			body.corner = { mode: st.cornerMode };
@@ -1530,6 +1549,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				dark: !!info.dark,
 				lang: info.lang === 'ja' ? 'ja' : 'en',
 				unit: info.unit === 'f' ? 'f' : 'c',
+				clock: info.clock === '12' ? '12' : '24',
 				refreshSec: info.refreshSec || 86400,
 				cornerMode: info.cornerMode,
 				cfg: cleanSettings(info.cornerCfg),

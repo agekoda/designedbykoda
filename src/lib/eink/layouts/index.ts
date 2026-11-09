@@ -5,6 +5,7 @@
 //      shows up in the setup page and dashboard
 // No firmware change is needed, devices pick it up the next time they wake.
 import { DEFAULT_FAMILY, isFamily, type Family } from '../fonts';
+import { getClock, isClock, setClock } from '../clock';
 import type { LayoutCtx } from '../context';
 import { cleanText, cleanTitle, toAscii } from '../draw';
 import { getLang, isLang, setLang } from '../i18n';
@@ -74,13 +75,16 @@ export function renderLayout(styleId: string, ctx: Omit<LayoutCtx, 'family'>, fa
 	const tasks = ctx.tasks ? ctx.tasks.map((t) => ({ ...t, title: JAPANESE_EVENT_TITLES ? cleanText(t.title, true) : toAscii(t.title, true) })) : ctx.tasks;
 	const before = getLang();
 	const beforeUnit = getUnit();
+	const beforeClock = getClock();
 	const unit = isTempUnit(ctx.unit) ? ctx.unit : 'c';
 	setLang(isLang(ctx.lang) ? ctx.lang : 'en');
 	setUnit(unit);
+	setClock(isClock(ctx.clock) ? ctx.clock : '24');
 	try {
 		return entry.render({ ...ctx, events, tasks, family, weather: convertWeather(ctx.weather, unit) });
 	} finally {
 		setLang(before);
 		setUnit(beforeUnit);
+		setClock(beforeClock);
 	}
 }
