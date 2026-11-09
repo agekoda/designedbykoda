@@ -5,6 +5,18 @@ import { METRICS } from './metrics';
 import { fontId, type Family, type Role } from './fonts';
 import { tr } from './i18n';
 import { hasGlyph, jpAdvance } from './jp';
+import { VMETRICS } from './vmetrics';
+
+// The degree sign: no font on the calendar has one, so it's drawn as a small ring at cap height
+// (Draw.text). d = ring diameter, stroke = line width, w = the space it takes, top = ring top
+// above the baseline. All in pixels at the given scale.
+export function degreeBox(family: Family, role: Role, scale = 1) {
+	const v = VMETRICS[fontId(family, role)] ?? VMETRICS[fontId('sans', role)] ?? [12, 12, 9, 5, 22];
+	const cap = v[1] * scale;
+	const d = Math.max(4, Math.round(cap * 0.36));
+	const stroke = d >= 10 ? 2 : 1;
+	return { d, stroke, w: d + Math.max(1, Math.round(d * 0.3)) + 1, top: cap };
+}
 
 export interface Bounds {
 	x1: number; // left edge of the visible ink, relative to where drawing starts
@@ -23,6 +35,14 @@ export function measure(family: Family, role: Role, s: string, scale = 1): Bound
 	const jw = jpAdvance(role, scale);
 	for (let i = 0; i < s.length; i++) {
 		const code = s.charCodeAt(i);
+		if (code === 0xb0) {
+			// the drawn degree ring
+			const b = degreeBox(family, role, scale);
+			if (x < minx) minx = x;
+			if (x + b.w - 1 > maxx) maxx = x + b.w - 1;
+			x += b.w;
+			continue;
+		}
 		if (code > 0x7f && hasGlyph(code)) {
 			// a Japanese character: a square cell (drawn as a bitmap, see jp.ts)
 			if (x < minx) minx = x;

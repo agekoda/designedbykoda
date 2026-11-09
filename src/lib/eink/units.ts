@@ -12,7 +12,7 @@ export function setUnit(u: TempUnit): void {
 }
 
 // The letter drawn after a temperature ("19C" / "66F"). The screen fonts have no degree sign.
-export const deg = (): string => (current === 'f' ? 'F' : 'C');
+export const deg = (): string => (current === 'f' ? '°F' : '°C');
 
 export const cToF = (c: number): number => (c * 9) / 5 + 32;
 export const kmhToMph = (k: number): number => Math.round(k * 0.621371);
