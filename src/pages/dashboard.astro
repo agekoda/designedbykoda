@@ -212,7 +212,7 @@ if (!userId) return Astro.redirect('/setup');
 				cornerImage = Uint8Array.from(bin, (c) => c.charCodeAt(0));
 			} catch {}
 		}
-		// the preview shows what the next update puts on the screen (your saved choice, the schedule or a button pick)
+		// what the next update puts on the screen (your saved choice, the schedule or a button pick)
 		const onScreen = d.nextStyle ?? d.style;
 		const nowShowing = d.shownStyle ?? onScreen; // what the calendar was last sent
 		let frameImage: Uint8Array | null = null;
@@ -221,7 +221,8 @@ if (!userId) return Astro.redirect('/setup');
 				frameImage = Uint8Array.from(atob(d.frameBits), (c) => c.charCodeAt(0));
 			} catch {}
 		}
-		renderPreview({ style: onScreen.startsWith('design:') ? 'custom' : onScreen, unit: d.unit, clock: d.clock, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null, cornerImage, refreshSec: onScreen === 'timeline' ? d.refreshIntervalSec : 86400, loc: d.location ? { lat: d.location.lat, lon: d.location.lon } : null, countdown: d.countdown ?? null, frameImage, custom: layoutFor(d, onScreen), sign: d.sign ?? null, reminders: d.reminders ?? [] })
+		// The preview is what's on the calendar now (the "Showing" line says if that's about to change).
+		renderPreview({ style: nowShowing.startsWith('design:') ? 'custom' : nowShowing, unit: d.unit, clock: d.clock, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null, cornerImage, refreshSec: nowShowing === 'timeline' ? d.refreshIntervalSec : 86400, loc: d.location ? { lat: d.location.lat, lon: d.location.lon } : null, countdown: d.countdown ?? null, frameImage, custom: layoutFor(d, nowShowing), sign: d.sign ?? null, reminders: d.reminders ?? [] })
 			.then((r) => paintScreen(canvas, r.px, { mode: 'screen', scale: 2 }))
 			.catch(() => {});
 
@@ -236,7 +237,7 @@ if (!userId) return Astro.redirect('/setup');
 				: `Showing <b>${esc(labelIn(d, onScreen))}</b>${next}`;
 
 		const quick = el.querySelector('[data-quick]') as HTMLFormElement;
-		const syncQuick = () => (quick.hidden = !(showsMsgs(d, onScreen)));
+		const syncQuick = () => (quick.hidden = !(showsMsgs(d, onScreen) || showsMsgs(d, nowShowing)));
 		syncQuick();
 		// battery history: click the battery to open a small graph
 		const battBtn = el.querySelector<HTMLButtonElement>('[data-batt]');
