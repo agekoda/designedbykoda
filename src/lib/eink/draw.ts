@@ -38,7 +38,7 @@
 import { fontId, type Family, type Role } from './fonts';
 import { tr } from './i18n';
 import { hasGlyph, hasJp, jpAscent, jpAdvance, jpBitmap } from './jp';
-import { advanceOf } from './measure';
+import { advanceOf, degreeBox } from './measure';
 
 export type Color = 0 | 1;
 export const INK: Color = 0;
@@ -133,7 +133,7 @@ export class Draw {
 	// ---- text ----
 	text(x: number, y: number, role: Role, s: string, o: TextOpts = {}): this {
 		s = tr(s);
-		if (hasJp(s)) return this.mixedText(x, y, role, s, o);
+		if (hasJp(s) || s.includes('°')) return this.mixedText(x, y, role, s, o);
 		const clean = toAscii(s);
 		if (!clean.trim()) return this;
 		const scale = Math.min(4, Math.max(1, Math.round(o.scale ?? 1)));
@@ -154,9 +154,11 @@ export class Draw {
 		const scale = Math.min(4, Math.max(1, Math.round(o.scale ?? 1)));
 		const align = o.align ?? 'left';
 		// one entry per character: Japanese ones as they are, everything else as plain ASCII
-		let chars: { ch: string; jp: boolean; w: number }[] = [];
+		let chars: { ch: string; jp: boolean; w: number; deg?: boolean }[] = [];
+		const db = degreeBox(this.family, role, scale);
 		for (const c of Array.from(s)) {
-			if (hasGlyph(c.codePointAt(0)!)) chars.push({ ch: c, jp: true, w: jpAdvance(role, scale) });
+			if (c === '°') chars.push({ ch: c, jp: false, w: db.w, deg: true });
+			else if (hasGlyph(c.codePointAt(0)!)) chars.push({ ch: c, jp: true, w: jpAdvance(role, scale) });
 			else for (const a of toAscii(c)) chars.push({ ch: a, jp: false, w: advanceOf(this.family, role, a, scale) });
 		}
 		const total = () => chars.reduce((n, c) => n + c.w, 0);
@@ -166,7 +168,7 @@ export class Draw {
 			while (chars.length && total() + dotW > maxW) chars.pop();
 			chars.push({ ch: '.', jp: false, w: dotW / 2 }, { ch: '.', jp: false, w: dotW / 2 });
 		}
-		if (!chars.some((c) => c.jp || c.ch.trim())) return this;
+		if (!chars.some((c) => c.jp || c.deg || c.ch.trim())) return this;
 		const w = total();
 		let cx = x;
 		if (align === 'center' || align === 'rawC') cx = x - w / 2;
@@ -179,12 +181,20 @@ export class Draw {
 			let j = i;
 			let run = '';
 			let rw = 0;
-			while (j < chars.length && chars[j].jp === chars[i].jp) {
+			while (j < chars.length && chars[j].jp === chars[i].jp && !chars[j].deg && !chars[i].deg) {
 				run += chars[j].ch;
 				rw += chars[j].w;
 				j++;
 			}
-			if (chars[i].jp) {
+			if (chars[i].deg) {
+				// the degree sign: a ring sitting at cap height
+				const r = db.d / 2;
+				const cxr = cx + 1 + r;
+				const cyr = y - db.top + r;
+				for (let k = 0; k < db.stroke + (o.bold ? 1 : 0); k++) this.circle(cxr, cyr, r - k, colour);
+				j = i + 1;
+				rw = chars[i].w;
+			} else if (chars[i].jp) {
 				const bmp = jpBitmap(run, role, scale, o.bold === true);
 				this.bitmapBytes(cx, y - jpAscent(role, scale), bmp.w, bmp.h, bmp.bytes, colour);
 			} else if (run.trim()) {

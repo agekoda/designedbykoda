@@ -287,6 +287,21 @@ function weatherWidget(env: Env, w: Widget, o: Opts) {
 	const { inner } = { inner: { w: w.w - (o.invert === true || o.border === true ? 10 : 0) } };
 	const sized = facesFor(o.size);
 	const fits = (s: string, key: string) => measure(env.fam, withBold(FACES[key], o.bold === true).role, s, FACES[key].scale).w <= inner.w;
+	if (o.show !== 'high' && o.show !== 'low') {
+		// High and Low: on one line if it fits, otherwise High above Low (never broken mid-way),
+		// at the biggest size that fits; the short wording if nothing does.
+		const { inner: box, color } = chrome(env, w, o);
+		const two = [`High ${hi}${deg()}`, `Low ${lo}${deg()}`];
+		for (const k of sized) {
+			const face = withBold(FACES[k], o.bold === true);
+			for (const lines of [[text], two]) {
+				if (lines.every((l) => measure(env.fam, face.role, l, face.scale).w <= box.w) && blockH(env, face, lines.length) <= box.h)
+					return drawLines(env, box, lines, face, o.align, o.valign ?? 'middle', color);
+			}
+		}
+		const sf = fitText(env, short, box.w, box.h, sized, o.bold === true);
+		return drawLines(env, box, sf.lines, sf.face, o.align, o.valign ?? 'middle', color);
+	}
 	const key = sized.find((k) => fits(text, k));
 	textWidget(env, w, o, key ? text : short);
 }

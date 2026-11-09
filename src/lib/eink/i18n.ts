@@ -129,12 +129,12 @@ const JA: Record<string, string> = {
 
 // Pattern translations, for strings with numbers in them.
 const PATTERNS: [RegExp, (...m: string[]) => string][] = [
-	[/^High:? ?(-?\d+)([CF])( +)Low:? ?(-?\d+)[CF]$/, (_a, h, u, sp, l) => `最高${h}${u}${sp}最低${l}${u}`],
-	[/^H:(-?\d+)([CF])( +)L:(-?\d+)[CF]$/, (_a, h, u, sp, l) => `高${h}${u}${sp}低${l}${u}`],
-	[/^H (-?\d+)([CF])$/, (_a, h, u) => `高 ${h}${u}`],
-	[/^L (-?\d+)([CF])$/, (_a, l, u) => `低 ${l}${u}`],
-	[/^High +(-?\d+)([CF])$/, (_a, h, u) => `最高${h}${u}`],
-	[/^Low +(-?\d+)([CF])$/, (_a, l, u) => `最低${l}${u}`],
+	[/^High:? ?(-?\d+)(°?[CF])( +)Low:? ?(-?\d+)°?[CF]$/, (_a, h, u, sp, l) => `最高${h}${u}${sp}最低${l}${u}`],
+	[/^H:(-?\d+)(°?[CF])( +)L:(-?\d+)°?[CF]$/, (_a, h, u, sp, l) => `高${h}${u}${sp}低${l}${u}`],
+	[/^H (-?\d+)(°?[CF])$/, (_a, h, u) => `高 ${h}${u}`],
+	[/^L (-?\d+)(°?[CF])$/, (_a, l, u) => `低 ${l}${u}`],
+	[/^High +(-?\d+)(°?[CF])$/, (_a, h, u) => `最高${h}${u}`],
+	[/^Low +(-?\d+)(°?[CF])$/, (_a, l, u) => `最低${l}${u}`],
 	[/^Low (\d+)%$/, (_a, p) => `低 ${p}%`],
 	[/^(\d+)% lit$/, (_a, p) => `輝面 ${p}%`],
 	[/^Rain (\d+)%$/, (_a, p) => `降水 ${p}%`],
