@@ -56,4 +56,4 @@ Full details on what is collected and how it is used are available in our [Priva
 - Battery level and time left on the dashboard
 - Press the button to update straight away
 - E-ink display for near-zero idle power draw
-- Tested 3–4 months of battery life per charge
+- 5–6 months of battery life per charge
