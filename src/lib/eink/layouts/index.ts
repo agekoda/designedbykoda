@@ -37,7 +37,7 @@ interface LayoutEntry {
 }
 
 export const LAYOUTS: Record<string, LayoutEntry> = {
-	agenda: { render: agenda, font: 'jbmono' },
+	agenda: { render: agenda, font: 'sans' },
 	month: { render: month, font: 'sans' },
 	bigdate: { render: bigdate, font: 'sans' },
 	week: { render: week, font: 'sans' },
