@@ -29,28 +29,31 @@ A low-power e-ink display that syncs with Google Calendar, built for months of u
 
 ## Make it yours
 
-Pick from five layouts: Agenda, Month, Big date, Week and Next up. Each one shows your schedule differently, so you can choose whichever suits the spot it lives in. There's also a dark mode if you'd rather have white on black.
+There are 17 ready-made screens. The calendar ones are Agenda, Month, Week, Big date, Next up, Timeline and Planner. Then there's To-do (from Google Tasks), Countdown, Moon & Sun, Quote of the day, Reminders, Message board and Photo frame, plus signs for a meeting room, a guest welcome and a desk name plate. Or design your own: drag widgets onto the screen in the layout builder, and keep up to 20 designs.
 
-Everything is controlled from a dashboard on this website. Sign in and you can change the style, turn dark mode on or off, choose which calendars appear, and give each calendar a name. If you have more than one, they all live in the same dashboard. Change something and the calendar picks it up by itself at midnight, or press the button on the calendar to see it within a few seconds.
+Set it to change by itself: a photo frame at night, the month on weekends. Or set the button to flip to the next screen. Pick a font, dark mode, English or Japanese, °C or °F, and a 24 or 12-hour clock.
 
-You can also add your city to show the day's high and low temperature on the screen. It's completely optional.
+Everything is done from the dashboard on this website, on your phone or computer. Choose which calendars show, add your city for the day's weather, and send a message to the screen, or share a link so others can. If you have more than one calendar, they live in the same dashboard, and you can copy one's setup to another. Changes show at the next update, or press the button to see them in a few seconds.
 
 ## How it connects to your Google Calendar
 
-Setting up the device involves signing in with your Google account. During sign in, you choose which calendar you want the device to display, including a shared or family calendar if you prefer. The device then fetches your upcoming events from that calendar and shows them on its screen.
+Setting up the device involves signing in with your Google account. During sign in, you choose which calendar you want the device to display, including a shared calendar if you prefer. The device then fetches your upcoming events from that calendar and shows them on its screen.
 
-Access is read only. The device can see upcoming events, but it cannot create, edit, or delete anything in your calendar. Your calendar data is used only to display your schedule on your own device and is never shared with anyone else. You can unpair a device, or delete your account and data, at any time from the dashboard.
+Access is read only. The device can see upcoming events (and your Google Tasks, if you use the To-do screen), but it cannot create, edit, or delete anything. Your calendar data is used only to display your schedule on your own device and is never shared with anyone else. You can unpair a device, or delete your account and data, at any time from the dashboard.
 
 Full details on what is collected and how it is used are available in our [Privacy Policy](/privacy).
 
 ## Features
 
-- Five layouts: Agenda, Month, Big date, Week and Next up
-- Dark mode (white on black)
-- Pulls events from Google Calendar, including shared or family calendars
-- Pick which calendars show, and name each one
-- Optional daily high and low temperature for your city
-- Manage multiple calendars from one dashboard, and change anything from your phone or computer
-- Updates automatically every day at midnight, or press the button to refresh straight away
+- 17 ready-made screens, plus your own designs from the layout builder
+- Screens that change at set times, or with the button
+- Google Calendar, including shared calendars, and Google Tasks
+- Message board: send messages from the dashboard or a shared link
+- Reminders for things that repeat, like bin day
+- Weather for your city, in °C or °F
+- Fonts, dark mode, English or Japanese, 24 or 12-hour clock
+- Manage several calendars from one dashboard, and copy settings between them
+- Battery level and time left on the dashboard
+- Press the button to update straight away
 - E-ink display for near-zero idle power draw
 - Tested 3–4 months of battery life per charge
