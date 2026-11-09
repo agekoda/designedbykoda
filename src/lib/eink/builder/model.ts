@@ -695,14 +695,14 @@ export interface SignCfg {
 export const SIGN_DEFAULTS: SignCfg = {
 	room: { name: 'Boardroom' },
 	guest: {
-		title: 'Welcome, Sam!',
+		title: 'Welcome, Joel!',
 		ssid: 'Guest Wi-Fi',
 		pass: 'change-me',
 		rules: 'No smoking inside\nQuiet after 10pm\nBins go out on Tuesday\nLeave keys on the table',
 		checkout: 'Check-out 10am',
 		contact: 'Questions? Text Koda on 0400 000 000',
 	},
-	nameplate: { name: 'Alex Koda', role: 'Hardware Engineer' },
+	nameplate: { name: 'Dylan Haines', role: 'Hardware Engineer' },
 };
 // How long each box may be, and which ones are kept exactly as typed (Wi-Fi details).
 const SIGN_LIMITS: Record<string, { max: number; raw?: boolean; multiline?: boolean }> = {
