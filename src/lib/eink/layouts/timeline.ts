@@ -8,6 +8,7 @@
 // is actually moving across the timeline: from the first visible hour to the last, then
 // it sleeps until midnight.
 import { deg } from '../units';
+import { hourText, minutesText, rangeText } from '../clock';
 import { Draw, PAPER } from '../draw';
 import { firstThatFits, measure } from '../measure';
 import { dayIdx, dayShort, monthShort, round0, tmOf, type CalEvent, type LayoutCtx } from '../context';
@@ -102,8 +103,7 @@ function wrapLines(fam: LayoutCtx['family'], role: 's' | 'sb', text: string, max
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 function hhmm(h: number): string {
-	const m = Math.round(h * 60);
-	return `${pad2(Math.floor(m / 60) % 24)}:${pad2(m % 60)}`;
+	return minutesText(h * 60);
 }
 function untilText(mins: number): string {
 	if (mins < 1) return 'now';
@@ -145,7 +145,7 @@ export function timeline(ctx: LayoutCtx): string {
 	for (let h = w.start; h <= w.end; h++) {
 		const y = Math.round(yOf(h));
 		d.dots(lineX, y, blockR - lineX, 4);
-		if ((h - w.start) % step === 0) d.text(8, y + 4, 's', `${pad2(h % 24)}:00`);
+		if ((h - w.start) % step === 0) d.text(8, y + 4, 's', hourText(h, h === w.start));
 	}
 
 	// the bar for "now" (only while it moves across the timeline)
@@ -232,7 +232,7 @@ export function timeline(ctx: LayoutCtx): string {
 	} else if (!live) {
 		d.text(px, 62, 's', 'TODAY');
 		d.text(px, 94, 'mb', `${timed.length} ${timed.length === 1 ? 'event' : 'events'}`, { maxW: colW });
-		d.text(px, 116, 's', `${hhmm(timed[0].s)} - ${hhmm(Math.max(...timed.map((t) => t.e)))}`, { maxW: colW });
+		d.text(px, 116, 's', rangeText(timed[0].s * 60, Math.max(...timed.map((t) => t.e)) * 60), { maxW: colW });
 	} else {
 		const cur = timed.find((t) => t.s <= nowH && nowH < t.e);
 		const nxt = timed.find((t) => t.s > nowH);

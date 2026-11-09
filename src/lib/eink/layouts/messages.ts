@@ -2,6 +2,7 @@
 //   - messages(): the "Message board" layout, newest message big, older ones listed below
 //   - messageList(): the same list, drawn into any box (the layout builder's Messages widget)
 import { Draw, INK, PAPER, type Color } from '../draw';
+import { timeText } from '../clock';
 import { fontId, type Family, type Role } from '../fonts';
 import { measure, wrapText } from '../measure';
 import { VMETRICS } from '../vmetrics';
@@ -13,7 +14,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 // "14:05", "Yesterday 18:02", "Mon 09:15", "3 Nov"
 export function msgWhen(atLocal: number, nowLocal: number): string {
 	const t = tmOf(atLocal);
-	const hm = `${pad2(t.hour)}:${pad2(t.min)}`;
+	const hm = timeText(t.hour, t.min);
 	const days = dayIdx(nowLocal) - dayIdx(atLocal);
 	if (days <= 0) return hm;
 	if (days === 1) return `${tr('Yesterday')} ${hm}`;

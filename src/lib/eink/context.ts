@@ -1,5 +1,6 @@
 import { deg } from './units';
 import { batteryPercent } from './battery';
+import { timeText } from './clock';
 // What a layout gets to work with, plus the small date helpers every layout
 // needs. Everything is "local wall-clock seconds": the real instant shifted by
 // the user's timezone offset and then read with the UTC getters, so no Intl
@@ -50,6 +51,8 @@ export interface LayoutCtx {
 	lang?: Lang;
 	// Celsius (default) or Fahrenheit. See units.ts.
 	unit?: import('./units').TempUnit;
+	// 24-hour (default) or 12-hour times. See clock.ts.
+	clock?: import('./clock').Clock;
 	// The layout builder: the widgets of the person's own design (see builder/model.ts).
 	custom?: import('./builder/model').CustomLayout | null;
 	// Meeting room / Guest welcome / Desk name plate: the words to fill in (see builder/model.ts).
@@ -128,7 +131,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 export function evTimeStr(e: CalEvent): string {
 	if (e.allDay) return tr('All day');
 	const t = tmOf(e.startLocal);
-	return `${pad2(t.hour)}:${pad2(t.min)}`;
+	return timeText(t.hour, t.min);
 }
 
 // printf("%.0f") rounds exact halves to the nearest even number; do the same so

@@ -3,6 +3,7 @@
 // someone drags a widget to, the result is a valid, tidy screen. Used by the server for the
 // real display and by the editor for the live preview, so they always match.
 import { deg, windText } from '../units';
+import { minutesShort, timeText } from '../clock';
 import { Draw, PAPER, INK, type Align, type Color } from '../draw';
 import { fontId, type Family, type Role } from '../fonts';
 import { measure, wrapText } from '../measure';
@@ -272,9 +273,7 @@ function weekStrip(env: Env, w: Widget, o: Opts) {
 // ---- weather & sky ----
 const pad2 = (n: number) => String(n).padStart(2, '0');
 function hhmm(ms: number, off: number): string {
-	const t = Math.round((ms / 1000 + off) / 60);
-	const m = ((t % 1440) + 1440) % 1440;
-	return `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
+	return minutesShort(Math.round((ms / 1000 + off) / 60)); // under Sunrise / Sunset labels: no am/pm
 }
 
 function weatherWidget(env: Env, w: Widget, o: Opts) {
@@ -760,7 +759,7 @@ function currentEvent(ctx: LayoutCtx): CalEvent | null {
 }
 const hm = (local: number) => {
 	const t = tmOf(local);
-	return `${pad2(t.hour)}:${pad2(t.min)}`;
+	return timeText(t.hour, t.min);
 };
 
 function roomStatusWidget(env: Env, w: Widget, o: Opts) {

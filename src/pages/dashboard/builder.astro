@@ -24,22 +24,20 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			<div class="tb-left">
 				<a class="back" id="back" href={`/dashboard/display?device=${encodeURIComponent(deviceId)}`}>← Customize display</a>
 				<div class="bld-title" id="title">Layout builder</div>
-				<!-- Your designs (schema-designs.sql): name, switch, new, duplicate, delete -->
+				<!-- Your designs (schema-designs.sql): switch and new in the dropdown; rename, duplicate, delete under the pencil -->
 				<div class="designs" id="designs" hidden>
-					<input class="name-in" id="design-name" maxlength="30" aria-label="Design name" placeholder="Name this design" spellcheck="false" />
 					<select id="design-pick" aria-label="Your designs"></select>
-					<button type="button" class="btn ghost small" id="design-dup">Duplicate</button>
-					<button type="button" class="btn ghost small" id="design-del">Delete</button>
+					<button type="button" class="icon-btn" id="design-edit" title="Rename, duplicate or delete" aria-label="Rename, duplicate or delete this design"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z" /><path d="M13.5 6.5l4 4" /></svg></button>
 				</div>
 				<select id="device-pick" class="mini" aria-label="Which display" hidden></select>
 			</div>
 			<div class="tb-right">
 				<span class="save-msg" id="save-msg" aria-live="polite"></span>
-				<button type="button" class="btn ghost small" id="undo" disabled title="Undo (Ctrl+Z)">Undo</button>
-				<button type="button" class="btn ghost small" id="redo" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
+				<div class="ur">
+					<button type="button" class="icon-btn" id="undo" disabled title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 010 11H11" /></svg></button>
+					<button type="button" class="icon-btn" id="redo" disabled title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5" /><path d="M20 9H9.5a5.5 5.5 0 000 11H13" /></svg></button>
+				</div>
 				<button type="button" class="btn ghost small" id="save" disabled>Save</button>
-				<span class="on-cal" id="on-cal" hidden>On the calendar now</span>
-				<button type="button" class="btn small" id="show-on" hidden>Show on calendar</button>
 				<button type="button" class="btn small" id="saveleave">Save and leave</button>
 			</div>
 		</div>
@@ -76,7 +74,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 							<div class="empty-card">
 								<div class="empty-t">Start with a template</div>
 								<div class="empty-tpls" id="empty-tpls"></div>
-								<div class="empty-or">or drag any widget from the left onto the screen</div>
+								<div class="empty-or">or drag a widget from the left, or click outside this box for a blank screen</div>
 							</div>
 						</div>
 					</div>
@@ -102,7 +100,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { renderDrawList } from '../../lib/eink/preview';
 	import { bytesToB64, decodePic, encodePic, DEFAULT_IMAGE_SETTINGS, DITHERS, ditherGray, packBits, type ImageSettings } from '../../lib/eink/image';
 	import { dropdown, type Dropdown } from '../../lib/dropdown';
-	import { ask } from '../../lib/dialog';
+	import { ask, closeDialog } from '../../lib/dialog';
 
 	const root = document.querySelector('.bld') as HTMLElement;
 	// Move to <body> so nothing in the page wrapper (animations, transforms) can interfere with covering the window.
@@ -123,6 +121,13 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const stageWrap = $('stage-wrap');
 	const emptyEl = $('empty');
 	const emptyTpls = $('empty-tpls');
+	// The "Start with a template" card is optional: click anywhere outside it for a blank screen.
+	let emptyDismissed = false;
+	emptyEl.addEventListener('pointerdown', (e) => {
+		if ((e.target as HTMLElement).closest('.empty-card')) return;
+		emptyDismissed = true;
+		emptyEl.hidden = true;
+	});
 	let dds: Dropdown[] = [];
 	const staticDds: Dropdown[] = [];
 	const mkdd = (s: HTMLSelectElement) => (dds.push(dropdown(s)), s);
@@ -149,6 +154,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	let fonts: any = null;
 	let lang: 'en' | 'ja' = 'en';
 	let unit: 'c' | 'f' = 'c';
+	let clock: '12' | '24' = '24';
 
 	// Your designs: which one this is (null = a new one, not saved yet), its name, and the list.
 	let designsOn = false; // false until schema-designs.sql has been run: then it's the old single design
@@ -201,6 +207,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			dark,
 			lang,
 			unit,
+			clock,
 			hasWeather: info.hasWeather,
 			vbat: 4.0,
 			loc: info.loc,
@@ -1298,15 +1305,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		redoBtn.disabled = hi >= hist.length - 1;
 		const dirty = isDirty();
 		saveBtn.disabled = !dirty;
-		if (dirty) {
-			saveMsg.textContent = 'Unsaved changes';
-			saveMsg.classList.add('is-dirty');
-			saveMsg.classList.remove('is-error');
-		}
+		if (dirty && saveMsg.textContent && !saveMsg.classList.contains('is-error')) saveMsg.textContent = ''; // the old "Saved" is out of date
 		const n = layoutNeeds(layout);
 		const types = new Set(layout.widgets.map((w) => w.t));
 		const notes: string[] = [];
-		if (n.tasks && !info.tasksGranted) notes.push('The To-do list needs Google Tasks. Connect it on the <a href="/dashboard/display?device=' + encodeURIComponent(deviceId) + '">Customize display</a> page (choose the To-do layout, then the Tasks tab). Until then your screen will say so.');
+		if (n.tasks && !info.tasksGranted) notes.push('The To-do list needs Google Tasks. Connect it on the <a href="/dashboard/display?device=' + encodeURIComponent(deviceId) + '">Customize display</a> page (Change screen, then To-do). Until then your screen will say so.');
 		if (n.countdown && !info.countdown) notes.push('Click the Countdown widget and fill in its name and date on the right. Until then the preview shows an example.');
 		if (n.picture && !info.cornerBits) notes.push('Click the Picture widget and choose your picture on the right. Nothing is drawn on the display until you do.');
 		if ((types.has('sun_times') || types.has('moon')) && !info.loc) notes.push('Add your city (weather location) to get sunrise and sunset times and the right way up moon.');
@@ -1316,7 +1319,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	function everything() {
-		emptyEl.hidden = layout.widgets.length > 0;
+		if (layout.widgets.length > 0) emptyDismissed = false; // shows again if the screen is emptied
+		emptyEl.hidden = layout.widgets.length > 0 || emptyDismissed;
 		syncOverlay();
 		buildInspector();
 		redraw();
@@ -1340,6 +1344,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		dark = !!d.dark;
 		lang = d.lang === 'ja' ? 'ja' : 'en';
 		unit = d.unit === 'f' ? 'f' : 'c';
+		clock = d.clock === '12' ? '12' : '24';
 		layout = sanitizeLayout(d.custom);
 		designsOn = Array.isArray(d.designs);
 		designList = d.designs ?? [];
@@ -1406,15 +1411,13 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 
 	let leaving = false;
 	const leave = () => (leaving = true, location.href = `/dashboard/display?device=${encodeURIComponent(deviceId)}`);
-	async function save(thenLeave = false, showIt = false) {
+	// Saving also puts the design on the calendar (it's the one you're working on).
+	async function save(thenLeave = false) {
 		flushCommit();
-		if (!isDirty() && !(showIt && designId === null) && !(showIt && designsOn)) {
+		const notShowing = designsOn && (designId === null || designId !== onScreen);
+		if (!isDirty() && !notShowing) {
 			if (thenLeave) leave();
 			return;
-		}
-		if (showIt && designsOn && designId && !isDirty()) {
-			// nothing to save, just put it on the screen
-			return void showOnCalendar();
 		}
 		if (saveBtn.disabled && !thenLeave) return;
 		saveBtn.disabled = true;
@@ -1424,8 +1427,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			const res = await fetch('/api/dashboard/builder', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				// With Your designs, saving doesn't change what the calendar shows (Show on calendar does).
-				body: JSON.stringify({ deviceId, custom: layout, font, dark, designId, name: designName, activate: designsOn ? showIt : true }),
+				body: JSON.stringify({ deviceId, custom: layout, font, dark, designId, name: designName, activate: true }),
 			});
 			const data = await res.json().catch(() => ({}));
 			if (!res.ok) throw new Error(data.error || 'Could not save.');
@@ -1433,14 +1435,14 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			if (designsOn && data.designId) {
 				const isNew = designId !== data.designId;
 				designId = data.designId;
-				if (showIt) onScreen = designId;
+				onScreen = designId;
 				const i = designList.findIndex((x) => x.id === designId);
 				if (i >= 0) designList[i].name = designName;
 				else designList.push({ id: designId!, name: designName });
 				if (isNew) history.replaceState(null, '', '/dashboard/builder?device=' + encodeURIComponent(deviceId) + '&design=' + designId);
 				syncDesigns();
 			}
-			flash(designsOn && !showIt && onScreen !== designId ? 'Saved. Press "Show on calendar" to put it on the screen.' : 'Saved. Your display picks it up the next time it refreshes.');
+			flash('Saved. It\u2019s on your calendar from the next update.');
 			refreshChrome();
 			saveBtn.disabled = true;
 			leaveBtn.disabled = false;
@@ -1457,35 +1459,44 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 
 	// ---------------------------------------------------------------- Your designs
 	const designsEl = $('designs');
-	const nameIn = $<HTMLInputElement>('design-name');
 	const designPick = $<HTMLSelectElement>('design-pick');
-	const showOnBtn = $<HTMLButtonElement>('show-on');
-	const onCalEl = $('on-cal');
 	let designPickDd: Dropdown | null = null;
 	function syncDesigns() {
 		designsEl.hidden = !designsOn;
+		$('title').hidden = designsOn;
 		if (!designsOn) return;
-		if (document.activeElement !== nameIn) nameIn.value = designName;
 		const opts = designList.map((x) => `<option value="${x.id}"${x.id === designId ? ' selected' : ''}>${esc(x.name)}${x.id === onScreen ? ' (on the calendar)' : ''}</option>`);
 		if (designId === null) opts.push(`<option value="" selected>${esc(designName || 'New design')} (not saved yet)</option>`);
 		opts.push('<option value="__new">+ New design</option>');
 		designPick.innerHTML = opts.join('');
 		if (designPickDd) designPickDd.sync();
 		else designPickDd = dropdown(designPick);
-		$('design-del').hidden = designId === null;
-		$('design-dup').hidden = designId === null;
-		const live = designId !== null && designId === onScreen;
-		onCalEl.hidden = !live;
-		showOnBtn.hidden = live;
 	}
-	nameIn.addEventListener('input', () => {
-		designName = nameIn.value;
-		refreshChrome();
-	});
-	nameIn.addEventListener('change', () => {
-		designName = nameIn.value.trim() || 'Untitled design';
+	// the pencil: rename it, or duplicate / delete it
+	$('design-edit').addEventListener('click', async () => {
+		const body = document.createElement('div');
+		body.className = 'dz-edit';
+		body.innerHTML = `<input class="x-dlg-field" maxlength="30" aria-label="Name" spellcheck="false" /><div class="dz-acts">${designId ? '<button type="button" class="link" data-act="dup">Duplicate</button><button type="button" class="link danger" data-act="del">Delete</button>' : ''}</div>`;
+		const inp = body.querySelector('input')!;
+		inp.value = designName;
+		let act = '';
+		body.addEventListener('click', (e) => {
+			const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
+			if (!b) return;
+			act = b.dataset.act!;
+			closeDialog();
+		});
+		setTimeout(() => (inp.focus(), inp.select()), 30);
+		const ok = await ask('Name', { title: 'This design', ok: 'Done', body });
+		if (act === 'dup') return duplicateDesign();
+		if (act === 'del') return deleteDesign();
+		if (!ok) return;
+		const name = inp.value.replace(/\s+/g, ' ').trim().slice(0, 30) || 'Untitled design';
+		if (name === designName) return;
+		designName = name;
 		syncDesigns();
 		refreshChrome();
+		flash('Renamed. Save to keep it.');
 	});
 	const openDesign = (id: string | 'new') => {
 		leaving = true;
@@ -1501,7 +1512,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		}
 		openDesign(to === '__new' ? 'new' : to);
 	});
-	$('design-dup').addEventListener('click', () => {
+	function duplicateDesign() {
 		// the same widgets as a new, unsaved design
 		designId = null;
 		designName = ('Copy of ' + designName).slice(0, 30);
@@ -1509,8 +1520,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		syncDesigns();
 		refreshChrome();
 		flash('This is a copy. Save it to keep it.');
-	});
-	$('design-del').addEventListener('click', async () => {
+	}
+	async function deleteDesign() {
 		if (!designId) return;
 		const onCal = designId === onScreen;
 		if (!(await ask(onCal ? 'It\u2019s on the calendar now, so the calendar goes back to the Agenda.' : 'This can\u2019t be undone.', { title: `Delete "${designName}"?`, ok: 'Delete it', danger: true }))) return;
@@ -1518,15 +1529,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		if (!r.ok) return flash('Couldn\u2019t delete it. Try again.', true);
 		const next = designList.find((x) => x.id !== designId);
 		openDesign(next ? next.id : 'new');
-	});
-	async function showOnCalendar() {
-		const r = await fetch('/api/dashboard/display', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceId, style: 'design:' + designId }) });
-		if (!r.ok) return flash('Couldn\u2019t put it on the calendar. Try again.', true);
-		onScreen = designId;
-		syncDesigns();
-		flash('It\u2019s on the calendar. Press its button to see it now.');
 	}
-	showOnBtn.addEventListener('click', () => save(false, true));
 
 	saveBtn.addEventListener('click', () => save(false));
 	leaveBtn.addEventListener('click', () => save(true));
@@ -1562,6 +1565,12 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		.bld { display: none !important; }
 	}
 	html.bld-open, html.bld-open body { overflow: hidden; }
+	/* No site header or footer behind the builder, from the very first paint (the page's
+	   entrance animation would otherwise show them, jumbled, for a moment). */
+	@media (min-width: 821px) {
+		html:has(.bld) body > header, html:has(.bld) body > footer { display: none !important; }
+		html:has(.bld) main { animation: none !important; transform: none !important; }
+	}
 	/* The builder takes the whole window, so the screen can always be shown big without scrolling. */
 	.bld { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: flex; flex-direction: column; gap: 0.8em; padding: 0.8em 1em 0.9em; min-height: 0; }
 	.bld .muted { color: var(--muted); margin: 0; }
@@ -1579,6 +1588,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .tb-right { display: flex; align-items: center; gap: 0.5em; margin-left: auto; }
 	.bld .designs { display: flex; align-items: center; gap: 0.45em; flex-wrap: wrap; }
 	.bld .designs[hidden] { display: none; }
+	.bld .icon-btn { display: inline-grid; place-items: center; width: 2.4em; height: 2.4em; border-radius: 999px; background: transparent; border: 1px solid var(--border); color: var(--fg); padding: 0; transition: background 0.15s, border-color 0.15s, opacity 0.15s; }
+	.bld .icon-btn:hover:not(:disabled) { background: var(--bg); border-color: var(--muted); }
+	.bld .icon-btn:disabled { opacity: 0.35; }
+	.bld .icon-btn svg { width: 1.1em; height: 1.1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+	.bld .ur { display: flex; gap: 0.3em; margin-right: 0.3em; }
 	.bld .name-in { width: 13em; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 999px; padding: 0.45em 0.9em; font: inherit; font-weight: 700; font-size: 0.9em; }
 	.bld .name-in:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.bld .designs .dd { min-width: 11em; }
@@ -1637,7 +1651,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .keys { flex: none; text-align: center; line-height: 1.4; font-size: 0.78em; }
 
 	/* a blank screen offers templates right on it */
-	.bld .empty { position: absolute; inset: 0; z-index: 2000; display: grid; place-items: center; background: rgba(223, 219, 208, 0.9); pointer-events: none; }
+	.bld .empty { position: absolute; inset: 0; z-index: 2000; display: grid; place-items: center; background: rgba(223, 219, 208, 0.9); }
 	.bld .empty-card { pointer-events: auto; width: min(94%, 640px); padding: 1em 1.1em 0.9em; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; text-align: center; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); }
 	.bld .empty-t { font-weight: 800; margin-bottom: 0.7em; }
 	.bld .empty-tpls { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5em; }

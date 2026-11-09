@@ -89,6 +89,7 @@ export interface PreviewOptions {
 	dark: boolean;
 	lang?: 'en' | 'ja';
 	unit?: 'c' | 'f';
+	clock?: '12' | '24';
 	hasWeather: boolean;
 	vbat?: number | null;
 	cornerImage?: Uint8Array | null;
@@ -119,6 +120,7 @@ export function drawListFor(o: PreviewOptions): string {
 			dark: o.dark,
 			lang: o.lang ?? 'en',
 			unit: o.unit ?? 'c',
+			clock: o.clock ?? '24',
 			cornerImage: o.cornerImage ?? null,
 			cornerSize: o.cornerSize ?? null,
 			refreshSec: o.refreshSec ?? 86400,

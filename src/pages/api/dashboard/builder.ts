@@ -74,6 +74,11 @@ export async function GET({ request, locals }: any) {
 		const uq = await db.prepare('SELECT temp_unit FROM devices WHERE id = ?').bind(deviceId).first();
 		unit = uq?.temp_unit === 'f' ? 'f' : 'c';
 	} catch {} // temp_unit comes from schema-screens.sql
+	let clock = '24';
+	try {
+		const cq = await db.prepare('SELECT clock FROM devices WHERE id = ?').bind(deviceId).first();
+		clock = cq?.clock === '12' ? '12' : '24';
+	} catch {} // schema-clock.sql
 
 	let lat: number | null = null;
 	let lon: number | null = null;
@@ -115,6 +120,7 @@ export async function GET({ request, locals }: any) {
 		dark: dev.dark_mode === 1,
 		lang,
 		unit,
+		clock,
 		font,
 		custom,
 		cornerBits,
