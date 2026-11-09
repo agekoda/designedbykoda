@@ -54,11 +54,6 @@ export async function POST({ request, locals }) {
 		.prepare('UPDATE devices SET user_id = ?, pairing_code = NULL, pairing_code_expires_at = NULL WHERE id = ?')
 		.bind(userId, device.id)
 		.run();
-	// A newly paired calendar starts in the Classic font, whatever screen it shows
-	// (left empty, each screen would use its own font: JetBrains Mono for the Agenda).
-	try {
-		await db.prepare("UPDATE devices SET layout_font = 'sans' WHERE id = ?").bind(device.id).run();
-	} catch {}
 	// Remember when this pairing happened (column from schema-paired-at.sql).
 	try {
 		await db.prepare('UPDATE devices SET paired_at = ? WHERE id = ?').bind(now, device.id).run();
