@@ -29,6 +29,19 @@ export async function releaseDevice(db: any, deviceId: string, userId: string): 
 		'UPDATE devices SET language = NULL WHERE id = ?',
 		'UPDATE devices SET refresh_interval_sec = 86400 WHERE id = ?',
 		'UPDATE devices SET layout_font = NULL, corner_mode = NULL, corner_bits = NULL, corner_src = NULL, corner_cfg = NULL WHERE id = ?',
+		// Everything added since: the next owner starts from the defaults (Agenda, 24-hour,
+		// Celsius, no schedule, the button refreshes), and none of this owner's things carry over.
+		'UPDATE devices SET countdown_title = NULL, countdown_date = NULL WHERE id = ?',
+		'UPDATE devices SET frame_bits = NULL, frame_src = NULL, frame_cfg = NULL WHERE id = ?',
+		'UPDATE devices SET custom_layout = NULL WHERE id = ?',
+		'UPDATE devices SET schedule = NULL, screen_override = NULL, override_until = NULL, temp_unit = NULL, sign_cfg = NULL WHERE id = ?',
+		'UPDATE devices SET clock = NULL WHERE id = ?',
+		'UPDATE devices SET reminders = NULL WHERE id = ?',
+		'UPDATE devices SET msg_token = NULL, msg_cfg = NULL WHERE id = ?', // the shared message link stops working
+		'DELETE FROM messages WHERE device_id = ?',
+		'DELETE FROM designs WHERE device_id = ?',
+		'DELETE FROM battery_log WHERE device_id = ?',
+		'UPDATE devices SET battery_anchor_mv = NULL, battery_anchor_at = NULL WHERE id = ?',
 	]) {
 		try {
 			await db.prepare(sql).bind(deviceId).run();
