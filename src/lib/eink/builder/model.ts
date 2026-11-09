@@ -702,7 +702,7 @@ export const SIGN_DEFAULTS: SignCfg = {
 		checkout: 'Check-out 10am',
 		contact: 'Questions? Text Koda on 0400 000 000',
 	},
-	nameplate: { name: 'Alex Koda', role: 'Hardware Engineer' },
+	nameplate: { name: 'Riley Morgan', role: 'Hardware Engineer' },
 };
 // How long each box may be, and which ones are kept exactly as typed (Wi-Fi details).
 const SIGN_LIMITS: Record<string, { max: number; raw?: boolean; multiline?: boolean }> = {
