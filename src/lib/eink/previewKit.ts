@@ -1,6 +1,7 @@
 // Browser helpers for the dashboard's live previews: loads the font data, builds
 // sample events, and paints the 1-bit screen onto a canvas.
 import { renderEink } from './render';
+import { sanitizeReminders } from './reminders';
 import { loadFontPack, renderDrawList, SCREEN_W, SCREEN_H, type Rendered } from './preview';
 import { renderLayout } from './layouts';
 import type { CalEvent, TaskItem } from './context';
@@ -100,6 +101,7 @@ export interface PreviewOptions {
 	custom?: CustomLayout | null; // Your own design (layout builder)
 	sign?: unknown; // Meeting room / Guest welcome / Desk name plate words
 	messages?: { author: string; body: string; atLocal: number }[]; // message board, newest first
+	reminders?: unknown; // repeating reminders (bin day...)
 }
 
 export function drawListFor(o: PreviewOptions): string {
@@ -129,6 +131,7 @@ export function drawListFor(o: PreviewOptions): string {
 			custom: o.custom ?? null,
 			sign: o.sign ?? null,
 			messages: o.messages ?? [],
+			reminders: sanitizeReminders(o.reminders),
 		},
 		o.font ?? undefined
 	);

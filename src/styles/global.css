@@ -549,6 +549,10 @@ html.has-custom-cursor .dd, html.has-custom-cursor .dd *, html.has-custom-cursor
 .x-dlg { width: min(420px, 100%); box-sizing: border-box; padding: 1.4em 1.4em 1.2em; background: var(--bg-raised); color: var(--fg); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--box-shadow); animation: x-dlg-in 0.16s cubic-bezier(0.16, 1, 0.3, 1); }
 .x-dlg-title { font-weight: 800; font-size: 1.1em; margin-bottom: 0.4em; }
 .x-dlg-text { margin: 0 0 1.2em; line-height: 1.5; color: var(--fg); }
+.copy-pick { display: grid; gap: 0.55em; margin: -0.4em 0 1.3em; }
+.copy-opt { display: flex; align-items: center; gap: 0.6em; font-weight: 600; }
+.copy-opt input { accent-color: var(--fg); width: 1.05em; height: 1.05em; margin: 0; }
+.copy-opt.copy-cals { font-weight: 400; color: var(--muted); margin-top: 0.4em; padding-top: 0.8em; border-top: 1px solid var(--border); }
 .x-dlg-field { width: 100%; box-sizing: border-box; margin: -0.4em 0 1.2em; padding: 0.65em 0.8em; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 0.85em; }
 .x-dlg-row { display: flex; justify-content: flex-end; gap: 0.6em; flex-wrap: wrap; }
 .x-dlg-row button { padding: 0.6em 1.3em; border-radius: 999px; font: inherit; font-weight: 700; font-size: 0.92em; border: 1px solid transparent; }

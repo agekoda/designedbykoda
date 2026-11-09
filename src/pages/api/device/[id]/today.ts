@@ -4,6 +4,7 @@
 // (handling DST automatically via Intl, which an ESP32 could never do on
 // its own), and returning a small, pre-formatted payload.
 import { viewForStyle, LIVE_STYLES, isRefreshSec, renderStyleOf } from '../../../../data/calendarStyles';
+import { sanitizeReminders, type Reminder } from '../../../../lib/eink/reminders';
 import { designIdOf, getDesign } from '../../../../lib/designs';
 import { timelineSleep } from '../../../../lib/eink/layouts/timeline';
 import { getForecast, type Forecast } from '../../../../lib/weather';
@@ -399,6 +400,12 @@ export async function GET({ params, request, locals }) {
 	// Meeting room and Desk name plate show free / busy, so they wake when meetings start and end.
 	if (style === 'room' || style === 'nameplate') needs.live = true;
 	// The words on a sign (schema-screens.sql).
+	// Repeating reminders (schema-reminders.sql).
+	let reminders: Reminder[] = [];
+	try {
+		const rq = await db.prepare('SELECT reminders FROM devices WHERE id = ?').bind(deviceId).first();
+		reminders = sanitizeReminders(rq?.reminders);
+	} catch {}
 	let sign: unknown = null;
 	if (isSignStyle(style)) {
 		try {
@@ -463,6 +470,17 @@ export async function GET({ params, request, locals }) {
 			else await db.prepare('UPDATE devices SET battery_prev_mv = ? WHERE id = ?').bind(mv, deviceId).run();
 		} catch {}
 	}
+	// Battery history (schema-battery.sql): at most one reading every 3 hours, kept for 90 days.
+	if (vbat !== null) {
+		try {
+			const mv = Math.round(vbat * 1000);
+			const r = await db
+				.prepare('INSERT INTO battery_log (device_id, at, mv) SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM battery_log WHERE device_id = ? AND at > ?)')
+				.bind(deviceId, now, mv, deviceId, now - 3 * 3600)
+				.run();
+			if (r?.meta?.changes) await db.prepare('DELETE FROM battery_log WHERE device_id = ? AND at < ?').bind(deviceId, now - 90 * 86400).run();
+		} catch {}
+	}
 
 	if (proto === '2') {
 		// Display options from the customise page (schema-display.sql). One query,
@@ -516,6 +534,7 @@ export async function GET({ params, request, locals }) {
 			custom: customLayout,
 			sign,
 			messages: msgs.map((m) => ({ author: m.author, body: m.body, atLocal: m.createdAt + offsetSec })),
+			reminders,
 		}, fontChoice ?? undefined);
 		// How long to sleep: the layout's own answer, but wake sooner for a scheduled screen change,
 		// and (for a "Free or busy" widget) when a meeting starts or ends.

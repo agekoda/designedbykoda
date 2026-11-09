@@ -12,7 +12,7 @@ import { batteryIcon } from '../batteryIcon';
 import { moonBits } from '../moonImage';
 import { weatherBits, wxKind, wxLabel } from '../weatherIcon';
 import { moonInfo, sunTimes } from '../astro';
-import { quoteForDay } from '../../../data/quotes';
+import { quoteFor } from '../../../data/quotes';
 import {
 	dateShort, dayAbbr, dayIdx, dayLetter, dayLong, dayShort, daysInMonth, dayMonth, evTimeStr, monthLong, monthName, monthShort, monthYear, round0, tmOf, weekLetters, type CalEvent, type LayoutCtx,
 } from '../context';
@@ -22,6 +22,7 @@ import { withDefaults, type CustomLayout, type Widget } from './model';
 import { linkPayload, qrBits, qrMatrix, wifiPayload, type WifiSecurity } from '../qr';
 import { toAscii } from '../draw';
 import { messageList } from '../layouts/messages';
+import { reminderList } from '../layouts/reminders';
 
 interface Env {
 	d: Draw;
@@ -455,7 +456,7 @@ function sunArc(env: Env, w: Widget) {
 // ---- extras ----
 function quoteWidget(env: Env, w: Widget, o: Opts) {
 	const { inner, color } = chrome(env, w, o);
-	const [text, author] = quoteForDay(dayIdx(env.ctx.nowLocal));
+	const [text, author] = quoteFor(dayIdx(env.ctx.nowLocal), isJa());
 	const small = FACES.s;
 	const sv = vm(env, small);
 	const authorH = o.author === true ? sv.lh + 2 : 0;
@@ -863,6 +864,8 @@ function drawWidget(env: Env, w: Widget) {
 			return boxWidget(env, w, o);
 		case 'line':
 			return lineWidget(env, w, o);
+		case 'reminders':
+			return reminderList(env.d, env.ctx, w, { bigToday: o.big === true, days: Number(o.days) || 7 });
 		case 'qr':
 			return qrWidget(env, w, o);
 		case 'messages':
@@ -886,7 +889,7 @@ export function renderCustom(ctx: LayoutCtx): string {
 	if (!layout || !layout.widgets.length) {
 		d.text(200, 138, 'mb', 'Design your own screen', { align: 'center', maxW: 380 });
 		d.text(200, 166, 's', 'Open Customize display on your dashboard', { align: 'center', maxW: 380 });
-		d.text(200, 188, 's', 'and choose "Open the layout builder".', { align: 'center', maxW: 380 });
+		d.text(200, 188, 's', 'and choose "Edit this design".', { align: 'center', maxW: 380 });
 		return d.toString();
 	}
 	for (const w of layout.widgets) {

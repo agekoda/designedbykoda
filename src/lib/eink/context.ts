@@ -56,6 +56,8 @@ export interface LayoutCtx {
 	sign?: unknown;
 	// The message board (src/lib/messages.ts): messages showing now, newest first.
 	messages?: ScreenMsg[];
+	// Repeating reminders, like bin day (src/lib/eink/reminders.ts).
+	reminders?: import('./reminders').Reminder[] | null;
 }
 
 export interface ScreenMsg {

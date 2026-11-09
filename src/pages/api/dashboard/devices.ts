@@ -1,8 +1,9 @@
 // The logged-in user's paired devices: list them, and edit one device's
 // name / layout / calendars. Everything is checked against the session's
 // user, so you can only ever see or change your own devices.
-import { sanitizeSchedule } from '../../../lib/eink/schedule';
-import { sanitizeCfg } from '../../../lib/messages';
+import { sanitizeSchedule, activeStyle } from '../../../lib/eink/schedule';
+import { sanitizeReminders } from '../../../lib/eink/reminders';
+import { sanitizeCfg, utcOffset } from '../../../lib/messages';
 import { listDesigns } from '../../../lib/designs';
 import { isStyleId, DEFAULT_STYLE } from '../../../data/calendarStyles';
 import { sanitizeLayout, sanitizeSign } from '../../../lib/eink/builder/model';
@@ -85,9 +86,15 @@ export async function GET({ request, locals }) {
 	} catch {}
 
 	// Schedule, °C/°F, what's on screen now and battery history, from schema-screens.sql (own query, same reason).
-	const scr = new Map<string, { sign: unknown; schedule: unknown; unit: string; shownStyle: string | null; anchorMv: number | null; anchorAt: number | null }>();
+	const scr = new Map<string, { sign: unknown; schedule: any; unit: string; shownStyle: string | null; anchorMv: number | null; anchorAt: number | null; override: string | null }>();
+	let tz: string | null = null;
 	try {
-		const sr = await db.prepare('SELECT id, schedule, temp_unit, shown_style, battery_anchor_mv, battery_anchor_at, sign_cfg FROM devices WHERE user_id = ?').bind(userId).all();
+		tz = ((await db.prepare('SELECT timezone FROM users WHERE id = ?').bind(userId).first()) as any)?.timezone ?? null;
+	} catch {}
+	const nowUnix = Math.floor(Date.now() / 1000);
+	const nowLocal = nowUnix + utcOffset(tz);
+	try {
+		const sr = await db.prepare('SELECT id, schedule, temp_unit, shown_style, battery_anchor_mv, battery_anchor_at, sign_cfg, screen_override, override_until FROM devices WHERE user_id = ?').bind(userId).all();
 		for (const e of sr.results ?? [])
 			scr.set(e.id, {
 				sign: sanitizeSign(e.sign_cfg),
@@ -96,6 +103,8 @@ export async function GET({ request, locals }) {
 				shownStyle: isStyleId(e.shown_style) ? e.shown_style : null,
 				anchorMv: e.battery_anchor_mv ?? null,
 				anchorAt: e.battery_anchor_at ?? null,
+				// a screen picked with the button, still showing (until the schedule changes, or the next press)
+				override: isStyleId(e.screen_override) && (e.override_until == null || e.override_until > nowUnix) ? e.screen_override : null,
 			});
 	} catch {}
 
@@ -110,6 +119,13 @@ export async function GET({ request, locals }) {
 		for (const e of mr.results ?? []) msg.set(e.id, { check: sanitizeCfg(e.msg_cfg).check, count: e.n ?? 0 });
 	} catch {}
 
+	// Repeating reminders (schema-reminders.sql), for the previews.
+	const rems = new Map<string, unknown>();
+	try {
+		const rr = await db.prepare('SELECT id, reminders FROM devices WHERE user_id = ?').bind(userId).all();
+		for (const e of rr.results ?? []) rems.set(e.id, sanitizeReminders(e.reminders));
+	} catch {}
+
 	// Your designs and when each calendar next wakes (schema-designs.sql / schema-screens.sql).
 	const designsOf = new Map<string, unknown>();
 	for (const d of rows.results ?? []) designsOf.set(d.id, (await listDesigns(db, d.id))?.map((x) => ({ id: x.id, name: x.name, layout: x.layout })) ?? null);
@@ -119,10 +135,17 @@ export async function GET({ request, locals }) {
 		for (const w of wr.results ?? []) wake.set(w.id, w.next_wake_at);
 	} catch {}
 
-	const devices = (rows.results ?? []).map((d: any) => ({
+	const devices = (rows.results ?? []).map((d: any) => {
+		const style = isStyleId(d.calendar_style) ? d.calendar_style : isStyleId(user?.calendar_style) ? user.calendar_style : DEFAULT_STYLE;
+		const s = scr.get(d.id);
+		// what the next update will show: a button pick, else the schedule, else the main screen
+		const nextStyle = s?.override ?? (s?.schedule ? activeStyle(s.schedule, style, nowLocal) : style);
+		return {
 		id: d.id,
 		name: d.name || '',
-		style: isStyleId(d.calendar_style) ? d.calendar_style : isStyleId(user?.calendar_style) ? user.calendar_style : DEFAULT_STYLE,
+		style,
+		nextStyle,
+		reminders: rems.get(d.id) ?? [],
 		calendarIds: parseIds(d.selected_calendar_ids) ?? parseIds(user?.selected_calendar_ids) ?? [],
 		lastSeenAt: d.last_seen_at ?? null,
 		createdAt: pairedAt.get(d.id) ?? d.created_at ?? null,
@@ -147,7 +170,8 @@ export async function GET({ request, locals }) {
 		shownStyle: scr.get(d.id)?.shownStyle ?? null,
 		batteryAnchorMv: scr.get(d.id)?.anchorMv ?? null,
 		batteryAnchorAt: scr.get(d.id)?.anchorAt ?? null,
-	}));
+		};
+	});
 	return json({ devices }, 200);
 }
 

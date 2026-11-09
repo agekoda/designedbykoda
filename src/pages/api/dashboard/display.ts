@@ -2,6 +2,7 @@
 // (layout, font, dark mode, and the Agenda's picture). Everything is checked
 // against the logged-in user, so you can only touch your own devices.
 import { isStyleId, isRefreshSec, DEFAULT_STYLE } from '../../../data/calendarStyles';
+import { sanitizeReminders } from '../../../lib/eink/reminders';
 import { isFamily } from '../../../lib/eink/fonts';
 import { b64ToBytes, decodePic, FRAME_BYTES, cleanSettings } from '../../../lib/eink/image';
 import { cleanText } from '../../../lib/eink/draw';
@@ -65,6 +66,14 @@ export async function GET({ request, locals }) {
 		const mq = await db.prepare('SELECT msg_cfg FROM devices WHERE id = ?').bind(deviceId).first();
 		msgCheck = sanitizeCfg(mq?.msg_cfg).check;
 	} catch {} // schema-messages.sql
+	let reminders: unknown = [];
+	let remindersReady = true;
+	try {
+		const rq = await db.prepare('SELECT reminders FROM devices WHERE id = ?').bind(deviceId).first();
+		reminders = sanitizeReminders(rq?.reminders);
+	} catch {
+		remindersReady = false;
+	} // schema-reminders.sql
 	let screensReady = true;
 	let batteryAnchor: { mv: number; at: number } | null = null;
 	try {
@@ -124,6 +133,8 @@ export async function GET({ request, locals }) {
 			schedule,
 			sign,
 			msgCheck,
+			reminders,
+			remindersReady,
 			designs: (await listDesigns(db, deviceId))?.map((d) => ({ id: d.id, name: d.name, layout: d.layout })) ?? null,
 			screensReady,
 			batteryAnchor,
@@ -261,6 +272,13 @@ export async function POST({ request, locals }) {
 			await db.prepare('UPDATE devices SET sign_cfg = ? WHERE id = ? AND user_id = ?').bind(JSON.stringify(sanitizeSign(body.sign)), deviceId, o.userId).run();
 		} catch {
 			return json({ error: 'These layouts need a one-off database update on the server (schema-screens.sql).' }, 500);
+		}
+	}
+	if (body.reminders !== undefined) {
+		try {
+			await db.prepare('UPDATE devices SET reminders = ? WHERE id = ? AND user_id = ?').bind(JSON.stringify(sanitizeReminders(body.reminders)), deviceId, o.userId).run();
+		} catch {
+			return json({ error: 'Reminders need a one-off database update on the server (schema-reminders.sql).' }, 500);
 		}
 	}
 	if (body.schedule !== undefined) {

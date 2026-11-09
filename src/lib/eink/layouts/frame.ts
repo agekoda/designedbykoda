@@ -16,6 +16,6 @@ export function frame(ctx: LayoutCtx): string {
 	d.text(10, 21, 'sb', 'PHOTO FRAME', { color: PAPER });
 	d.text(200, 130, 'mb', 'Add your photo', { align: 'center' });
 	d.text(200, 158, 's', 'Open your dashboard, choose Customize,', { align: 'center' });
-	d.text(200, 176, 's', 'then the Picture tab.', { align: 'center' });
+	d.text(200, 176, 's', 'then add your photo.', { align: 'center' });
 	return d.toString();
 }
