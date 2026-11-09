@@ -7,6 +7,7 @@ const SUPPORT = 'support@designedbykoda.com';
 interface Topic {
 	id: string;
 	title: string;
+	intro?: string; // a line before the questions (plain HTML)
 	items: { q: string; a: string }[]; // a: plain HTML (links only)
 }
 const TOPICS: Topic[] = [
@@ -14,7 +15,7 @@ const TOPICS: Topic[] = [
 		id: 'setup',
 		title: 'Setting up',
 		items: [
-			{ q: 'How do I connect it to Wi-Fi?', a: 'Turn it on. The screen shows <b>Connect to Wi-Fi</b>. On your phone, join the network <b>EInkCalendar-Setup</b>, pick your home Wi-Fi and type its password. If no page opens, go to <b>192.168.4.1</b> in your browser. You have 5 minutes; if it says <b>Setup timed out</b>, press the button to start again.' },
+			{ q: 'How do I connect it to Wi-Fi?', a: 'Press the button on the Welcome screen. The screen shows <b>Connect to Wi-Fi</b>. On your phone, join the network <b>EInkCalendar-Setup</b>, pick your home Wi-Fi and type its password. If no page opens, go to <b>192.168.4.1</b> in your browser. You have 5 minutes; if it says <b>Setup timed out</b>, press the button to start again.' },
 			{ q: 'My Wi-Fi isn’t in the list', a: 'The calendar only uses <b>2.4 GHz</b> Wi-Fi. Most routers have both; if yours shows two networks, pick the one without "5G". Wi-Fi that needs a sign-in page (hotels, some offices) won’t work.' },
 			{ q: 'How do I link it to my account?', a: 'Once it’s on Wi-Fi it shows a six-letter code and a QR code. Go to <a href="/setup">designedbykoda.com/setup</a> (or scan the code), sign in with Google and type the code.' },
 			{ q: 'Which calendars does it show?', a: 'Your main Google calendar to start with. Pick others on <a href="/dashboard">My devices</a>, under the preview.' },
@@ -25,7 +26,7 @@ const TOPICS: Topic[] = [
 		title: 'The button',
 		items: [
 			{ q: 'Press', a: 'Updates the screen now. If you set the button to <b>show the next screen</b> in Customize display, it flips through your screens instead.' },
-			{ q: 'Hold for 5 seconds', a: 'Asks <b>Reset Wi-Fi?</b> on the screen. Press the button for No, or hold it for 3 seconds for Yes. Yes forgets your Wi-Fi and shows the setup steps again; it stays linked to your account. Doing nothing for a minute counts as No.' },
+			{ q: 'Hold for 5 seconds', a: 'Asks <b>Reset Wi-Fi?</b> on the screen. Press the button for No, or hold it for 3 seconds for Yes. Doing nothing for a minute counts as No. Yes forgets your Wi-Fi and shows the Welcome screen; press the button when you’re ready to set it up again. It stays linked to your account.' },
 		],
 	},
 	{
@@ -40,8 +41,8 @@ const TOPICS: Topic[] = [
 	{
 		id: 'trouble',
 		title: 'It’s not updating',
+		intro: 'First, press the button and watch the screen for at least 15 seconds.',
 		items: [
-			{ q: 'First, press the button', a: 'That makes it update now. Watch the screen for a few seconds.' },
 			{ q: 'Nothing happens', a: 'The battery is probably flat. Charge it for an hour and press the button again.' },
 			{ q: 'The screen flashes but stays the same', a: 'It can’t reach the internet. Check your Wi-Fi is on and that the calendar is within range. If you changed your Wi-Fi name or password, hold the button for 5 seconds to set it up again.' },
 			{ q: 'It says "Reconnect needed"', a: 'Google stopped letting it read your calendar (this happens if you remove access, or change your Google password). Sign in again at <a href="/dashboard">designedbykoda.com/dashboard</a>.' },
@@ -53,7 +54,7 @@ const TOPICS: Topic[] = [
 		id: 'more',
 		title: 'Everything else',
 		items: [
-			{ q: 'Giving it to someone else', a: 'On <a href="/dashboard">My devices</a>, choose <b>Unpair this device</b>. Then hold the button for 5 seconds to reset its Wi-Fi. The new owner sets it up like new.' },
+			{ q: 'Giving it to someone else', a: 'On <a href="/dashboard">My devices</a>, choose <b>Unpair this device</b>. Then hold the button for 5 seconds, and hold it again for 3 seconds to say Yes. It forgets your Wi-Fi and shows the Welcome screen, ready for the new owner to set up.' },
 			{ q: 'Deleting your account', a: 'At the bottom of <a href="/dashboard">My devices</a>. It removes your account, settings and messages.' },
 			{ q: 'Still stuck?', a: `Email <a href="mailto:${SUPPORT}">${SUPPORT}</a>. Say what the screen shows, and roughly when it last updated.` },
 		],
@@ -77,6 +78,7 @@ const num = (i: number) => String(i + 1).padStart(2, '0');
 						<span class="n">{num(i)}</span>
 						{t.title}
 					</h2>
+					{t.intro && <p class="intro" set:html={t.intro} />}
 					{t.items.map((it) => (
 						<details class="qa">
 							<summary>{it.q}</summary>
@@ -103,6 +105,7 @@ const num = (i: number) => String(i + 1).padStart(2, '0');
 	.sec { padding: 1.8em 0 0.8em; border-bottom: 1px solid var(--border); scroll-margin-top: 5em; }
 	.sec h2 { display: flex; align-items: baseline; gap: 0.7em; margin: 0 0 0.6em; font-size: 1.35em; }
 	.n { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 0.7em; color: var(--accent); font-weight: 700; }
+	.intro { margin: 0 0 0.6em; padding: 0.8em 1em; border-left: 3px solid var(--accent); background: var(--bg-raised); border-radius: 0 10px 10px 0; font-weight: 600; color: var(--fg); }
 	.qa { border-top: 1px solid var(--border); }
 	.qa:first-of-type { border-top: none; }
 	.qa summary { list-style: none; display: flex; justify-content: space-between; gap: 1em; padding: 0.9em 0; font-weight: 700; }
