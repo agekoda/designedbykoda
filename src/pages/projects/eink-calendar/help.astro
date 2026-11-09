@@ -1,0 +1,115 @@
+---
+// Help for E-Ink Calendar owners: setup, the button, charging and "it's not updating".
+// Everything is in the TOPICS list, so adding a question is one entry.
+import Layout from '../../../layouts/Layout.astro';
+const SUPPORT = 'support@designedbykoda.com';
+
+interface Topic {
+	id: string;
+	title: string;
+	items: { q: string; a: string }[]; // a: plain HTML (links only)
+}
+const TOPICS: Topic[] = [
+	{
+		id: 'setup',
+		title: 'Setting up',
+		items: [
+			{ q: 'How do I connect it to Wi-Fi?', a: 'Turn it on. The screen shows <b>Connect to Wi-Fi</b>. On your phone, join the network <b>EInkCalendar-Setup</b>, pick your home Wi-Fi and type its password. If no page opens, go to <b>192.168.4.1</b> in your browser.' },
+			{ q: 'My Wi-Fi isn’t in the list', a: 'The calendar only uses <b>2.4 GHz</b> Wi-Fi. Most routers have both; if yours shows two networks, pick the one without "5G". Wi-Fi that needs a sign-in page (hotels, some offices) won’t work.' },
+			{ q: 'How do I link it to my account?', a: 'Once it’s on Wi-Fi it shows a six-letter code and a QR code. Go to <a href="/setup">designedbykoda.com/setup</a> (or scan the code), sign in with Google and type the code.' },
+			{ q: 'Which calendars does it show?', a: 'Your main Google calendar to start with. Pick others on <a href="/dashboard">My devices</a>, under the preview.' },
+		],
+	},
+	{
+		id: 'button',
+		title: 'The button',
+		items: [
+			{ q: 'Press', a: 'Updates the screen now. If you set the button to <b>show the next screen</b> in Customize display, it flips through your screens instead.' },
+			{ q: 'Hold for 5 seconds', a: 'Asks <b>Reset Wi-Fi?</b> on the screen. Press the button for No, or hold it for 3 seconds for Yes. Yes forgets your Wi-Fi and shows the setup steps again; it stays linked to your account. Doing nothing for a minute counts as No.' },
+		],
+	},
+	{
+		id: 'power',
+		title: 'Battery and charging',
+		items: [
+			{ q: 'How do I charge it?', a: 'With any USB-C cable and phone charger. The light is on while it charges and changes when it’s full. A full charge takes about 2 hours.' },
+			{ q: 'How long does the battery last?', a: 'Months, when it updates once a day. Updating every hour (Timeline), checking for messages, or meeting-room screens use more. <a href="/dashboard">My devices</a> shows how much is left; click it for a graph.' },
+			{ q: 'The screen says "Battery low"', a: 'Charge it. It goes back to normal by itself once it’s charged, or press the button.' },
+		],
+	},
+	{
+		id: 'trouble',
+		title: 'It’s not updating',
+		items: [
+			{ q: 'First, press the button', a: 'That makes it update now. Watch the screen for a few seconds.' },
+			{ q: 'Nothing happens', a: 'The battery is probably flat. Charge it for an hour and press the button again.' },
+			{ q: 'The screen flashes but stays the same', a: 'It can’t reach the internet. Check your Wi-Fi is on and that the calendar is within range. If you changed your Wi-Fi name or password, hold the button for 5 seconds to set it up again.' },
+			{ q: 'It says "Reconnect needed"', a: 'Google stopped letting it read your calendar (this happens if you remove access, or change your Google password). Sign in again at <a href="/dashboard">designedbykoda.com/dashboard</a>.' },
+			{ q: 'Changes I made aren’t showing', a: 'Changes show at the next update. Press the button to see them now. Screen schedules take over at their set times.' },
+			{ q: 'Faint marks from the last picture', a: 'That’s normal for e-paper. It does a full clean refresh every night, which clears them.' },
+		],
+	},
+	{
+		id: 'more',
+		title: 'Everything else',
+		items: [
+			{ q: 'Giving it to someone else', a: 'On <a href="/dashboard">My devices</a>, choose <b>Unpair this device</b>. Then hold the button for 5 seconds to reset its Wi-Fi. The new owner sets it up like new.' },
+			{ q: 'Deleting your account', a: 'At the bottom of <a href="/dashboard">My devices</a>. It removes your account, settings and messages.' },
+			{ q: 'Still stuck?', a: `Email <a href="mailto:${SUPPORT}">${SUPPORT}</a>. Say what the screen shows, and roughly when it last updated.` },
+		],
+	},
+];
+const num = (i: number) => String(i + 1).padStart(2, '0');
+---
+
+<Layout title="E-Ink Calendar help — designedbykoda" description="Setting up the E-Ink Calendar, the button, charging, and what to do when it isn't updating.">
+	<article class="help">
+		<nav class="crumbs" aria-label="Breadcrumb"><a href="/projects">Projects</a> / <a href="/projects/eink-calendar/">E-Ink Calendar</a> / Help</nav>
+		<header class="help-head">
+			<p class="kicker">Help</p>
+			<h1>E-Ink Calendar</h1>
+			<nav class="toc" aria-label="Topics">{TOPICS.map((t) => <a href={'#' + t.id}>{t.title}</a>)}</nav>
+		</header>
+		{
+			TOPICS.map((t, i) => (
+				<section class="sec" id={t.id}>
+					<h2>
+						<span class="n">{num(i)}</span>
+						{t.title}
+					</h2>
+					{t.items.map((it) => (
+						<details class="qa">
+							<summary>{it.q}</summary>
+							<p set:html={it.a} />
+						</details>
+					))}
+				</section>
+			))
+		}
+		<footer class="help-foot">Can't find it? <a href={`mailto:${SUPPORT}`}>{SUPPORT}</a></footer>
+	</article>
+</Layout>
+
+<style>
+	.help { max-width: 760px; margin: 0 auto; }
+	.crumbs { font-size: 0.85em; color: var(--muted); margin-bottom: 1.6em; }
+	.crumbs a { color: var(--muted); }
+	.help-head { padding-bottom: 1.4em; border-bottom: 2px solid var(--fg); }
+	.kicker { margin: 0; font-size: 0.75em; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+	.help-head h1 { margin: 0.1em 0 0.5em; font-size: clamp(2em, 5vw, 3em); line-height: 1.05; }
+	.toc { display: flex; flex-wrap: wrap; gap: 0.5em; }
+	.toc a { padding: 0.4em 0.95em; border: 1px solid var(--border); border-radius: 999px; color: var(--fg); text-decoration: none; font-size: 0.88em; font-weight: 600; }
+	.toc a:hover { border-color: var(--muted); }
+	.sec { padding: 1.8em 0 0.8em; border-bottom: 1px solid var(--border); scroll-margin-top: 5em; }
+	.sec h2 { display: flex; align-items: baseline; gap: 0.7em; margin: 0 0 0.6em; font-size: 1.35em; }
+	.n { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 0.7em; color: var(--accent); font-weight: 700; }
+	.qa { border-top: 1px solid var(--border); }
+	.qa:first-of-type { border-top: none; }
+	.qa summary { list-style: none; display: flex; justify-content: space-between; gap: 1em; padding: 0.9em 0; font-weight: 700; }
+	.qa summary::-webkit-details-marker { display: none; }
+	.qa summary::after { content: '+'; color: var(--muted); font-weight: 400; font-size: 1.2em; line-height: 1; transition: transform 0.2s; }
+	.qa[open] summary::after { transform: rotate(45deg); }
+	.qa p { margin: 0 0 1.1em; line-height: 1.6; color: var(--muted); }
+	.qa p :global(b) { color: var(--fg); }
+	.help-foot { padding: 2em 0 1em; color: var(--muted); }
+</style>

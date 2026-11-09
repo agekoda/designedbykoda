@@ -13,6 +13,7 @@ interface AskOpts {
 	cancel?: string | null; // null = no cancel button (an alert)
 	danger?: boolean; // the OK button is red (deleting, turning something off)
 	copy?: string; // show this text, selected, in a box (for copying by hand)
+	body?: HTMLElement; // extra controls under the text (the caller reads them after)
 }
 
 let current: (() => void) | null = null;
@@ -37,6 +38,7 @@ export function ask(text: string, o: AskOpts = {}): Promise<boolean> {
 		p.className = 'x-dlg-text';
 		p.textContent = text;
 		box.appendChild(p);
+		if (o.body) box.appendChild(o.body);
 		let field: HTMLInputElement | null = null;
 		if (o.copy !== undefined) {
 			field = document.createElement('input');
@@ -78,7 +80,8 @@ export function ask(text: string, o: AskOpts = {}): Promise<boolean> {
 			else if (e.key === 'Enter' && document.activeElement !== cancelBtn) (e.preventDefault(), done(true));
 			else if (e.key === 'Tab') {
 				// keep focus inside the box
-				const f = [field, cancelBtn, okBtn].filter(Boolean) as HTMLElement[];
+				const extra = o.body ? [...o.body.querySelectorAll<HTMLElement>('input, button, select, textarea')] : [];
+				const f = [field, ...extra, cancelBtn, okBtn].filter(Boolean) as HTMLElement[];
 				const i = f.indexOf(document.activeElement as HTMLElement);
 				e.preventDefault();
 				f[(i + (e.shiftKey ? f.length - 1 : 1)) % f.length].focus();

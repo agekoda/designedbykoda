@@ -1,6 +1,7 @@
 // The layout builder's API: read and save a calendar's designs (Your designs), each with a name.
 // Everything is checked against the logged-in user, so you can only touch your own devices.
 import { isFamily } from '../../../lib/eink/fonts';
+import { sanitizeReminders } from '../../../lib/eink/reminders';
 import { cleanSettings } from '../../../lib/eink/image';
 import { MAX_JSON, sanitizeLayout } from '../../../lib/eink/builder/model';
 import { markSaved } from '../../../lib/screens';
@@ -84,6 +85,11 @@ export async function GET({ request, locals }: any) {
 		}
 	} catch {}
 
+	let reminders: unknown = [];
+	try {
+		const rq = await db.prepare('SELECT reminders FROM devices WHERE id = ?').bind(deviceId).first();
+		reminders = sanitizeReminders(rq?.reminders);
+	} catch {} // schema-reminders.sql
 	let countdown: { title: string; date: string } | null = null;
 	try {
 		const x = await db.prepare('SELECT countdown_title, countdown_date FROM devices WHERE id = ?').bind(deviceId).first();
@@ -118,6 +124,7 @@ export async function GET({ request, locals }: any) {
 		lon,
 		hasWeather: lat !== null,
 		countdown,
+		reminders,
 		tasksGranted,
 		devices,
 		designs: designs ? designs.map((d) => ({ id: d.id, name: d.name })) : null,

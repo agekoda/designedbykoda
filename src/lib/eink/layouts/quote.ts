@@ -3,7 +3,8 @@ import { Draw, PAPER } from '../draw';
 import { measure, wrapText } from '../measure';
 import { dayIdx, dayShort, monthShort, tmOf, type LayoutCtx } from '../context';
 import { batteryIcon } from '../batteryIcon';
-import { quoteForDay } from '../../../data/quotes';
+import { quoteFor } from '../../../data/quotes';
+import { isJa } from '../i18n';
 import { dateShort } from '../context';
 
 export function quote(ctx: LayoutCtx): string {
@@ -15,7 +16,7 @@ export function quote(ctx: LayoutCtx): string {
 	d.text(10, 21, 'sb', 'QUOTE OF THE DAY', { color: PAPER });
 	d.text(392, 21, 's', dateShort(now), { align: 'right', color: PAPER });
 
-	const [text, who] = quoteForDay(dayIdx(ctx.nowLocal));
+	const [text, who] = quoteFor(dayIdx(ctx.nowLocal), isJa());
 	const boxW = 350;
 	const boxH = 196; // from y=48 to y=244
 	// the biggest size where the whole quote fits

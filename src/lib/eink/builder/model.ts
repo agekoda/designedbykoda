@@ -351,6 +351,18 @@ export const WIDGETS: Record<string, WidgetDef> = {
 			{ key: 'time', label: 'When', kind: 'toggle', def: true },
 		],
 	},
+	reminders: {
+		label: 'Reminders',
+		group: 'Extras',
+		blurb: 'Bin day and other things that repeat. Set them in Customize display',
+		w: 250,
+		h: 120,
+		min: { w: 100, h: 30 },
+		opts: [
+			{ key: 'big', label: 'Today\u2019s in a dark box', kind: 'toggle', def: false },
+			{ key: 'days', label: 'Looks ahead', kind: 'choice', choices: [['1', 'Today'], ['2', '2 days'], ['7', 'A week'], ['14', '2 weeks']], def: '7' },
+		],
+	},
 	qr: {
 		label: 'QR code',
 		group: 'Extras',
@@ -553,6 +565,7 @@ export function layoutNeeds(layout: CustomLayout | null | undefined) {
 		picture: types.has('picture'),
 		// redraw when a meeting starts or ends, not just at midnight
 		live: types.has('room_status'),
+		reminders: types.has('reminders'),
 	};
 }
 

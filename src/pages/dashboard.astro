@@ -17,7 +17,10 @@ if (!userId) return Astro.redirect('/setup');
 				<div class="kicker">Your account</div>
 				<div class="dash-title">My devices</div>
 			</div>
-			<a class="btn" data-magnetic href="/setup?new=1">Add a device</a>
+			<div class="head-btns">
+				<a class="btn ghost" href="/projects/eink-calendar/help">Help</a>
+				<a class="btn" data-magnetic href="/setup?new=1">Add a device</a>
+			</div>
 		</div>
 
 		<div id="devices" class="devices">
@@ -45,6 +48,7 @@ if (!userId) return Astro.redirect('/setup');
 	import { estimate, measured, lifeText } from '../lib/eink/batteryLife';
 	import { layoutNeeds } from '../lib/eink/builder/model';
 	import { CALENDAR_STYLES } from '../data/calendarStyles';
+	import { ask } from '../lib/dialog';
 	const list = document.getElementById('devices')!;
 
 	const esc = (v: string) =>
@@ -94,6 +98,24 @@ if (!userId) return Astro.redirect('/setup');
 	// does this screen show messages? The Message board, or a design with a Messages widget
 	const showsMsgs = (d: any, id: string) => id === 'messages' || !!layoutFor(d, id)?.widgets?.some((w: any) => w.t === 'messages');
 
+	// A small line graph of battery % over time (readings every few hours, up to 60 days).
+	function battGraph(points: [number, number][]): string {
+		if (points.length < 2) return '<p class="muted small">Not enough readings yet. It saves one every few hours, so check back in a day or two.</p>';
+		const W = 600, H = 90, P = 4;
+		const t0 = points[0][0], t1 = Math.max(points[points.length - 1][0], t0 + 1);
+		const x = (t: number) => P + ((t - t0) / (t1 - t0)) * (W - 2 * P);
+		const y = (pct: number) => P + (1 - pct / 100) * (H - 2 * P);
+		const pts = points.map(([t, mv]) => [x(t), y(batteryPercent(mv / 1000))]);
+		const line = pts.map(([a, b], i) => `${i ? 'L' : 'M'}${a.toFixed(1)},${b.toFixed(1)}`).join('');
+		const area = `${line}L${pts[pts.length - 1][0].toFixed(1)},${H - P}L${pts[0][0].toFixed(1)},${H - P}Z`;
+		const days = Math.max(1, Math.round((t1 - t0) / 86400));
+		const fmt = (t: number) => new Date(t * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+		return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="bgraph" role="img" aria-label="Battery over the last ${days} days">
+			<line x1="0" x2="${W}" y1="${y(50)}" y2="${y(50)}" class="g50" vector-effect="non-scaling-stroke"/>
+			<path d="${area}" class="ga"/><path d="${line}" class="gl" vector-effect="non-scaling-stroke"/></svg>
+			<div class="bgraph-x"><span>${fmt(t0)}</span><span>Battery, last ${days} day${days === 1 ? '' : 's'} · line is 50%</span><span>${fmt(t1)}</span></div>`;
+	}
+
 	let allCalendars: { id: string; summary: string; primary: boolean }[] | null = null;
 
 	function flash(el: HTMLElement, text: string, err = false) {
@@ -104,12 +126,14 @@ if (!userId) return Astro.redirect('/setup');
 		if (!err) (el as any)._t = setTimeout(() => el.classList.remove('show'), 1800);
 	}
 
+	let allDevices: any[] = [];
 	function render(devices: any[]) {
 		if (!devices.length) {
 			list.innerHTML = `<div class="empty"><div class="dev-name-static">No devices yet</div><p class="muted">Pair your first E-Ink Calendar to get started.</p><a class="btn" href="/setup?new=1">Set up a device</a></div>`;
 			return;
 		}
 		list.innerHTML = '';
+		allDevices = devices;
 		devices.forEach((d, i) => list.appendChild(card(d, i)));
 	}
 
@@ -124,7 +148,7 @@ if (!userId) return Astro.redirect('/setup');
 			status = `<span class="dot ${late ? 'bad' : 'on'}"></span>Checked in ${ago(d.lastSeenAt)}`;
 			if (late) {
 				el.classList.add('warn');
-				alert = `<div class="alert"><b>Hasn\'t checked in since ${esc(dayTime(d.lastSeenAt))}.</b> Press its button. If the screen doesn\'t change, charge it for an hour. If it still doesn\'t, it may not be reaching your Wi-Fi.</div>`;
+				alert = `<div class="alert"><b>Hasn\'t checked in since ${esc(dayTime(d.lastSeenAt))}.</b> Press its button. If the screen doesn\'t change, charge it for an hour. If it still doesn\'t, it may not be reaching your Wi-Fi. <a href="/projects/eink-calendar/help#trouble">More help</a></div>`;
 			}
 		}
 		let battery = '';
@@ -138,7 +162,7 @@ if (!userId) return Astro.redirect('/setup');
 			const live = layoutNeeds(layoutFor(d, d.style)).live || d.style === 'room' || d.style === 'nameplate';
 			const left = real ? real.left : (estimate({ style: d.style, refreshSec: d.refreshIntervalSec, schedule: d.schedule, live, msgCheck: d.msgCheck }) * pct) / 100;
 			const leftText = needs ? ' · Needs charging' : pct >= 99 && !real ? '' : ` · ${lifeText(left)} left`;
-			battery = `<span class="sep">·</span><span class="batt${needs ? ' needs' : ''}" title="Battery level${d.batteryAt ? ', ' + ago(d.batteryAt) : ''}${real ? '. Time left is from how fast it has actually been using its battery.' : '. Time left is an estimate from its settings.'}"><span class="batt-icon ${needs ? 'flat' : pct < 20 ? 'low' : ''}"><i style="width:${Math.max(6, pct)}%"></i></span>${pct}%${leftText}</span>`;
+			battery = `<span class="sep">·</span><button type="button" data-batt aria-expanded="false" class="batt${needs ? ' needs' : ''}" title="Battery level${d.batteryAt ? ', ' + ago(d.batteryAt) : ''}${real ? '. Time left is from how fast it has actually been using its battery.' : '. Time left is an estimate from its settings.'}"><span class="batt-icon ${needs ? 'flat' : pct < 20 ? 'low' : ''}"><i style="width:${Math.max(6, pct)}%"></i></span>${pct}%${leftText}<span class="caret" aria-hidden="true">▾</span></button>`;
 		}
 		const paired = d.createdAt ? new Date(d.createdAt * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 		el.innerHTML = `
@@ -153,6 +177,7 @@ if (!userId) return Astro.redirect('/setup');
 				<input class="dev-name" maxlength="40" value="${esc(d.name)}" placeholder="E-Ink Calendar${index ? ' ' + (index + 1) : ''}" aria-label="Device name" />
 				${alert}
 				<div class="dev-meta">${status}${battery}</div>
+				<div class="batt-hist" data-bhist hidden></div>
 				<div class="onnow" data-onnow></div>
 				<div class="actions">
 					<a class="btn customize" href="/dashboard/display?device=${encodeURIComponent(d.id)}">Customize display</a>
@@ -172,6 +197,7 @@ if (!userId) return Astro.redirect('/setup');
 
 				<div class="dev-foot">
 					${paired ? `<span class="muted small paired">Paired ${paired}</span>` : ''}
+					<button type="button" class="link copy-link" data-copy hidden>Copy settings to…</button>
 					<span data-foot><button type="button" class="link danger-link" data-unpair>Unpair this device</button></span>
 				</div>
 			</div>`;
@@ -186,25 +212,52 @@ if (!userId) return Astro.redirect('/setup');
 				cornerImage = Uint8Array.from(bin, (c) => c.charCodeAt(0));
 			} catch {}
 		}
-		const onScreen = d.shownStyle ?? d.style; // the schedule or the button may be showing another layout
+		// the preview shows what the next update puts on the screen (your saved choice, the schedule or a button pick)
+		const onScreen = d.nextStyle ?? d.style;
+		const nowShowing = d.shownStyle ?? onScreen; // what the calendar was last sent
 		let frameImage: Uint8Array | null = null;
 		if (d.frameBits && onScreen === 'frame') {
 			try {
 				frameImage = Uint8Array.from(atob(d.frameBits), (c) => c.charCodeAt(0));
 			} catch {}
 		}
-		renderPreview({ style: onScreen.startsWith('design:') ? 'custom' : onScreen, unit: d.unit, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null, cornerImage, refreshSec: onScreen === 'timeline' ? d.refreshIntervalSec : 86400, loc: d.location ? { lat: d.location.lat, lon: d.location.lon } : null, countdown: d.countdown ?? null, frameImage, custom: layoutFor(d, onScreen), sign: d.sign ?? null })
+		renderPreview({ style: onScreen.startsWith('design:') ? 'custom' : onScreen, unit: d.unit, font: d.font, dark: !!d.dark, hasWeather: !!d.location, vbat: d.batteryMv ? d.batteryMv / 1000 : null, cornerImage, refreshSec: onScreen === 'timeline' ? d.refreshIntervalSec : 86400, loc: d.location ? { lat: d.location.lat, lon: d.location.lon } : null, countdown: d.countdown ?? null, frameImage, custom: layoutFor(d, onScreen), sign: d.sign ?? null, reminders: d.reminders ?? [] })
 			.then((r) => paintScreen(canvas, r.px, { mode: 'screen', scale: 2 }))
 			.catch(() => {});
 
 		// what's on it now, and when it next updates
 		const onnow = el.querySelector('[data-onnow]') as HTMLElement;
 		const next = d.nextWakeAt && d.nextWakeAt > Date.now() / 1000 ? ` <span class="sep">·</span> next update <b>${hhmm(d.nextWakeAt)}</b>` : '';
-		onnow.innerHTML = d.lastSeenAt ? `Showing <b>${esc(labelIn(d, onScreen))}</b>${next}` : '';
+		const when = d.nextWakeAt && d.nextWakeAt > Date.now() / 1000 ? hhmm(d.nextWakeAt) : '';
+		onnow.innerHTML = !d.lastSeenAt
+			? ''
+			: nowShowing !== onScreen
+				? `Showing <b>${esc(labelIn(d, nowShowing))}</b> <span class="sep">·</span> <b>${esc(labelIn(d, onScreen))}</b> from ${when ? when : 'the next update'} or a button press`
+				: `Showing <b>${esc(labelIn(d, onScreen))}</b>${next}`;
 
 		const quick = el.querySelector('[data-quick]') as HTMLFormElement;
-		const syncQuick = () => (quick.hidden = !(showsMsgs(d, d.style) || showsMsgs(d, onScreen)));
+		const syncQuick = () => (quick.hidden = !(showsMsgs(d, onScreen)));
 		syncQuick();
+		// battery history: click the battery to open a small graph
+		const battBtn = el.querySelector<HTMLButtonElement>('[data-batt]');
+		const bhist = el.querySelector('[data-bhist]') as HTMLElement;
+		battBtn?.addEventListener('click', async () => {
+			const open = bhist.hidden;
+			bhist.hidden = !open;
+			battBtn.setAttribute('aria-expanded', String(open));
+			battBtn.classList.toggle('open', open);
+			if (!open || bhist.dataset.loaded) return;
+			bhist.innerHTML = '<p class="muted small">Loading…</p>';
+			try {
+				const r = await (await fetch('/api/dashboard/battery?deviceId=' + encodeURIComponent(d.id))).json();
+				if (!r.ok) throw new Error(r.error || 'Could not load the battery history.');
+				bhist.dataset.loaded = '1';
+				bhist.innerHTML = battGraph(r.points as [number, number][]);
+			} catch (err: any) {
+				bhist.innerHTML = `<p class="muted small">${esc(err?.message || 'Could not load the battery history.')}</p>`;
+			}
+		});
+
 		// quick message
 		const qtext = el.querySelector('[data-qtext]') as HTMLInputElement;
 		quick.addEventListener('submit', async (e) => {
@@ -281,6 +334,25 @@ if (!userId) return Astro.redirect('/setup');
 				},
 			})
 		);
+
+		// copy this calendar's settings to another one (only when there's another one)
+		const copyBtn = el.querySelector('[data-copy]') as HTMLButtonElement;
+		copyBtn.hidden = allDevices.length < 2;
+		copyBtn.addEventListener('click', async () => {
+			const others = allDevices.filter((x) => x.id !== d.id);
+			const body = document.createElement('div');
+			body.className = 'copy-pick';
+			body.innerHTML =
+				others.map((x, i) => `<label class="copy-opt"><input type="radio" name="copy-to" value="${esc(x.id)}"${i === 0 ? ' checked' : ''} /> <span>${esc(x.name || 'Calendar')}</span></label>`).join('') +
+				`<label class="copy-opt copy-cals"><input type="checkbox" data-cals /> <span>Also its calendars and weather</span></label>`;
+			const ok = await ask(`Its screen, look, schedule, signs, reminders, pictures and your designs. These are replaced on the other calendar. Its name and messages stay.`, { title: `Copy ${d.name || 'this calendar'}'s settings to`, ok: 'Copy settings', body });
+			if (!ok) return;
+			const to = body.querySelector<HTMLInputElement>('input[name="copy-to"]:checked')?.value;
+			const res = await post('/api/dashboard/devices/copy', { from: d.id, to, calendars: body.querySelector<HTMLInputElement>('[data-cals]')!.checked });
+			if (!res.ok) return flash(note, res.error || 'Could not copy the settings.', true);
+			flash(note, `Copied to ${others.find((x) => x.id === to)?.name || 'the other calendar'}.`);
+			setTimeout(() => location.reload(), 900);
+		});
 
 		// unpair: two taps
 		const foot = el.querySelector('[data-foot]') as HTMLElement;
@@ -386,7 +458,17 @@ if (!userId) return Astro.redirect('/setup');
 	.dash .customize + .customize { margin-left: 0.5em; }
 	.dash .msg-count { display: inline-block; min-width: 1.4em; margin-left: 0.35em; padding: 0 0.4em; border-radius: 999px; background: var(--accent); color: var(--bg); font-size: 0.8em; line-height: 1.5; text-align: center; }
 	.dash .cust-hint { margin-top: 0.6em; }
-	.dash .batt { display: inline-flex; align-items: center; gap: 0.4em; }
+	.dash .batt { display: inline-flex; align-items: center; gap: 0.4em; background: none; border: none; padding: 0; font: inherit; color: inherit; }
+	.dash .batt:hover { color: var(--fg); }
+	.dash .batt .caret { font-size: 0.8em; opacity: 0.7; transition: transform 0.2s; }
+	.dash .batt.open .caret { transform: rotate(180deg); }
+	.dash .batt-hist { margin: -0.4em 0 1em; padding: 0.8em 0.9em 0.6em; border: 1px solid var(--border); border-radius: 12px; }
+	.dash .batt-hist[hidden] { display: none; }
+	.dash .bgraph { width: 100%; height: 70px; display: block; }
+	.dash .bgraph .gl { fill: none; stroke: #4caf7a; stroke-width: 2; }
+	.dash .bgraph .ga { fill: rgba(76, 175, 122, 0.15); }
+	.dash .bgraph .g50 { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 4; }
+	.dash .bgraph-x { display: flex; justify-content: space-between; gap: 1em; font-size: 0.75em; color: var(--muted); margin-top: 0.3em; }
 	.dash .batt.needs { color: #d9a441; }
 	.dash .batt-icon { position: relative; width: 22px; height: 11px; border: 1.5px solid var(--muted); border-radius: 3px; display: inline-block; }
 	.dash .batt-icon::after { content: ''; position: absolute; right: -4px; top: 2px; width: 2px; height: 4px; background: var(--muted); border-radius: 0 1px 1px 0; }
@@ -406,12 +488,15 @@ if (!userId) return Astro.redirect('/setup');
 	.dash .dot.on { background: #4caf7a; }
 	.dash .dot.warn { background: #d9a441; }
 	.dash .dot.bad { background: #e08a8a; }
+	.dash .head-btns { display: flex; gap: 0.6em; flex-wrap: wrap; }
+	.dash .alert a { color: inherit; font-weight: 700; }
 	.dash .dev.warn { border-color: #d9a441; }
 	.dash .alert { margin: 0.5em 0 0.6em; padding: 0.75em 0.95em; border-radius: 12px; background: rgba(217, 164, 65, 0.12); border: 1px solid #d9a441; font-size: 0.9em; line-height: 1.45; }
 	.dash .batt.needs { color: #e08a8a; }
 	.dash .batt-icon.flat { border-color: #e08a8a; }
 	.dash .batt-icon.flat i { background: #e08a8a; }
-	.dash .onnow { color: var(--muted); font-size: 0.9em; margin: -0.8em 0 0; display: flex; gap: 0.45em; flex-wrap: wrap; align-items: baseline; }
+	.dash .onnow { color: var(--muted); font-size: 0.9em; margin: -0.8em 0 0; line-height: 1.5; }
+	.dash .onnow .sep { margin: 0 0.3em; }
 	.dash .onnow:empty { display: none; }
 	.dash .onnow b { color: var(--fg); }
 	.dash .onnow .sep { opacity: 0.5; }
@@ -426,6 +511,9 @@ if (!userId) return Astro.redirect('/setup');
 	.dash .dev-left .label { margin-top: 1.4em; }
 	.dash .weather { margin-top: 1.4em; padding-top: 0.2em; border-top: 1px solid var(--border); }
 	.dash .dev-foot { display: flex; align-items: center; gap: 1.2em; flex-wrap: wrap; }
+	.dash .copy-link { background: none; border: none; padding: 0; font: inherit; font-size: 0.87em; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+	.dash .copy-link:hover { color: var(--fg); }
+	.dash .copy-link[hidden] { display: none; }
 	.dash .dev-foot [data-foot] { margin-left: auto; display: inline-flex; align-items: center; gap: 0.6em; flex-wrap: wrap; }
 	.dash .label { font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 1.2em 0 0.6em; }
 

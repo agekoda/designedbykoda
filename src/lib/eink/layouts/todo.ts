@@ -84,7 +84,7 @@ export function todo(ctx: LayoutCtx): string {
 
 	batteryIcon(d, ctx, 10, 270, 'left');
 	const more = list.length - ROWS;
-	const summary = `${open.length} to do` + (more > 0 ? `   +${more} more` : '');
+	const summary = open.length ? `${open.length} to do` + (more > 0 ? `   +${more} more` : '') : 'All done!';
 	d.text(392, 285, 's', summary, { align: 'right' });
 	return d.toString();
 }

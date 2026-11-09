@@ -78,6 +78,12 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						<a class="btn small ghost" id="sign-builder" href="#">Edit the layout in the builder</a>
 						<p class="muted small hint">Opens it in the layout builder as a new design of your own, where you can move things around and add widgets.</p>
 					</div>
+					<div id="opt-rem" hidden>
+						<div class="label sub">Reminders</div>
+						<div id="rem-list"></div>
+						<button type="button" class="btn small ghost" id="rem-add">+ Add a reminder</button>
+						<p class="muted small hint">Shown on the Reminders screen, and in the Reminders widget in your own designs. They don't go in your Google Calendar.</p>
+					</div>
 					<div id="opt-todo" hidden>
 						<p class="muted" id="todo-status"></p>
 						<a class="btn small" id="todo-connect" href="/api/auth/google/start?tasks=1">Connect Google Tasks</a>
@@ -265,6 +271,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { batteryPercent } from '../../lib/eink/battery';
 	import { layoutNeeds } from '../../lib/eink/builder/model';
 	import { dropdown, type Dropdown } from '../../lib/dropdown';
+	import { MAX_REMINDERS, MAX_REMINDER_TEXT, repeatText, sampleReminders, sanitizeReminders, type Reminder } from '../../lib/eink/reminders';
 	import {
 		CORNER,
 		FRAME,
@@ -292,7 +299,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const layoutOf = (id: string) => (id === 'custom' ? customLayout : designOf(id)?.layout ?? null);
 	const renderId = (id: string) => (isDesign(id) ? 'custom' : id);
 	// which group each ready-made screen sits in, for the picker's filters
-	const GROUP: Record<string, string> = { agenda: 'cal', month: 'cal', week: 'cal', bigdate: 'cal', timeline: 'cal', nextup: 'cal', planner: 'cal', room: 'sign', guest: 'sign', nameplate: 'sign', messages: 'glance', moon: 'glance', quote: 'glance', countdown: 'glance', todo: 'glance', frame: 'glance', custom: 'mine' };
+	const GROUP: Record<string, string> = { agenda: 'cal', month: 'cal', week: 'cal', bigdate: 'cal', timeline: 'cal', nextup: 'cal', planner: 'cal', room: 'sign', guest: 'sign', nameplate: 'sign', messages: 'glance', reminders: 'glance', moon: 'glance', quote: 'glance', countdown: 'glance', todo: 'glance', frame: 'glance', custom: 'mine' };
 	const families: { id: string; label: string }[] = JSON.parse(root.dataset.families!);
 	const dithers: { id: string; label: string; note: string }[] = JSON.parse(root.dataset.dithers!);
 	const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -315,6 +322,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const optTodo = $('opt-todo');
 	const optSign = $('opt-sign');
 	const optMsgs = $('opt-msgs');
+	const optRem = $('opt-rem');
+	const remList = $('rem-list');
 	const signFields = $('sign-fields');
 	const signBuilder = $<HTMLAnchorElement>('sign-builder');
 	const cdTitle = $<HTMLInputElement>('cd-title');
@@ -376,6 +385,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		countdown: { title: string; date: string };
 		sch: Schedule;
 		sign: SignCfg;
+		reminders: Reminder[];
 	}
 	// The picture editor works on one of two pictures: the Agenda's corner picture, or the Photo frame's full-screen one.
 	type PicKey = 'corner' | 'frame';
@@ -410,6 +420,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		countdown: { title: '', date: '' },
 		sch: { ...EMPTY_SCHEDULE },
 		sign: JSON.parse(JSON.stringify(SIGN_DEFAULTS)),
+		reminders: [],
 	};
 	let base = JSON.stringify(st);
 	// A layout picked in the Schedule tab is previewed (and its Picture / Options tabs shown)
@@ -459,6 +470,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			custom: styleId === 'custom' ? (thumb && !customLayout?.widgets?.length ? sanitizeLayout(TEMPLATES.find((x) => x.id === 'sky')!.build()) : customLayout) : isDesign(styleId) ? layoutOf(styleId) : null,
 			tasksState: (thumb || tasksGranted ? 'ok' : 'needs_permission') as 'ok' | 'needs_permission',
 			sign: st.sign,
+			reminders: st.reminders.some((r) => r.text.trim()) ? st.reminders : thumb ? sampleReminders(Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60) : [],
 		};
 	}
 
@@ -895,6 +907,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		optTodo.hidden = opt !== 'todo';
 		optSign.hidden = opt !== 'sign';
 		optMsgs.hidden = opt !== 'msgs';
+		// reminders: on the Reminders screen, or a design with the Reminders widget
+		const remNow = fs() === 'reminders' || !!layoutOf(fs())?.widgets?.some((w: any) => w.t === 'reminders');
+		optRem.hidden = !remNow;
+		if (remNow && !remList.contains(document.activeElement)) drawReminders();
 		($('msgs-open') as HTMLAnchorElement).href = '/dashboard/messages?device=' + encodeURIComponent(deviceId);
 		if (opt === 'sign') syncSignFields();
 		// your own design: a button to edit it
@@ -913,6 +929,98 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		todoConnect.textContent = tasksGranted ? 'Reconnect Google Tasks' : 'Connect Google Tasks';
 		todoConnect.href = '/api/auth/google/start?tasks=1&return=' + encodeURIComponent('/dashboard/display?device=' + deviceId);
 	}
+
+	// ---------------------------------------------------------------- reminders (bin day and the like)
+	const REPEATS: [string, string][] = [['1', 'Every week'], ['2', 'Every 2 weeks'], ['3', 'Every 3 weeks'], ['4', 'Every 4 weeks'], ['m', 'Every month']];
+	let remDds: Dropdown[] = [];
+	const todayIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+	function drawReminders() {
+		remDds.forEach((d) => d.destroy());
+		remDds = [];
+		remList.innerHTML = st.reminders
+			.map((r, i) => {
+				const rep = r.kind === 'month' ? 'm' : String(r.every);
+				const days = DAY_ORDER.map((d) => `<button type="button" class="day${(r.days >> d) & 1 ? ' on' : ''}" data-d="${d}" aria-pressed="${!!((r.days >> d) & 1)}" title="${DAY_NAME[d]}">${DAY_LETTER[d]}</button>`).join('');
+				return `<div class="slot rem" data-i="${i}">
+					<div class="sl-top"><input class="txt rem-text" type="text" maxlength="${MAX_REMINDER_TEXT}" value="${escHtml(r.text)}" placeholder="Bins out" aria-label="Reminder" autocomplete="off" /><button type="button" class="sl-del" aria-label="Remove">&times;</button></div>
+					<div class="rem-when"><select class="rem-rep" aria-label="Repeats">${REPEATS.map(([v, l]) => `<option value="${v}"${v === rep ? ' selected' : ''}>${l}</option>`).join('')}</select>
+					${
+						r.kind === 'month'
+							? `<label class="rem-md"><span class="muted small">on the</span><input class="txt rem-mday" type="number" min="1" max="31" value="${r.mday}" aria-label="Day of the month" /><span class="muted small">${r.mday === 31 ? '(the last day)' : ''}</span></label>`
+							: `<div class="sl-days" role="group" aria-label="Days">${days}</div>`
+					}</div>
+					${r.kind === 'week' && r.every > 1 ? `<label class="rem-start"><span class="muted small">Next one is in the week of</span><input class="txt rem-from" type="date" value="${r.start || todayIso()}" /></label>` : ''}
+					<p class="sl-note">${escHtml(repeatText(r))}</p>
+				</div>`;
+			})
+			.join('');
+		remList.querySelectorAll<HTMLSelectElement>('select.rem-rep').forEach((sel) => remDds.push(dropdown(sel)));
+		($('rem-add') as HTMLButtonElement).hidden = st.reminders.length >= MAX_REMINDERS;
+	}
+	const remAt = (el: Element) => {
+		const row = el.closest<HTMLElement>('.rem');
+		return row ? { i: parseInt(row.dataset.i!, 10), r: st.reminders[parseInt(row.dataset.i!, 10)], row } : null;
+	};
+	const remChanged = (redrawRows: boolean) => {
+		if (redrawRows) drawReminders();
+		schedule(false);
+		changed();
+	};
+	$('rem-add').addEventListener('click', () => {
+		const wd = new Date().getDay();
+		st.reminders.push({ text: '', kind: 'week', days: 1 << wd, every: 1, start: '', mday: new Date().getDate() });
+		remChanged(true);
+		remList.querySelector<HTMLInputElement>('.rem:last-child .rem-text')?.focus();
+	});
+	remList.addEventListener('input', (e) => {
+		const el = e.target as HTMLInputElement;
+		const a = remAt(el);
+		if (!a) return;
+		if (el.classList.contains('rem-text')) {
+			a.r.text = el.value;
+			a.row.querySelector('.sl-note')!.textContent = repeatText(a.r);
+			remChanged(false);
+		} else if (el.classList.contains('rem-mday')) {
+			const n = Math.max(1, Math.min(31, parseInt(el.value, 10) || 1));
+			a.r.mday = n;
+			a.row.querySelector('.sl-note')!.textContent = repeatText(a.r);
+			remChanged(false);
+		} else if (el.classList.contains('rem-from')) {
+			a.r.start = el.value;
+			remChanged(false);
+		}
+	});
+	remList.addEventListener('change', (e) => {
+		const el = e.target as HTMLSelectElement;
+		const a = remAt(el);
+		if (!a || !el.classList.contains('rem-rep')) return;
+		if (el.value === 'm') a.r.kind = 'month';
+		else {
+			a.r.kind = 'week';
+			a.r.every = parseInt(el.value, 10);
+			if (a.r.every > 1 && !a.r.start) a.r.start = todayIso();
+			if (!a.r.days) a.r.days = 1 << new Date().getDay();
+		}
+		remChanged(true);
+	});
+	remList.addEventListener('click', (e) => {
+		const t = e.target as HTMLElement;
+		const a = remAt(t);
+		if (!a) return;
+		if (t.closest('.sl-del')) {
+			st.reminders.splice(a.i, 1);
+			remChanged(true);
+			return;
+		}
+		const day = t.closest<HTMLElement>('.day');
+		if (day) {
+			const bit = 1 << parseInt(day.dataset.d!, 10);
+			const next = a.r.days ^ bit;
+			if (!next) return; // at least one day
+			a.r.days = next;
+			remChanged(true);
+		}
+	});
 
 	// ---------------------------------------------------------------- signs (Meeting room, Guest welcome, Desk name plate)
 	const SIGN_FIELDS: Record<string, { key: string; label: string; max: number; rows?: number; ph?: string }[]> = {
@@ -1269,6 +1377,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const baseState = JSON.parse(base);
 		if (JSON.stringify(st.sch) !== JSON.stringify(baseState.sch)) body.schedule = st.sch;
 		if (JSON.stringify(st.sign) !== JSON.stringify(baseState.sign)) body.sign = st.sign;
+		if (JSON.stringify(st.reminders) !== JSON.stringify(baseState.reminders)) body.reminders = st.reminders.filter((r) => r.text.trim());
 		if (st.unit !== baseState.unit) body.unit = st.unit; // only when changed, so a server without schema-screens.sql still saves the rest
 		if (anyCorner || st.cornerMode === 'image') {
 			body.corner = { mode: st.cornerMode };
@@ -1430,6 +1539,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				countdown: info.countdown ?? { title: '', date: '' },
 				sch: info.schedule ?? { ...EMPTY_SCHEDULE },
 				sign: sanitizeSign(info.sign),
+				reminders: sanitizeReminders(info.reminders),
 			};
 			screensReady = info.screensReady !== false;
 			battAnchor = info.batteryAnchor ?? null;
@@ -1704,6 +1814,14 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .batt-line { margin-top: 0.7em; font-size: 0.85em; color: var(--muted); line-height: 1.5; }
 	.cust .batt-line b { color: var(--fg); }
 	.cust .sign-f { display: block; margin-bottom: 1em; }
+	.cust #opt-rem[hidden] { display: none; }
+	.cust #rem-list .rem { margin-bottom: 0.8em; }
+	.cust .rem .sl-top .txt { flex: 1; min-width: 0; }
+	.cust .rem-when { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6em; margin-top: 0.6em; }
+	.cust .rem-md, .cust .rem-start { display: inline-flex; align-items: center; gap: 0.5em; }
+	.cust .rem-start { margin-top: 0.6em; }
+	.cust .rem-mday { width: 4.5em; }
+	.cust .rem .sl-note { color: var(--muted); }
 	.cust .sign-f .label { display: block; margin-bottom: 0.45em; }
 	.cust textarea.txt { resize: vertical; line-height: 1.45; }
 	.cust #opt-sign[hidden], .cust #opt-msgs[hidden] { display: none; }

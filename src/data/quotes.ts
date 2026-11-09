@@ -78,3 +78,45 @@ export const QUOTES: [string, string][] = [
 export function quoteForDay(dayIdx: number): [string, string] {
 	return QUOTES[((dayIdx % QUOTES.length) + QUOTES.length) % QUOTES.length];
 }
+
+// Japanese quotes, shown instead when the screen is in Japanese. Proverbs and sayings old
+// enough to be anyone's. Keep them short (about 40 characters at most) so they set large.
+export const QUOTES_JA: [string, string][] = [
+	['七転び八起き。', 'ことわざ'],
+	['継続は力なり。', 'ことわざ'],
+	['石の上にも三年。', 'ことわざ'],
+	['千里の道も一歩から。', '老子'],
+	['急がば回れ。', 'ことわざ'],
+	['塵も積もれば山となる。', 'ことわざ'],
+	['笑う門には福来る。', 'ことわざ'],
+	['一期一会。', '茶道の言葉'],
+	['初心忘るべからず。', '世阿弥'],
+	['為せば成る、為さねば成らぬ何事も。', '上杉鷹山'],
+	['早起きは三文の徳。', 'ことわざ'],
+	['案ずるより産むが易し。', 'ことわざ'],
+	['雨降って地固まる。', 'ことわざ'],
+	['良薬は口に苦し。', 'ことわざ'],
+	['百聞は一見に如かず。', 'ことわざ'],
+	['時は金なり。', 'ことわざ'],
+	['明日は明日の風が吹く。', 'ことわざ'],
+	['虎穴に入らずんば虎子を得ず。', 'ことわざ'],
+	['失敗は成功のもと。', 'ことわざ'],
+	['住めば都。', 'ことわざ'],
+	['知るを知るとなし、知らざるを知らずとなす。是知るなり。', '孔子'],
+	['過ぎたるは猶及ばざるが如し。', '孔子'],
+	['温故知新。', '孔子'],
+	['人の一生は重荷を負うて遠き道を行くが如し。急ぐべからず。', '徳川家康'],
+	['天は人の上に人を造らず人の下に人を造らず。', '福沢諭吉'],
+	['精神一到何事か成らざらん。', '朱子'],
+	['桃栗三年柿八年。', 'ことわざ'],
+	['能ある鷹は爪を隠す。', 'ことわざ'],
+	['実るほど頭を垂れる稲穂かな。', 'ことわざ'],
+	['念ずれば花ひらく。', 'ことわざ'],
+];
+
+// The quote for a day, in Japanese when the screen is.
+export function quoteFor(dayIdx: number, ja: boolean): [string, string] {
+	if (!ja) return quoteForDay(dayIdx);
+	const n = QUOTES_JA.length;
+	return QUOTES_JA[((dayIdx % n) + n) % n];
+}

@@ -79,7 +79,13 @@ export function wrapText(family: Family, role: Role, text: string, maxW: number,
 		const t = cur ? cur + (gap ? ' ' : '') + p : p;
 		gap = false;
 		if (!cur || measure(family, role, t, scale).w <= maxW) cur = t;
-		else {
+		else if (/^[。、，．」』）！？ー]$/.test(p) && /[^\x00-\x7f]$/.test(cur) && [...cur].length > 1) {
+			// Japanese closing punctuation never starts a line: take the character before it down too
+			const chars = [...cur];
+			const last = chars.pop()!;
+			lines.push(chars.join(''));
+			cur = last + p;
+		} else {
 			lines.push(cur);
 			cur = p;
 		}

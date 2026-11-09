@@ -98,6 +98,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 <script>
 	import { WIDGETS, GROUPS, TEMPLATES, makeWidget, clampWidget, sanitizeLayout, withDefaults, newId, SCREEN, MAX_WIDGETS, layoutNeeds, type CustomLayout, type Widget, type OptDef } from '../../lib/eink/builder/model';
 	import { loadFonts, drawListFor, paint, type PreviewOptions } from '../../lib/eink/previewKit';
+	import { sampleReminders } from '../../lib/eink/reminders';
 	import { renderDrawList } from '../../lib/eink/preview';
 	import { bytesToB64, decodePic, encodePic, DEFAULT_IMAGE_SETTINGS, DITHERS, ditherGray, packBits, type ImageSettings } from '../../lib/eink/image';
 	import { dropdown, type Dropdown } from '../../lib/dropdown';
@@ -207,6 +208,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			cornerImage: decodePic(info.cornerBits)?.bytes ?? null,
 			cornerSize: ((p) => (p ? { w: p.w, h: p.h } : null))(decodePic(info.cornerBits)),
 			custom: l,
+			reminders: info.reminders?.length ? info.reminders : sampleReminders(Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60),
 		};
 	}
 	let picHook: (() => void) | null = null;
