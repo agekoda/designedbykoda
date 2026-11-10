@@ -24,6 +24,11 @@ const ask = async (q, def) => {
 };
 const yes = async (q, def = 'y') => /^y/i.test(await ask(`${q} (y/n)`, def));
 const line = () => console.log('-'.repeat(64));
+const clear = () => process.stdout.write('\x1b[2J\x1b[3J\x1b[H'); // clears the window (and its scrollback)
+const header = (title) => {
+	clear();
+	console.log(`E-Ink Calendar firmware${title ? '  >  ' + title : ''}\n`);
+};
 const isVer = (v) => /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(v || '');
 const cmp = (a, b) => {
 	const x = a.split('.').map(Number), y = b.split('.').map(Number);
@@ -116,7 +121,7 @@ async function publish(message, version, newFile = true) {
 
 async function newVersion() {
 	const d = load();
-	line();
+	header('Release a new version');
 	console.log('Latest versions:');
 	showReleases(d);
 	const latest = [...d.releases].sort((a, b) => cmp(b.version, a.version))[0]?.version ?? '1.0.0';
@@ -179,6 +184,7 @@ async function newVersion() {
 
 async function promote() {
 	const d = load();
+	header('Send beta to everyone');
 	const b = d.channels.beta.version;
 	const s = d.channels.stable.version;
 	if (!b || (s && cmp(b, s) <= 0)) return console.log(`\nBeta (${b ?? 'nothing'}) isn't ahead of everyone (${s ?? 'nothing'}). Nothing to send.`);
@@ -190,6 +196,7 @@ async function promote() {
 
 async function revert() {
 	const d = load();
+	header('Emergency revert');
 	console.log('\nEmergency revert: calendars go back to an older version on their next wake,');
 	console.log('with no link on the dashboard. Release a fixed, newer version afterwards.\n');
 	showChannels(d);
@@ -208,7 +215,7 @@ async function revert() {
 
 function listAll() {
 	const d = load();
-	line();
+	header('All versions');
 	showChannels(d);
 	line();
 	console.log('All versions:');
@@ -220,7 +227,7 @@ function listAll() {
 }
 
 async function main() {
-	console.log('\nE-Ink Calendar firmware\n');
+	header();
 	// Up to date with what's deployed (and on the right branch).
 	try {
 		const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
@@ -234,7 +241,7 @@ async function main() {
 	}
 	for (;;) {
 		const d = load();
-		line();
+		header();
 		showChannels(d);
 		line();
 		console.log('  1) Release a new version');
@@ -252,7 +259,7 @@ async function main() {
 		} catch (e) {
 			console.log('\nSomething went wrong: ' + (e?.message || e));
 		}
-		console.log('');
+		await rl.question('\nPress Enter to go back to the menu.');
 	}
 	rl.close();
 }
