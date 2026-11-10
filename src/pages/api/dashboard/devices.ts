@@ -125,6 +125,14 @@ export async function GET({ request, locals }) {
 		const fr = await db.prepare('SELECT id, firmware FROM devices WHERE user_id = ?').bind(userId).all();
 		for (const e of fr.results ?? []) if (e.firmware) fws.set(e.id, e.firmware);
 	} catch {}
+	// Over-the-air updates (schema-ota.sql): which channel, and whether "Update now" is waiting.
+	const otaCfg = new Map<string, { channel: unknown; askedAt: number | null }>();
+	try {
+		const oq = await db.prepare('SELECT id, fw_channel, update_now_at FROM devices WHERE user_id = ?').bind(userId).all();
+		for (const e of oq.results ?? []) otaCfg.set(e.id, { channel: e.fw_channel, askedAt: e.update_now_at ?? null });
+	} catch {}
+	const { availableFor, channelOf } = await import('../../../lib/firmware');
+	const nowSecOta = Math.floor(Date.now() / 1000);
 	// 12-hour clock (schema-clock.sql), for the previews.
 	const clocks = new Map<string, string>();
 	try {
@@ -160,6 +168,12 @@ export async function GET({ request, locals }) {
 		reminders: rems.get(d.id) ?? [],
 		clock: clocks.get(d.id) ?? '24',
 		firmware: fws.get(d.id) ?? null,
+		update: (() => {
+			const r = availableFor(fws.get(d.id) ?? null, channelOf(otaCfg.get(d.id)?.channel));
+			if (!r) return null;
+			const at = otaCfg.get(d.id)?.askedAt;
+			return { version: r.version, notes: r.notes ?? '', asked: !!at && nowSecOta - at < 3600 };
+		})(),
 		calendarIds: parseIds(d.selected_calendar_ids) ?? parseIds(user?.selected_calendar_ids) ?? [],
 		lastSeenAt: d.last_seen_at ?? null,
 		createdAt: pairedAt.get(d.id) ?? d.created_at ?? null,

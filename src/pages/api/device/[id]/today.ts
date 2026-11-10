@@ -474,6 +474,16 @@ export async function GET({ params, request, locals }) {
 			await db.prepare('UPDATE devices SET firmware = ? WHERE id = ? AND (firmware IS NULL OR firmware <> ?)').bind(fw, deviceId, fw).run();
 		} catch {}
 	}
+	// Over-the-air update on offer (schema-ota.sql, src/lib/firmware.ts). The calendar decides
+	// whether it's safe to install (battery, earlier failures); "Update now" makes it go at once.
+	let otaHeaders: Record<string, string> = {};
+	try {
+		const { offerFor, offerHeaders, channelOf } = await import('../../../../lib/firmware');
+		const oq: any = await db.prepare('SELECT fw_channel, update_now_at FROM devices WHERE id = ?').bind(deviceId).first();
+		const offer = offerFor(fw, channelOf(oq?.fw_channel), oq?.update_now_at ?? null, now);
+		otaHeaders = offerHeaders(offer, `https://${reqUrl.host}`);
+		if (!offer && oq?.update_now_at) await db.prepare('UPDATE devices SET update_now_at = NULL WHERE id = ?').bind(deviceId).run();
+	} catch {} // before schema-ota.sql: no updates offered
 	// Battery life from real use (schema-screens.sql): remember the voltage and time just after a
 	// charge, so the dashboard can work out how fast this calendar actually drains.
 	if (vbat !== null) {
@@ -591,6 +601,7 @@ export async function GET({ params, request, locals }) {
 				})(),
 				'X-Sleep': String(sleepSec),
 				'X-Unchanged': unchanged ? '1' : '0',
+				...otaHeaders,
 			},
 		});
 	}

@@ -198,6 +198,7 @@ if (!userId) return Astro.redirect('/setup');
 				<div class="dev-foot">
 					${paired ? `<span class="muted small paired">Paired ${paired}</span>` : ''}
 					${d.firmware ? `<span class="muted small paired">Firmware ${esc(d.firmware)}</span>` : ''}
+					${d.update ? `<button type="button" class="link copy-link" data-update>${d.update.asked ? 'Update waiting: press the button' : `Update to ${esc(d.update.version)}`}</button>` : ''}
 					<button type="button" class="link copy-link" data-copy hidden>Copy settings to…</button>
 					<span data-foot><button type="button" class="link danger-link" data-unpair>Unpair this device</button></span>
 				</div>
@@ -354,6 +355,24 @@ if (!userId) return Astro.redirect('/setup');
 			if (!res.ok) return flash(note, res.error || 'Could not copy the settings.', true);
 			flash(note, `Copied to ${others.find((x) => x.id === to)?.name || 'the other calendar'}.`);
 			setTimeout(() => location.reload(), 900);
+		});
+
+		// over-the-air update: confirm, then the next button press installs it
+		el.querySelector('[data-update]')?.addEventListener('click', async () => {
+			const u = d.update!;
+			const body = document.createElement('div');
+			body.className = 'update-note';
+			body.innerHTML =
+				(u.notes ? `<p><strong>What's new:</strong> ${esc(u.notes)}</p>` : '') +
+				`<p class="muted small">It needs at least a quarter of its battery. If anything goes wrong, it goes back to ${esc(d.firmware || 'the old version')} by itself.</p>`;
+			const ok = await ask('After you click Update now, press the button on the calendar. It shows a progress bar, then restarts by itself. This takes about a minute.', { title: `Update to ${u.version}`, ok: 'Update now', body });
+			if (!ok) return;
+			const res = await post('/api/dashboard/devices/update-now', { id: d.id });
+			if (!res.ok) return flash(note, res.error || 'Could not start the update.', true);
+			flash(note, 'Now press the button on the calendar.');
+			const b = el.querySelector('[data-update]') as HTMLButtonElement | null;
+			if (b) b.textContent = 'Update waiting: press the button';
+			u.asked = true;
 		});
 
 		// unpair: two taps
@@ -516,6 +535,7 @@ if (!userId) return Astro.redirect('/setup');
 	.dash .copy-link { background: none; border: none; padding: 0; font: inherit; font-size: 0.87em; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 	.dash .copy-link:hover { color: var(--fg); }
 	.dash .copy-link[hidden] { display: none; }
+	:global(.update-note p) { margin: 0.6em 0 0; }
 	.dash .dev-foot [data-foot] { margin-left: auto; display: inline-flex; align-items: center; gap: 0.6em; flex-wrap: wrap; }
 	.dash .label { font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 1.2em 0 0.6em; }
 
