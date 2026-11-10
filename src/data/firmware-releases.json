@@ -5,7 +5,7 @@
       "auto": true
     },
     "beta": {
-      "version": "1.0.1",
+      "version": "1.0.2",
       "auto": true
     }
   },
@@ -17,6 +17,14 @@
       "sig": "MEQCIHYVFN6nFtLUd0ZwZ2q9KqYyLzM+PWdTGIRb7yYo2NEvAiAlFrb0WM8T+Ivgj14sODhQl7UojCGeYYcHo3z+o/9BrA==",
       "date": "2026-11-10",
       "notes": "First OTA test"
+    },
+    {
+      "version": "1.0.2",
+      "size": 1494096,
+      "sha256": "3904d040ec354cfe5152f9bef855df6bdab88671270c1f0e20ece910d8112ce2",
+      "sig": "MEUCIQDO6mf5iPDU7nJQw9+6kNvk+ADLakAzQUymWVq0ljdG3AIgNilwqchrUXt4LbaC7hHuGdOQRkLbanMVQzcNd1KOxMw=",
+      "date": "2026-11-10",
+      "notes": "Smoother progress bar"
     }
   ]
 }
