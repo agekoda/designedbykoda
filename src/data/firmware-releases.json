@@ -1,11 +1,11 @@
 {
   "channels": {
     "stable": {
-      "version": null,
+      "version": "1.0.3",
       "auto": true
     },
     "beta": {
-      "version": "1.0.1",
+      "version": "1.0.3",
       "auto": true
     }
   },
@@ -23,6 +23,14 @@
       "size": 1494096,
       "sha256": "3904d040ec354cfe5152f9bef855df6bdab88671270c1f0e20ece910d8112ce2",
       "sig": "MEUCIQDO6mf5iPDU7nJQw9+6kNvk+ADLakAzQUymWVq0ljdG3AIgNilwqchrUXt4LbaC7hHuGdOQRkLbanMVQzcNd1KOxMw=",
+      "date": "2026-11-10",
+      "notes": "Smoother progress bar"
+    },
+    {
+      "version": "1.0.3",
+      "size": 1494096,
+      "sha256": "ae6646e0a25f34c0dee9aacbdc2d41ccafe2e6f92a3d9ce0b0ebc9edd5ef81cc",
+      "sig": "MEQCIFPOKLflkok1RTM1jUQzOA9rCJlbIQcHo2IAOTd3mO7kAiApzJSamHl56RrlEDG2mkdBNQIlItPEne/ioykvI5U5QA==",
       "date": "2026-11-10",
       "notes": "Smoother progress bar"
     }
