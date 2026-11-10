@@ -1,7 +1,22 @@
 {
   "channels": {
-    "stable": { "version": null, "auto": true },
-    "beta": { "version": null, "auto": true }
+    "stable": {
+      "version": null,
+      "auto": true
+    },
+    "beta": {
+      "version": "1.0.1",
+      "auto": true
+    }
   },
-  "releases": []
+  "releases": [
+    {
+      "version": "1.0.1",
+      "size": 1493520,
+      "sha256": "af442768948376afe144c3e18d41e64e7734528504dde612498c6ba2620f9b8a",
+      "sig": "MEQCIHYVFN6nFtLUd0ZwZ2q9KqYyLzM+PWdTGIRb7yYo2NEvAiAlFrb0WM8T+Ivgj14sODhQl7UojCGeYYcHo3z+o/9BrA==",
+      "date": "2026-11-10",
+      "notes": "First OTA test"
+    }
+  ]
 }
