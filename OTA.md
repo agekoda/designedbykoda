@@ -25,7 +25,16 @@ The one thing this can't save you from is a version that *works* (it checks in f
 3. **Run the migration:** `npx wrangler d1 execute eink-calendar-db --remote --file=schema-ota.sql`.
 4. **Put your own calendar on beta:** `npx wrangler d1 execute eink-calendar-db --remote --command="UPDATE devices SET fw_channel='beta' WHERE id='<your device id>'"`.
 
-## Every release
+## The easy way: firmware.bat
+Double-click `firmware.bat` in the repo folder. It pulls the latest, shows what each channel runs and the last 5 versions, and then lets you:
+- **release a new version:** pick the exported `main_partial.ino.bin`, the version number (it suggests the next one) and the notes, then beta or everyone, and automatic or Update now only
+- **send the beta version to everyone**
+- **emergency revert**
+- **list all versions**
+
+It commits, pushes and waits for the deploy. It remembers where your .bin is. The steps below are what it does for you.
+
+## Every release (by hand)
 1. Bump `FW_VERSION` in the sketch (PATCH, MINOR or MAJOR, as the comment says), then Sketch > Export Compiled Binary.
 2. Add the build: `node scripts/firmware-release.mjs add build/esp32.esp32.XIAO_ESP32C3/main_partial.ino.bin --version 1.0.1 --notes "What changed"`.
     - It refuses wrong files.
