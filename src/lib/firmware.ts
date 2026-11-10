@@ -59,9 +59,10 @@ export function offerHeaders(o: Offer | null, origin: string): Record<string, st
 	};
 }
 
-// For the dashboard: is there a version this calendar could move to?
+// For the dashboard: is there a NEWER version this calendar could move to? A revert to an
+// older one isn't shown: it installs by itself on the next wake, without anyone clicking.
 export function availableFor(fw: string | null, channel: Channel): Release | null {
 	if (!canUpdate(fw)) return null;
 	const t = targetFor(channel);
-	return t && t.version !== fw ? t : null;
+	return t && compareVersions(t.version, fw!) > 0 ? t : null;
 }
