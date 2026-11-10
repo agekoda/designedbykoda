@@ -15,8 +15,9 @@ import { createHash, createPrivateKey, createPublicKey, sign, verify } from 'nod
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url)); // works on Windows too
 const DATA = join(ROOT, 'src/data/firmware-releases.json');
 const KEY = process.env.FIRMWARE_KEY || join(homedir(), '.designedbykoda/firmware-signing-key.pem');
 const MARKER = 'DBK-EINK-OTA-1';
