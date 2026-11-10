@@ -197,6 +197,7 @@ if (!userId) return Astro.redirect('/setup');
 
 				<div class="dev-foot">
 					${paired ? `<span class="muted small paired">Paired ${paired}</span>` : ''}
+					${d.firmware ? `<span class="muted small paired">Firmware ${esc(d.firmware)}</span>` : ''}
 					<button type="button" class="link copy-link" data-copy hidden>Copy settings to…</button>
 					<span data-foot><button type="button" class="link danger-link" data-unpair>Unpair this device</button></span>
 				</div>

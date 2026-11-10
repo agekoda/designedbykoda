@@ -465,6 +465,15 @@ export async function GET({ params, request, locals }) {
 		} catch {} // columns come from schema-display.sql; fall back below if not run yet
 	}
 	if (!seenSaved) await db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(now, deviceId).run();
+	// Firmware version (schema-firmware.sql): "1.0.0" style from 1.0 on. Test builds sent a
+	// bare number (fw=7, fw=8), kept as "build 8". Written only when it changes.
+	const fwRaw = reqUrl.searchParams.get('fw') ?? '';
+	const fw = /^\d{1,3}\.\d{1,3}(\.\d{1,3})?$/.test(fwRaw) ? fwRaw : /^\d{1,4}$/.test(fwRaw) ? 'build ' + fwRaw : null;
+	if (fw) {
+		try {
+			await db.prepare('UPDATE devices SET firmware = ? WHERE id = ? AND (firmware IS NULL OR firmware <> ?)').bind(fw, deviceId, fw).run();
+		} catch {}
+	}
 	// Battery life from real use (schema-screens.sql): remember the voltage and time just after a
 	// charge, so the dashboard can work out how fast this calendar actually drains.
 	if (vbat !== null) {
