@@ -142,7 +142,13 @@ async function newVersion() {
 
 	// Suggest the version written inside the binary, if one newer than the latest is there.
 	const bin = readFileSync(file);
-	const found = [...new Set([...bin.toString('latin1').matchAll(/\0(\d{1,3}\.\d{1,3}\.\d{1,3})\0/g)].map((m) => m[1]))].filter((v) => cmp(v, latest) > 0);
+	// The file also holds other version numbers (the ESP32 core's, like 3.3.11), so only a
+	// number close after the latest release counts: same major, at most one minor step up.
+	const [lM, lm] = latest.split('.').map(Number);
+	const found = [...new Set([...bin.toString('latin1').matchAll(/\0(\d{1,3}\.\d{1,3}\.\d{1,3})\0/g)].map((m) => m[1]))].filter((v) => {
+		const [M, m] = v.split('.').map(Number);
+		return cmp(v, latest) > 0 && M === lM && m <= lm + 1;
+	});
 	const suggest = found.length === 1 ? found[0] : bump(latest);
 	if (found.length === 1) console.log(`  The file says it's version ${found[0]}.`);
 	let version;
