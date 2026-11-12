@@ -36,9 +36,9 @@ const signIn = '/api/auth/google/start?return=' + encodeURIComponent('/d/' + tok
 			share ? (
 				<>
 					<div class="intro">
-						<p class="kicker">E-Ink Calendar · Shared design</p>
+						<p class="kicker"><a href="/projects/eink-calendar/">E-Ink Calendar</a> · Shared design</p>
 						<h1>{share.name}</h1>
-						<p class="sub">Someone shared this screen design with you. The events and weather are examples; on your calendar it shows yours.</p>
+						<p class="sub">Someone shared this screen design with you.</p>
 					</div>
 					<div class="preview">
 						<canvas id="screen" width="675" height="506" aria-label={`Preview of the design ${share.name}`} />
@@ -62,7 +62,7 @@ const signIn = '/api/auth/google/start?return=' + encodeURIComponent('/d/' + tok
 								)}
 								{devices.length === 1 && <input type="hidden" id="dev" value={devices[0].id} />}
 								<button type="button" class="go" id="use">Add to my designs</button>
-								<p class="hint">It's added as a copy you can change. Your calendar keeps showing its current screen until you pick this one.</p>
+								<p class="hint">It's added as a copy you can change.</p>
 							</>
 						)}
 						{signedIn && devices.length === 0 && (
@@ -109,10 +109,13 @@ const signIn = '/api/auth/google/start?return=' + encodeURIComponent('/d/' + tok
 				pending = false;
 				try {
 					const r = await renderPreview({ style: 'custom', custom: share.layout, font: share.font, dark, hasWeather: true, vbat: 3.95 });
+					// fill the column at any screen size or zoom: draw a little bigger, let the browser fit it
 					const dpr = window.devicePixelRatio || 1;
-					const k = Math.max(1, Math.floor(((canvas.parentElement as HTMLElement).clientWidth * dpr) / 675));
+					// as wide as the column, but short enough that the Light/Dark switch stays on screen
+					const avail = Math.floor(Math.min((canvas.parentElement as HTMLElement).clientWidth, Math.max(300, (window.innerHeight - 250) * (675 / 506))));
+					const k = Math.max(1, Math.ceil((avail * dpr) / 675));
 					paintScreen(canvas, r.px, { mode: 'device', scale: k });
-					canvas.style.width = canvas.width / dpr + 'px';
+					canvas.style.width = avail + 'px';
 				} catch {}
 			});
 		};
@@ -149,12 +152,15 @@ const signIn = '/api/auth/google/start?return=' + encodeURIComponent('/d/' + tok
 
 <style>
 	.dshare { max-width: 520px; margin: 0 auto; padding: 0.5em 0 3em; }
+	/* desktop: the design fills the left of the screen, the name and button sit in a column on the right */
 	@media (min-width: 900px) {
-		.dshare { max-width: 1040px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); grid-template-areas: 'preview intro' 'preview act'; column-gap: 3.5em; align-content: start; padding-top: 1.5em; }
+		.dshare { position: relative; left: 50%; transform: translateX(-50%); width: calc(100vw - 4em); max-width: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); grid-template-rows: 1fr auto auto 1fr; grid-template-areas: 'preview .' 'preview intro' 'preview act' 'preview .'; column-gap: 3em; padding-top: 1em; }
 		.intro { grid-area: intro; }
 		.preview { grid-area: preview; }
 		.act { grid-area: act; }
 	}
+	.kicker a { color: inherit; text-decoration: none; }
+	.kicker a:hover { text-decoration: underline; text-underline-offset: 3px; }
 	.kicker { margin: 0; font-size: 0.75em; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
 	h1 { font-size: clamp(1.7em, 7vw, 2.3em); line-height: 1.1; margin: 0.2em 0 0.3em; overflow-wrap: anywhere; }
 	.sub { color: var(--muted); margin: 0 0 1.4em; }

@@ -581,4 +581,8 @@ html.has-custom-cursor .dd, html.has-custom-cursor .dd *, html.has-custom-cursor
 .dz-share .dz-link .x-dlg-field { flex: 1; min-width: 0; margin: 0; }
 .dz-share .x-dlg-text { margin: 0; font-size: 0.9em; color: var(--muted); }
 .dz-copy { flex: none; padding: 0.6em 1.1em; border: 1px solid var(--border); border-radius: 999px; background: var(--fg); color: var(--bg); font: inherit; font-size: 0.85em; font-weight: 700; cursor: pointer; }
-.dz-share .dz-acts a.link { color: var(--muted); }
+.dz-btns { display: flex; gap: 0.5em; margin-top: 0.9em; }
+.dz-btn { display: inline-block; padding: 0.5em 1em; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--fg); font: inherit; font-size: 0.85em; font-weight: 600; text-decoration: none; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.dz-btn:hover { border-color: var(--muted); background: var(--bg); }
+.dz-btn.danger { color: #e08a8a; }
+.dz-btn.danger:hover { border-color: #e08a8a; }

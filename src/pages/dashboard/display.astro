@@ -603,11 +603,13 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			const r = await renderPreview({ ...common, style: renderId(fs()), ...extras(fs(), false), refreshSec: fs() === 'timeline' ? st.refreshSec : 86400 });
 			paintScreen($<HTMLCanvasElement>('cur-thumb'), r.px, { mode: 'screen', scale: 1 });
 			const dpr = window.devicePixelRatio || 1;
-			// whole-number panel pixels (each dot = k x k real screen pixels) so the dithering stays crisp
-			const avail = (screen.parentElement as HTMLElement).clientWidth * dpr;
-			const k = Math.max(1, Math.floor(avail / 675));
+			// Fill the column whatever the screen size or zoom: draw at the next whole-number scale up
+			// (each dot = k x k pixels, so the dithering stays crisp) and let the browser shrink it to fit.
+			// as wide as the column, but never taller than the window (leave room for the header and the battery line)
+			const availCss = Math.floor(Math.min((screen.parentElement as HTMLElement).clientWidth, Math.max(320, (window.innerHeight - 280) * (675 / 506))));
+			const k = Math.max(1, Math.ceil((availCss * dpr) / 675));
 			paintScreen(screen, r.px, { mode: 'device', scale: k });
-			screen.style.width = screen.width / dpr + 'px';
+			screen.style.width = availCss + 'px';
 			if (thumbsDirty) {
 				thumbsDirty = false;
 				for (const s of styles) {
@@ -946,8 +948,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const shareId = isDesign(fs()) ? fs().slice(7) : null;
 		const shareBtn = $<HTMLButtonElement>('design-share');
 		shareBtn.hidden = !shareId || !designs?.some((x) => x.id === shareId);
-		shareBtn.textContent = shareId && shares[shareId] ? 'Shared link' : 'Share';
-		$('design-hint').textContent = shareId && shares[shareId] ? 'Opens it in the layout builder. Anyone with the shared link can copy it.' : 'Opens it in the layout builder.';
+
 		// nothing to set up for this screen? say so, rather than leave an empty box
 		const detailsEl = $('details');
 		detailsEl.classList.toggle('empty', [...detailsEl.children].every((c) => (c as HTMLElement).hidden));
@@ -1134,9 +1135,6 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			delete shares[id];
 			flash('Stopped sharing. The link no longer works.');
 		}
-		const b = $<HTMLButtonElement>('design-share');
-		b.textContent = shares[id] ? 'Shared link' : 'Share';
-		$('design-hint').textContent = shares[id] ? 'Opens it in the layout builder. Anyone with the shared link can copy it.' : 'Opens it in the layout builder.';
 	});
 
 	// ---------------------------------------------------------------- schedule
@@ -1685,7 +1683,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		.cust #cur-thumb { width: 84px; }
 		.cust #change-screen { grid-column: 1 / -1; }
 	}
-	.cust { position: relative; left: 50%; width: min(1400px, 100vw - 3em); transform: translateX(-50%); margin-top: -1.8em; padding: 0.6em 0 3em; }
+	.cust { position: relative; left: 50%; width: calc(100vw - 3em); transform: translateX(-50%); margin-top: -1.8em; padding: 0.6em 0 3em; }
 	.cust .muted { color: var(--muted); margin: 0; }
 	.cust .small { font-size: 0.9em; }
 	.cust .banner { background: rgba(217, 164, 65, 0.12); border: 1px solid #d9a441; color: var(--fg); border-radius: 12px; padding: 0.8em 1em; margin: 0 0 1.2em; font-size: 0.92em; }
@@ -1702,10 +1700,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .save-msg.is-error { color: #e08a8a; }
 
 	/* the stage: the preview never changes size, whatever the layout */
-	.cust .stage { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 2em; align-items: start; }
+	.cust .stage { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 2em; align-items: start; }
 	.cust .left { position: sticky; top: 5.4em; }
 	.cust .screen-wrap { border-radius: 14px; overflow: hidden; background: transparent; }
-	.cust #screen { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+	.cust #screen { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 14px; }
 
 	.cust .tabs { display: flex; gap: 0.3em; padding: 4px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 999px; width: fit-content; max-width: 100%; margin-bottom: 1.2em; overflow-x: auto; }
 	.cust .tab { background: none; border: none; font: inherit; font-weight: 700; font-size: 0.95em; color: var(--muted); padding: 0.55em 1.3em; border-radius: 999px; transition: background 0.2s, color 0.2s; white-space: nowrap; }
