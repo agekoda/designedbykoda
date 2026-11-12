@@ -1,7 +1,9 @@
 // Agenda: today's date and weather on the left, a mini month on the right,
 // then the next events grouped by day underneath.
 import { deg } from '../units';
-import { Draw } from '../draw';
+import { Draw, PAPER } from '../draw';
+import { fontId } from '../fonts';
+import { VMETRICS } from '../vmetrics';
 import { CORNER, fitBits } from '../image';
 import { firstThatFits, measure } from '../measure';
 import { batteryIcon } from '../batteryIcon';
@@ -37,9 +39,15 @@ export function agenda(ctx: LayoutCtx): string {
 	} else {
 		// ---- mini month ----
 		const cellW = 27;
-		const cellH = 21;
 		const startX = 400 - 7 * cellW - 5;
 		const miniY = 7;
+		// Months that start late in the week need a sixth row of dates (like November 2026,
+		// whose 30th falls on a Monday): squash the rows a little so every date still fits
+		// above the line across the screen.
+		const firstWday0 = (((now.wday - (now.mday - 1)) % 7) + 7) % 7;
+		const sixRows = Math.ceil((((firstWday0 + 6) % 7) + daysInMonth(now.year, now.mon)) / 7) > 5;
+		const cellH = sixRows ? 18 : 21;
+		const firstRowY = miniY + (sixRows ? 43 : 45);
 		d.text(startX + Math.floor((7 * cellW) / 2), miniY + 5, 's', monthShort(now), { align: 'rawC' });
 		weekLetters().forEach((l, i) => d.text(startX + i * cellW + Math.floor(cellW / 2) - (isJa() ? 8 : 4), miniY + 28, 's', l));
 
@@ -50,10 +58,28 @@ export function agenda(ctx: LayoutCtx): string {
 			const col = (day + offset - 1) % 7;
 			const row = Math.floor((day + offset - 1) / 7);
 			const x = startX + col * cellW;
-			const y = miniY + 45 + row * cellH;
-			if (y > miniY + 145) break;
+			const y = firstRowY + row * cellH;
+			if (y > 140) break;
 			const cx = x + (day < 10 ? Math.floor(cellW / 2) - 4 : Math.floor(cellW / 2) - 7);
-			d.text(cx, y, 's', String(day), day === now.mday ? { ring: true } : {});
+			if (day === now.mday && sixRows) {
+				// The standard circle is too tall for 18 px rows, so draw it as an oval: the same
+				// width as the circle, squashed to fit the row height.
+				const b = measure(ctx.family, 's', String(day));
+				const cap = (VMETRICS[fontId(ctx.family, 's')] ?? VMETRICS[fontId('sans', 's')] ?? [12, 12])[1];
+				const rx = Math.floor(Math.max(b.w, cap) / 2) + 3;
+				const ry = Math.min(rx, Math.floor((cellH + 1) / 2));
+				const ox = cx + b.x1 + Math.floor(b.w / 2);
+				const oy = y - Math.floor(cap / 2);
+				const W = rx * 2 + 1, Hh = ry * 2 + 1, stride = (W + 7) >> 3;
+				const bits = new Uint8Array(stride * Hh);
+				for (let yy = 0; yy < Hh; yy++)
+					for (let xx = 0; xx < W; xx++) {
+						const dx = (xx - rx) / (rx + 0.5), dy = (yy - ry) / (ry + 0.5);
+						if (dx * dx + dy * dy <= 1) bits[yy * stride + (xx >> 3)] |= 0x80 >> (xx & 7);
+					}
+				d.bitmapBytes(ox - rx, oy - ry, W, Hh, bits);
+				d.text(cx, y, 's', String(day), { color: PAPER });
+			} else d.text(cx, y, 's', String(day), day === now.mday ? { ring: true } : {});
 		}
 	}
 
