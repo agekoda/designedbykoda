@@ -1,0 +1,176 @@
+---
+// The page a shared design link opens: a preview of someone's layout-builder design (with
+// made-up events and weather), and a button to copy it onto your own calendar.
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+import { getShareByToken } from '../../lib/designShare';
+
+const token = Astro.params.token ?? '';
+const db = Astro.locals.runtime?.env?.DB;
+const share = db ? await getShareByToken(db, token) : null;
+
+// Who's looking: signed out, signed in without a calendar, or signed in with calendars.
+let signedIn = false;
+let devices: { id: string; name: string }[] = [];
+if (share && db) {
+	try {
+		const { getSessionUserId } = await import('../../lib/session');
+		const userId = await getSessionUserId(Astro.request, db);
+		if (userId) {
+			signedIn = true;
+			const r = await db.prepare('SELECT id, name FROM devices WHERE user_id = ? ORDER BY paired_at').bind(userId).all().catch(() => db.prepare('SELECT id, name FROM devices WHERE user_id = ?').bind(userId).all());
+			devices = (r.results ?? []).map((d: any) => ({ id: d.id, name: d.name || 'E-Ink Calendar' }));
+		}
+	} catch {}
+}
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+Astro.response.headers.set('Referrer-Policy', 'no-referrer');
+if (!share) Astro.response.status = 404;
+const data = share ? JSON.stringify({ token, layout: share.layout, font: share.font }) : '';
+const signIn = '/api/auth/google/start?return=' + encodeURIComponent('/d/' + token);
+---
+
+<Layout title={share ? `${share.name}: a design for the E-Ink Calendar` : 'Link not found'} description="A screen design for the E-Ink Calendar. Copy it onto your own calendar." noindex>
+	<div class="dshare">
+		{
+			share ? (
+				<>
+					<div class="intro">
+						<p class="kicker">E-Ink Calendar · Shared design</p>
+						<h1>{share.name}</h1>
+						<p class="sub">Someone shared this screen design with you. The events and weather are examples; on your calendar it shows yours.</p>
+					</div>
+					<div class="preview">
+						<canvas id="screen" width="675" height="506" aria-label={`Preview of the design ${share.name}`} />
+						<div class="seg" role="group" aria-label="Preview colours">
+							<button type="button" class="on" data-dark="0">Light</button>
+							<button type="button" data-dark="1">Dark</button>
+						</div>
+					</div>
+					<div class="act">
+						{signedIn && devices.length > 0 && (
+							<>
+								{devices.length > 1 && (
+									<label class="fld">
+										<span class="lab">Add it to</span>
+										<select id="dev">
+											{devices.map((d) => (
+												<option value={d.id}>{d.name}</option>
+											))}
+										</select>
+									</label>
+								)}
+								{devices.length === 1 && <input type="hidden" id="dev" value={devices[0].id} />}
+								<button type="button" class="go" id="use">Add to my designs</button>
+								<p class="hint">It's added as a copy you can change. Your calendar keeps showing its current screen until you pick this one.</p>
+							</>
+						)}
+						{signedIn && devices.length === 0 && (
+							<>
+								<a class="go" href="/setup">Pair your calendar first</a>
+								<p class="hint">Once it's paired, come back to this link to add the design.</p>
+							</>
+						)}
+						{!signedIn && (
+							<>
+								<a class="go" href={signIn}>Sign in to use this design</a>
+								<p class="hint">You'll come straight back here afterwards.</p>
+							</>
+						)}
+						<p class="note" id="note" aria-live="polite" />
+						<p class="foot">
+							Don't have one? <a href="/projects/eink-calendar/">See the E-Ink Calendar</a>
+						</p>
+					</div>
+					<script type="application/json" id="share-data" set:html={data} />
+				</>
+			) : (
+				<div class="intro">
+					<h1>This link doesn't work</h1>
+					<p class="sub">Whoever shared it may have stopped sharing the design. Ask them for a new link.</p>
+				</div>
+			)
+		}
+	</div>
+</Layout>
+
+<script>
+	import { renderPreview, paintScreen } from '../../lib/eink/previewKit';
+	const raw = document.getElementById('share-data')?.textContent;
+	if (raw) {
+		const share = JSON.parse(raw);
+		const canvas = document.getElementById('screen') as HTMLCanvasElement;
+		let dark = false;
+		let pending = false;
+		const draw = () => {
+			if (pending) return;
+			pending = true;
+			requestAnimationFrame(async () => {
+				pending = false;
+				try {
+					const r = await renderPreview({ style: 'custom', custom: share.layout, font: share.font, dark, hasWeather: true, vbat: 3.95 });
+					const dpr = window.devicePixelRatio || 1;
+					const k = Math.max(1, Math.floor(((canvas.parentElement as HTMLElement).clientWidth * dpr) / 675));
+					paintScreen(canvas, r.px, { mode: 'device', scale: k });
+					canvas.style.width = canvas.width / dpr + 'px';
+				} catch {}
+			});
+		};
+		draw();
+		addEventListener('resize', draw);
+		document.querySelectorAll<HTMLButtonElement>('.seg button').forEach((b) =>
+			b.addEventListener('click', () => {
+				dark = b.dataset.dark === '1';
+				document.querySelectorAll('.seg button').forEach((x) => x.classList.toggle('on', x === b));
+				draw();
+			})
+		);
+
+		const use = document.getElementById('use') as HTMLButtonElement | null;
+		const note = document.getElementById('note')!;
+		use?.addEventListener('click', async () => {
+			const deviceId = (document.getElementById('dev') as HTMLInputElement | HTMLSelectElement).value;
+			use.disabled = true;
+			note.textContent = 'Adding…';
+			note.className = 'note';
+			try {
+				const r = await fetch('/api/designs/copy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: share.token, deviceId }) });
+				const d = await r.json().catch(() => ({}));
+				if (!r.ok || !d.designId) throw new Error(d.error || 'Couldn’t add it. Try again.');
+				location.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId) + '&design=' + encodeURIComponent(d.designId) + '&added=1';
+			} catch (err: any) {
+				note.textContent = err.message;
+				note.className = 'note err';
+				use.disabled = false;
+			}
+		});
+	}
+</script>
+
+<style>
+	.dshare { max-width: 520px; margin: 0 auto; padding: 0.5em 0 3em; }
+	@media (min-width: 900px) {
+		.dshare { max-width: 1040px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); grid-template-areas: 'preview intro' 'preview act'; column-gap: 3.5em; align-content: start; padding-top: 1.5em; }
+		.intro { grid-area: intro; }
+		.preview { grid-area: preview; }
+		.act { grid-area: act; }
+	}
+	.kicker { margin: 0; font-size: 0.75em; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+	h1 { font-size: clamp(1.7em, 7vw, 2.3em); line-height: 1.1; margin: 0.2em 0 0.3em; overflow-wrap: anywhere; }
+	.sub { color: var(--muted); margin: 0 0 1.4em; }
+	.preview { margin-bottom: 1.6em; }
+	.preview canvas { display: block; max-width: 100%; height: auto; border-radius: 14px; margin: 0 auto; }
+	.seg { display: flex; gap: 4px; width: max-content; margin: 0.8em auto 0; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 999px; padding: 3px; }
+	.seg button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 0.85em; font-weight: 600; padding: 0.35em 1em; border-radius: 999px; cursor: pointer; }
+	.seg button.on { background: var(--fg); color: var(--bg); }
+	.fld { display: block; margin-bottom: 1em; }
+	.lab { display: block; font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.45em; }
+	select { width: 100%; background: var(--bg-raised); color: var(--fg); border: 1px solid var(--border); border-radius: 14px; padding: 0.75em 0.9em; font: inherit; }
+	.go { display: block; width: 100%; box-sizing: border-box; padding: 0.9em; border: none; border-radius: 999px; background: var(--fg); color: var(--bg); font: inherit; font-weight: 800; font-size: 1.05em; text-align: center; text-decoration: none; cursor: pointer; }
+	.go:disabled { opacity: 0.5; }
+	.hint { margin: 0.8em 0 0; font-size: 0.85em; color: var(--muted); text-align: center; }
+	.note { min-height: 1.4em; margin: 0.6em 0 0; text-align: center; color: var(--muted); }
+	.note.err { color: #e08a8a; }
+	.foot { margin-top: 2em; text-align: center; font-size: 0.85em; color: var(--muted-dim); }
+	.foot a { color: inherit; }
+</style>

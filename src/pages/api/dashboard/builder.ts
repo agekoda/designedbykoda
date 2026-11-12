@@ -5,6 +5,7 @@ import { sanitizeReminders } from '../../../lib/eink/reminders';
 import { cleanSettings } from '../../../lib/eink/image';
 import { MAX_JSON, sanitizeLayout } from '../../../lib/eink/builder/model';
 import { markSaved } from '../../../lib/screens';
+import { refreshShare, shareDesign, sharesForDevice, stopSharing } from '../../../lib/designShare';
 import { cleanName, designIdOf, designStyle, getDesign, listDesigns, MAX_DESIGNS, newDesignId } from '../../../lib/designs';
 import { isStyleId } from '../../../data/calendarStyles';
 import { sanitizeSchedule } from '../../../lib/eink/schedule';
@@ -134,6 +135,7 @@ export async function GET({ request, locals }: any) {
 		tasksGranted,
 		devices,
 		designs: designs ? designs.map((d) => ({ id: d.id, name: d.name })) : null,
+		shares: designs ? await sharesForDevice(db, deviceId) : {},
 		designId,
 		designName,
 		onScreen: designIdOf(dev.calendar_style),
@@ -158,12 +160,32 @@ export async function POST({ request, locals }: any) {
 	const now = Math.floor(Date.now() / 1000);
 	const designs = await listDesigns(db, deviceId);
 
+	// Share a design (a link anyone can open to copy it), or stop sharing it.
+	if (body.action === 'share') {
+		if (!designs) return json({ error: 'Not available yet.' }, 400);
+		const d = designs.find((x) => x.id === String(body.designId ?? ''));
+		if (!d) return json({ error: 'Save the design first.' }, 404);
+		if (body.stop === true) {
+			await stopSharing(db, d.id);
+			return json({ ok: true, token: null });
+		}
+		let font: string | null = null;
+		try {
+			const f = await db.prepare('SELECT layout_font FROM devices WHERE id = ?').bind(deviceId).first();
+			font = isFamily(f?.layout_font) ? f.layout_font : null;
+		} catch {}
+		const token = await shareDesign(db, deviceId, d.id, d.name, d.layout, font);
+		if (!token) return json({ error: 'Sharing isn\'t set up yet (schema-shared-designs.sql).' }, 500);
+		return json({ ok: true, token });
+	}
+
 	// Delete a design. If the screen (or the schedule) used it, those go back to the Agenda.
 	if (body.action === 'delete') {
 		if (!designs) return json({ error: 'Not available yet.' }, 400);
 		const id = String(body.designId ?? '');
 		if (!designs.some((d) => d.id === id)) return json({ error: 'Design not found.' }, 404);
 		await db.prepare('DELETE FROM designs WHERE id = ? AND device_id = ?').bind(id, deviceId).run();
+		await stopSharing(db, id);
 		const style = designStyle(id);
 		if (o.dev.calendar_style === style) await db.prepare("UPDATE devices SET calendar_style = 'agenda' WHERE id = ?").bind(deviceId).run();
 		try {
@@ -191,6 +213,15 @@ export async function POST({ request, locals }: any) {
 		if (existing) {
 			await db.prepare('UPDATE designs SET name = ?, layout = ?, updated_at = ? WHERE id = ? AND device_id = ?').bind(name, text, now, existing, deviceId).run();
 			savedId = existing;
+			// a shared design's link always shows the latest saved version
+			let font: string | null = body.font !== undefined ? body.font : null;
+			if (body.font === undefined) {
+				try {
+					const f = await db.prepare('SELECT layout_font FROM devices WHERE id = ?').bind(deviceId).first();
+					font = isFamily(f?.layout_font) ? f.layout_font : null;
+				} catch {}
+			}
+			await refreshShare(db, existing, name, layout, font);
 		} else {
 			if (designs.length >= MAX_DESIGNS) return json({ error: `You can keep up to ${MAX_DESIGNS} designs. Delete one first.` }, 400);
 			savedId = newDesignId();

@@ -40,6 +40,7 @@ export async function releaseDevice(db: any, deviceId: string, userId: string): 
 		'UPDATE devices SET msg_token = NULL, msg_cfg = NULL WHERE id = ?', // the shared message link stops working
 		'DELETE FROM messages WHERE device_id = ?',
 		'DELETE FROM designs WHERE device_id = ?',
+		'DELETE FROM shared_designs WHERE device_id = ?', // shared design links stop working
 		'DELETE FROM battery_log WHERE device_id = ?',
 		'UPDATE devices SET battery_anchor_mv = NULL, battery_anchor_at = NULL WHERE id = ?',
 	]) {

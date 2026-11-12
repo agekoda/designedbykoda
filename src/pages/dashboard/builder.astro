@@ -101,6 +101,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { bytesToB64, decodePic, encodePic, DEFAULT_IMAGE_SETTINGS, DITHERS, ditherGray, packBits, type ImageSettings } from '../../lib/eink/image';
 	import { dropdown, type Dropdown } from '../../lib/dropdown';
 	import { ask, closeDialog } from '../../lib/dialog';
+	import { shareDialog as shareDesignDialog } from '../../lib/shareDialog';
 
 	const root = document.querySelector('.bld') as HTMLElement;
 	// Move to <body> so nothing in the page wrapper (animations, transforms) can interfere with covering the window.
@@ -162,6 +163,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	let designName = '';
 	let designList: { id: string; name: string }[] = [];
 	let onScreen: string | null = null; // the design id on the calendar now
+	let shares: Record<string, string> = {}; // design id -> shared link token
 	const key = () => JSON.stringify({ l: layout, f: font, d: dark, n: designName });
 	const ser = () => JSON.stringify(layout);
 	const find = (id: string | null) => layout.widgets.find((w) => w.id === id) ?? null;
@@ -1348,6 +1350,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		layout = sanitizeLayout(d.custom);
 		designsOn = Array.isArray(d.designs);
 		designList = d.designs ?? [];
+		shares = d.shares ?? {};
 		designId = d.designId ?? null;
 		designName = d.designName || (designsOn ? (designList.length ? 'New design' : 'My design') : '');
 		onScreen = d.onScreen ?? null;
@@ -1379,6 +1382,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		hi = 0;
 		savedKey = key();
 		if (designsOn) $('title').textContent = d.name || 'Layout builder';
+		// arrived from a shared design link: say what happened, and tidy the address
+		if (new URLSearchParams(location.search).get('added') === '1') {
+			flash(`Added "${designName}" to your designs. Change anything you like, then Save and leave to put it on the calendar.`);
+			history.replaceState(null, '', location.pathname + '?device=' + encodeURIComponent(deviceId) + (designId ? '&design=' + designId : ''));
+		}
 		// "Edit the layout in the builder" on Customize display: start from that layout, filled in,
 		// as an unsaved change (so Undo goes back to the saved design, and nothing changes until Save).
 		if (new URLSearchParams(location.search).get('seed') === '1') {
@@ -1476,7 +1484,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	$('design-edit').addEventListener('click', async () => {
 		const body = document.createElement('div');
 		body.className = 'dz-edit';
-		body.innerHTML = `<input class="x-dlg-field" maxlength="30" aria-label="Name" spellcheck="false" /><div class="dz-acts">${designId ? '<button type="button" class="link" data-act="dup">Duplicate</button><button type="button" class="link danger" data-act="del">Delete</button>' : ''}</div>`;
+		body.innerHTML = `<input class="x-dlg-field" maxlength="30" aria-label="Name" spellcheck="false" /><div class="dz-acts">${designId ? `<button type="button" class="link" data-act="share">${shares[designId] ? 'Shared link' : 'Share'}</button><button type="button" class="link" data-act="dup">Duplicate</button><button type="button" class="link danger" data-act="del">Delete</button>` : ''}</div>`;
 		const inp = body.querySelector('input')!;
 		inp.value = designName;
 		let act = '';
@@ -1488,6 +1496,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		});
 		setTimeout(() => (inp.focus(), inp.select()), 30);
 		const ok = await ask('Name', { title: 'This design', ok: 'Done', body });
+		if (act === 'share') return shareDialog();
 		if (act === 'dup') return duplicateDesign();
 		if (act === 'del') return deleteDesign();
 		if (!ok) return;
@@ -1512,6 +1521,19 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		}
 		openDesign(to === '__new' ? 'new' : to);
 	});
+	// Share: a link anyone can open to see this design and copy it onto their own calendar.
+	const hasWifi = () => layout.widgets.some((w) => w.t === 'qr' && w.o.mode === 'wifi' && (w.o.ssid || w.o.pass));
+	async function shareDialog() {
+		if (!designId) return flash('Save the design first, then share it.', true);
+		const id = designId;
+		const t = await shareDesignDialog({ deviceId, designId: id, name: designName, token: shares[id] ?? null, hasWifi: hasWifi(), dirtyNote: isDirty(), onError: (m) => flash(m, true) });
+		if (t === undefined) return;
+		if (t) shares[id] = t;
+		else {
+			delete shares[id];
+			flash('Stopped sharing. The link no longer works.');
+		}
+	}
 	function duplicateDesign() {
 		// the same widgets as a new, unsaved design
 		designId = null;
