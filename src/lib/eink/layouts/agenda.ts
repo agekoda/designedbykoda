@@ -1,7 +1,9 @@
 // Agenda: today's date and weather on the left, a mini month on the right,
 // then the next events grouped by day underneath.
 import { deg } from '../units';
-import { Draw } from '../draw';
+import { Draw, PAPER } from '../draw';
+import { fontId } from '../fonts';
+import { VMETRICS } from '../vmetrics';
 import { CORNER, fitBits } from '../image';
 import { firstThatFits, measure } from '../measure';
 import { batteryIcon } from '../batteryIcon';
@@ -59,7 +61,14 @@ export function agenda(ctx: LayoutCtx): string {
 			const y = firstRowY + row * cellH;
 			if (y > 140) break;
 			const cx = x + (day < 10 ? Math.floor(cellW / 2) - 4 : Math.floor(cellW / 2) - 7);
-			d.text(cx, y, 's', String(day), day === now.mday ? { ring: true } : {});
+			if (day === now.mday && sixRows) {
+				// The standard ring is too big for 18 px rows, so draw a smaller disc here.
+				const b = measure(ctx.family, 's', String(day));
+				const cap = (VMETRICS[fontId(ctx.family, 's')] ?? VMETRICS[fontId('sans', 's')] ?? [12, 12])[1];
+				const r = Math.min(10, Math.floor(Math.max(b.w, cap) / 2) + 2);
+				d.disc(cx + b.x1 + Math.floor(b.w / 2), y - Math.floor(cap / 2), r);
+				d.text(cx, y, 's', String(day), { color: PAPER });
+			} else d.text(cx, y, 's', String(day), day === now.mday ? { ring: true } : {});
 		}
 	}
 
