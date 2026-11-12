@@ -61,7 +61,7 @@ export async function POST({ request, locals, cookies }) {
 	params.set('shipping_options[0][shipping_rate_data][fixed_amount][amount]', String(shippingInMinorUnits));
 	params.set('shipping_options[0][shipping_rate_data][fixed_amount][currency]', currency.toLowerCase());
 	params.set('custom_text[submit][message]', 'ABN 61 261 672 813');
-	params.set('custom_text[shipping_address][message]', 'Preorder: ships by the end of January 2027. Please double-check your address.');
+	params.set('custom_text[shipping_address][message]', 'Preorder: ships by the end of February 2027. Please double-check your address.');
 	params.set('metadata[country]', country);
 	params.set('metadata[currency]', currency);
 	params.set('success_url', `${origin}/preorder/success`);
