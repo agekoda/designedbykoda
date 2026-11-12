@@ -87,9 +87,16 @@ if (cmd === 'add') {
 	if (cmd === 'send' && ch === 'stable' && d.channels.beta.version && cmp(d.channels.beta.version, version) < 0 && !flag('skip-beta'))
 		die(`${version} hasn't been on beta. Send it to beta and test it first (or add --skip-beta if you really mean it).`);
 	d.channels[ch] = { version, auto: cmd === 'revert' ? true : !flag('manual') };
+	// Reverting everyone also reverts beta calendars that are on the same bad version
+	// (or newer), so your own test calendars go back too.
+	let alsoBeta = false;
+	if (cmd === 'revert' && ch === 'stable' && d.channels.beta.version && cmp(d.channels.beta.version, cur) >= 0) {
+		d.channels.beta = { version, auto: true };
+		alsoBeta = true;
+	}
 	if (ch === 'stable' && d.channels.beta.version && cmp(d.channels.beta.version, version) < 0) d.channels.beta = { ...d.channels[ch] };
 	save(d);
-	console.log(`${ch} calendars will now ${cmd === 'revert' ? 'go back to' : 'get'} ${version}${d.channels[ch].auto ? ' on their next wake' : ' when Update now is clicked'}. Commit and deploy.`);
+	console.log(`${ch}${alsoBeta ? ' and beta' : ''} calendars will now ${cmd === 'revert' ? 'go back to' : 'get'} ${version}${d.channels[ch].auto ? ' on their next wake' : ' when Update now is clicked'}. Commit and deploy.`);
 } else if (cmd === 'list') {
 	const d = load();
 	for (const [k, v] of Object.entries(d.channels)) console.log(`${k}: ${v.version ?? '(none)'}${v.version ? (v.auto ? ' (automatic)' : ' (Update now only)') : ''}`);
