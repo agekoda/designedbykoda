@@ -1683,7 +1683,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		.cust #cur-thumb { width: 84px; }
 		.cust #change-screen { grid-column: 1 / -1; }
 	}
-	.cust { position: relative; left: 50%; width: calc(100vw - 3em); transform: translateX(-50%); margin-top: -1.8em; padding: 0.6em 0 3em; }
+	.cust { position: relative; left: 50%; width: min(100vw - 3em, (100vh - 280px) * 1.334 + 560px + 2em); transform: translateX(-50%); margin-top: -1.8em; padding: 0.6em 0 3em; }
 	.cust .muted { color: var(--muted); margin: 0; }
 	.cust .small { font-size: 0.9em; }
 	.cust .banner { background: rgba(217, 164, 65, 0.12); border: 1px solid #d9a441; color: var(--fg); border-radius: 12px; padding: 0.8em 1em; margin: 0 0 1.2em; font-size: 0.92em; }
@@ -1700,7 +1700,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .save-msg.is-error { color: #e08a8a; }
 
 	/* the stage: the preview never changes size, whatever the layout */
-	.cust .stage { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 2em; align-items: start; }
+	.cust .stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, 560px); gap: 2em; align-items: start; }
 	.cust .left { position: sticky; top: 5.4em; }
 	.cust .screen-wrap { border-radius: 14px; overflow: hidden; background: transparent; }
 	.cust #screen { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 14px; }

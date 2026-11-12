@@ -28,7 +28,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				<div class="designs" id="designs" hidden>
 					<select id="design-pick" aria-label="Your designs"></select>
 					<button type="button" class="icon-btn" id="design-edit" title="Rename" aria-label="Rename this design"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z" /><path d="M13.5 6.5l4 4" /></svg></button>
-					<button type="button" class="icon-btn" id="design-dup" title="Duplicate" aria-label="Duplicate this design"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" /></svg></button>
+					<button type="button" class="icon-btn" id="design-dup" title="Duplicate" aria-label="Duplicate this design"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></svg></button>
 					<button type="button" class="icon-btn" id="design-share" title="Share" aria-label="Share this design"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" /><path d="M16 6l-4-4-4 4" /><path d="M12 2v13" /></svg></button>
 					<button type="button" class="icon-btn danger" id="design-del" title="Delete" aria-label="Delete this design"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" /><path d="M9 7V4h6v3" /></svg></button>
 				</div>
@@ -1613,6 +1613,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .icon-btn:hover:not(:disabled) { background: var(--bg); border-color: var(--muted); }
 	.bld .icon-btn:disabled { opacity: 0.35; }
 	.bld .icon-btn.danger { color: #e08a8a; }
+	.bld .designs .icon-btn { width: 2.8em; height: 2.8em; }
+	.bld .designs .icon-btn svg { width: 1.3em; height: 1.3em; }
 	.bld .icon-btn.danger:hover:not(:disabled) { border-color: #e08a8a; }
 	.bld .icon-btn svg { width: 1.1em; height: 1.1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 	.bld .ur { display: flex; gap: 0.3em; margin-right: 0.3em; }

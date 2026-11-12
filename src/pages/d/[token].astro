@@ -112,7 +112,7 @@ const signIn = '/api/auth/google/start?return=' + encodeURIComponent('/d/' + tok
 					// fill the column at any screen size or zoom: draw a little bigger, let the browser fit it
 					const dpr = window.devicePixelRatio || 1;
 					// as wide as the column, but short enough that the Light/Dark switch stays on screen
-					const avail = Math.floor(Math.min((canvas.parentElement as HTMLElement).clientWidth, Math.max(300, (window.innerHeight - 250) * (675 / 506))));
+					const avail = Math.floor(Math.min((canvas.parentElement as HTMLElement).clientWidth, Math.max(300, (window.innerHeight - 360) * (675 / 506))));
 					const k = Math.max(1, Math.ceil((avail * dpr) / 675));
 					paintScreen(canvas, r.px, { mode: 'device', scale: k });
 					canvas.style.width = avail + 'px';
@@ -154,13 +154,12 @@ const signIn = '/api/auth/google/start?return=' + encodeURIComponent('/d/' + tok
 	.dshare { max-width: 520px; margin: 0 auto; padding: 0.5em 0 3em; }
 	/* desktop: the design fills the left of the screen, the name and button sit in a column on the right */
 	@media (min-width: 900px) {
-		.dshare { position: relative; left: 50%; transform: translateX(-50%); width: calc(100vw - 4em); max-width: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); grid-template-rows: 1fr auto auto 1fr; grid-template-areas: 'preview .' 'preview intro' 'preview act' 'preview .'; column-gap: 3em; padding-top: 1em; }
+		.dshare { position: relative; left: 50%; transform: translateX(-50%); width: min(100vw - 4em, 1320px, (100vh - 360px) * 1.334 + 360px + 4em); max-width: none; display: grid; grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: 1fr auto auto 1fr; grid-template-areas: 'preview .' 'preview intro' 'preview act' 'preview .'; column-gap: 4em; padding-top: 1em; }
 		.intro { grid-area: intro; }
 		.preview { grid-area: preview; }
 		.act { grid-area: act; }
 	}
 	.kicker a { color: inherit; text-decoration: none; }
-	.kicker a:hover { text-decoration: underline; text-underline-offset: 3px; }
 	.kicker { margin: 0; font-size: 0.75em; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
 	h1 { font-size: clamp(1.7em, 7vw, 2.3em); line-height: 1.1; margin: 0.2em 0 0.3em; overflow-wrap: anywhere; }
 	.sub { color: var(--muted); margin: 0 0 1.4em; }
