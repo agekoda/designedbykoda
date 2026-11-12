@@ -29,7 +29,7 @@ The one thing this can't save you from is a version that *works* (it checks in f
 Double-click `firmware.bat` in the repo folder. It pulls the latest, shows what each channel runs and the last 5 versions, and then lets you:
 - **release a new version:** pick the exported `main_partial.ino.bin`, the version number (it suggests the next one) and the notes, then beta or everyone, and automatic or Update now only
 - **send the beta version to everyone**
-- **emergency revert**
+- **change version**: move everyone (or only beta) back to an older version in an emergency, or forward again to any version already added
 - **list all versions**
 
 It commits, pushes and waits for the deploy. It remembers where your .bin is. The steps below are what it does for you.
