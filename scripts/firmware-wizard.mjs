@@ -206,7 +206,7 @@ async function revert() {
 	console.log('\nEmergency revert: calendars go back to an older version on their next wake,');
 	console.log('with no link on the dashboard. Release a fixed, newer version afterwards.\n');
 	showChannels(d);
-	const ch = (await ask('Which calendars? 1) everyone  2) beta', '1')) === '2' ? 'beta' : 'stable';
+	const ch = (await ask('Which calendars? 1) everyone (beta too)  2) only beta', '1')) === '2' ? 'beta' : 'stable';
 	const cur = d.channels[ch].version;
 	if (!cur) return console.log('Nothing is on that channel yet.');
 	const older = d.releases.filter((r) => cmp(r.version, cur) < 0).sort((a, b) => cmp(b.version, a.version));
