@@ -64,7 +64,7 @@ export async function POST({ request, locals, cookies }) {
 	params.set('custom_text[shipping_address][message]', 'Preorder: ships by the end of January 2027. Please double-check your address.');
 	params.set('metadata[country]', country);
 	params.set('metadata[currency]', currency);
-	params.set('success_url', `${origin}/preorder/success`);
+	params.set('success_url', `${origin}/preorder/success?order={CHECKOUT_SESSION_ID}`);
 	params.set('cancel_url', `${origin}/preorder/eink-calendar`);
 
 	const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {

@@ -33,6 +33,10 @@ export async function POST({ request, locals }) {
 	for (const d of devices.results ?? []) await releaseDevice(db, d.id, userId);
 
 	await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
+	// Orders are business records and stay, but they're no longer linked to the account.
+	try {
+		await db.prepare('UPDATE orders SET user_id = NULL WHERE user_id = ?').bind(userId).run();
+	} catch {}
 	await db.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
 
 	return new Response(JSON.stringify({ ok: true }), {
