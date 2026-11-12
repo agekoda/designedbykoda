@@ -1,5 +1,22 @@
 ---
+export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
+
+// Stripe sends buyers here with ?order=<checkout id>. Signed in: we link the order to their
+// account so it shows on their dashboard. Signed out: one button to sign in and do that.
+const order = Astro.url.searchParams.get('order') ?? '';
+const valid = /^cs_(test|live)_[A-Za-z0-9]{10,200}$/.test(order);
+let signedIn = false;
+const db = Astro.locals.runtime?.env?.DB;
+if (valid && db) {
+	try {
+		const { getSessionUserId } = await import('../../lib/session');
+		signedIn = !!(await getSessionUserId(Astro.request, db));
+	} catch {}
+}
+Astro.response.headers.set('X-Robots-Tag', 'noindex');
+Astro.response.headers.set('Referrer-Policy', 'no-referrer');
+const signIn = '/api/auth/google/start?return=' + encodeURIComponent('/preorder/success?order=' + order);
 ---
 <Layout title="Preorder confirmed - designedbykoda" description="Your E-Ink Calendar preorder is confirmed.">
 	<div class="success-page">
@@ -8,9 +25,45 @@ import Layout from '../../layouts/Layout.astro';
 			Thanks for preordering the E-Ink Calendar. You'll get an email receipt from Stripe
 			shortly, and I'll be in touch with updates as your order gets closer to shipping.
 		</p>
-		<a class="button" data-magnetic href="/projects/eink-calendar">Back to the project page</a>
+		{valid && signedIn && (
+			<div class="track" id="track" data-order={order}>
+				<p class="t" id="track-text">Adding it to your dashboard…</p>
+				<a class="button" href="/dashboard">Go to your dashboard</a>
+			</div>
+		)}
+		{valid && !signedIn && (
+			<div class="track">
+				<p class="t">Track your order on your dashboard: see when it's being made, when it ships, and its tracking number.</p>
+				<a class="button" href={signIn}>Sign in with Google to track it</a>
+				<p class="small">Use the Google account you'll set your calendar up with.</p>
+			</div>
+		)}
+		<a class={valid ? 'back' : 'button'} href="/projects/eink-calendar">Back to the project page</a>
 	</div>
 </Layout>
+
+<script>
+	const box = document.getElementById('track');
+	if (box) {
+		const text = document.getElementById('track-text')!;
+		const order = box.dataset.order;
+		// Stripe's payment notice can arrive a few seconds after this page loads, so try for a little while.
+		let tries = 0;
+		const go = async () => {
+			try {
+				const r = await fetch('/api/orders/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order }) });
+				const d = await r.json().catch(() => ({}));
+				if (d.found) {
+					text.textContent = d.linked ? 'It’s on your dashboard, where you can follow it until it arrives.' : 'This order is linked to a different account.';
+					return;
+				}
+			} catch {}
+			if (++tries < 10) setTimeout(go, 3000);
+			else text.textContent = 'It’ll show on your dashboard in a few minutes.';
+		};
+		go();
+	}
+</script>
 
 <style>
 	.success-page {
@@ -23,6 +76,21 @@ import Layout from '../../layouts/Layout.astro';
 		color: var(--muted);
 		margin-bottom: 2em;
 	}
+	.track {
+		margin: 0 0 2em;
+		padding: 1.4em 1.4em 1.6em;
+		border: 1px solid var(--border);
+		border-radius: 18px;
+		background: var(--bg-raised);
+	}
+	.track .t {
+		color: var(--fg);
+		margin: 0 0 1.1em;
+	}
+	.track .small {
+		margin: 0.9em 0 0;
+		font-size: 0.85em;
+	}
 	.button {
 		display: inline-block;
 		padding: 0.7em 1.4em;
@@ -31,9 +99,14 @@ import Layout from '../../layouts/Layout.astro';
 		color: var(--bg);
 		font-weight: 700;
 		font-size: 0.95em;
+		text-decoration: none;
 	}
 	.button:hover {
 		background: var(--accent);
 		color: var(--bg);
+	}
+	.back {
+		color: var(--muted);
+		font-size: 0.9em;
 	}
 </style>

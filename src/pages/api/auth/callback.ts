@@ -121,6 +121,15 @@ export async function GET({ request, locals }) {
 	try {
 		await db.prepare('UPDATE devices SET cached_access_token = NULL, cached_token_expiry = 0 WHERE user_id = ?').bind(userId).run();
 	} catch {}
+	// Remember the account's email (for email alerts) and link any pre-orders paid with it,
+	// so they show on the dashboard. Only a verified Google email counts.
+	if (email && userInfo.email_verified !== false) {
+		try {
+			await db.prepare('UPDATE users SET email = ? WHERE id = ?').bind(String(email).slice(0, 254), userId).run();
+		} catch {} // column comes from schema-order-status.sql
+		const { linkOrdersByEmail } = await import('../../../lib/orders');
+		await linkOrdersByEmail(db, userId, email);
+	}
 
 	// Log the user into the dashboard (separate concern from the device's
 	// own credential — this cookie is what keeps *them* signed in here).

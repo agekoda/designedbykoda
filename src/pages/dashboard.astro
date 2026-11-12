@@ -23,6 +23,8 @@ if (!userId) return Astro.redirect('/setup');
 			</div>
 		</div>
 
+		<div id="orders" class="orders" hidden></div>
+
 		<div id="devices" class="devices">
 			<p class="muted">Loading your devices…</p>
 		</div>
@@ -396,6 +398,51 @@ if (!userId) return Astro.redirect('/setup');
 		return el;
 	}
 
+	// Pre-orders linked to this account: where each one is up to.
+	const SHIP_BY = 'end of February 2027';
+	const STEPS = ['Ordered', 'Being made', 'Shipped', 'Delivered'];
+	fetch('/api/dashboard/orders')
+		.then((r) => r.json())
+		.then((d) => {
+			const orders: any[] = d.orders || [];
+			if (!orders.length) return;
+			const box = document.getElementById('orders')!;
+			const day = (t: number) => new Date(t * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+			const money = (c: number, cur: string) => {
+				try {
+					return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(c / 100);
+				} catch {
+					return (c / 100).toFixed(2) + ' ' + cur;
+				}
+			};
+			box.innerHTML =
+				`<div class="orders-title">${orders.length > 1 ? 'Your orders' : 'Your order'}</div>` +
+				orders
+					.map((o) => {
+						const cancelled = o.status === 'cancelled';
+						const steps = cancelled
+							? '<p class="ord-cancel">This order was cancelled.</p>'
+							: `<ol class="steps">${STEPS.map((label, i) => `<li class="${i < o.step ? 'done' : i === o.step ? 'now' : ''}"><span class="dot"></span><span class="lab">${label}</span></li>`).join('')}</ol>`;
+						const line =
+							o.status === 'delivered'
+								? `Delivered${o.deliveredAt ? ' ' + day(o.deliveredAt) : ''}. Enjoy it! Set it up from <a href="/setup?new=1">Add a device</a>.`
+								: o.status === 'shipped'
+									? `On its way${o.shippedAt ? ', posted ' + day(o.shippedAt) : ''}.` + (o.trackingUrl ? ` <a href="${esc(o.trackingUrl)}" target="_blank" rel="noopener">Track it${o.tracking && !/^https?:/i.test(o.tracking) ? ' (' + esc(o.tracking) + ')' : ''}</a>` : '')
+									: cancelled
+										? ''
+										: `Ships by the ${SHIP_BY}.`;
+						return `<article class="ord">
+							<div class="ord-top"><div><div class="ord-name">E-Ink Calendar</div><div class="muted small">Order ${esc(o.number)} · ${day(o.createdAt)}${o.shipTo ? ' · to ' + esc(o.shipTo) : ''}</div></div><div class="ord-amt">${money(o.total, o.currency)}</div></div>
+							${steps}
+							${line ? `<p class="ord-line">${line}</p>` : ''}
+							${o.note ? `<p class="ord-note">${esc(o.note)}</p>` : ''}
+						</article>`;
+					})
+					.join('');
+			box.hidden = false;
+		})
+		.catch(() => {});
+
 	fetch('/api/dashboard/devices')
 		.then((r) => r.json())
 		.then((data) => {
@@ -464,6 +511,27 @@ if (!userId) return Astro.redirect('/setup');
 	.dash .danger-link:hover { color: #f0a0a0; }
 
 	.dash .devices { display: grid; gap: 1.2em; }
+	.dash .orders { margin-bottom: 2.2em; }
+	.dash .orders[hidden] { display: none; }
+	.dash .orders-title { font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.8em; }
+	.dash .ord { border: 1px solid var(--border); border-radius: 18px; background: var(--bg-raised); padding: 1.2em 1.4em; margin-bottom: 0.8em; }
+	.dash .ord-top { display: flex; justify-content: space-between; gap: 1em; align-items: flex-start; }
+	.dash .ord-name { font-weight: 700; font-size: 1.05em; }
+	.dash .ord-amt { font-weight: 700; white-space: nowrap; }
+	.dash .steps { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 1.3em 0 0.4em; padding: 0; }
+	.dash .steps li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.5em; font-size: 0.8em; color: var(--muted-dim); text-align: center; }
+	.dash .steps li::before { content: ''; position: absolute; top: 6px; left: -50%; width: 100%; height: 2px; background: var(--border); z-index: 0; }
+	.dash .steps li:first-child::before { display: none; }
+	.dash .steps li.done::before, .dash .steps li.now::before { background: var(--fg); }
+	.dash .steps .dot { position: relative; z-index: 1; width: 14px; height: 14px; border-radius: 50%; background: var(--bg-raised); border: 2px solid var(--border); box-sizing: border-box; }
+	.dash .steps li.done .dot { background: var(--fg); border-color: var(--fg); }
+	.dash .steps li.now .dot { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+	.dash .steps li.done, .dash .steps li.now { color: var(--fg); }
+	.dash .steps li.now .lab { font-weight: 700; }
+	.dash .ord-line { margin: 0.9em 0 0; font-size: 0.92em; color: var(--muted); }
+	.dash .ord-line a { color: var(--fg); }
+	.dash .ord-note { margin: 0.7em 0 0; padding: 0.7em 0.9em; border-radius: 12px; background: var(--bg); font-size: 0.9em; }
+	.dash .ord-cancel { margin: 1em 0 0; color: var(--muted); }
 	.dash .dev {
 		display: grid; grid-template-columns: 280px 1fr; gap: 1.6em; padding: 1.4em;
 		background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px;
