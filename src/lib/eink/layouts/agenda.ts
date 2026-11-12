@@ -62,11 +62,22 @@ export function agenda(ctx: LayoutCtx): string {
 			if (y > 140) break;
 			const cx = x + (day < 10 ? Math.floor(cellW / 2) - 4 : Math.floor(cellW / 2) - 7);
 			if (day === now.mday && sixRows) {
-				// The standard ring is too big for 18 px rows, so draw a smaller disc here.
+				// The standard circle is too tall for 18 px rows, so draw it as an oval: the same
+				// width as the circle, squashed to fit the row height.
 				const b = measure(ctx.family, 's', String(day));
 				const cap = (VMETRICS[fontId(ctx.family, 's')] ?? VMETRICS[fontId('sans', 's')] ?? [12, 12])[1];
-				const r = Math.min(10, Math.floor(Math.max(b.w, cap) / 2) + 2);
-				d.disc(cx + b.x1 + Math.floor(b.w / 2), y - Math.floor(cap / 2), r);
+				const rx = Math.floor(Math.max(b.w, cap) / 2) + 3;
+				const ry = Math.min(rx, Math.floor((cellH + 1) / 2));
+				const ox = cx + b.x1 + Math.floor(b.w / 2);
+				const oy = y - Math.floor(cap / 2);
+				const W = rx * 2 + 1, Hh = ry * 2 + 1, stride = (W + 7) >> 3;
+				const bits = new Uint8Array(stride * Hh);
+				for (let yy = 0; yy < Hh; yy++)
+					for (let xx = 0; xx < W; xx++) {
+						const dx = (xx - rx) / (rx + 0.5), dy = (yy - ry) / (ry + 0.5);
+						if (dx * dx + dy * dy <= 1) bits[yy * stride + (xx >> 3)] |= 0x80 >> (xx & 7);
+					}
+				d.bitmapBytes(ox - rx, oy - ry, W, Hh, bits);
 				d.text(cx, y, 's', String(day), { color: PAPER });
 			} else d.text(cx, y, 's', String(day), day === now.mday ? { ring: true } : {});
 		}
