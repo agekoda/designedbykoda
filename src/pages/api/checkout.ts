@@ -60,7 +60,7 @@ export async function POST({ request, locals, cookies }) {
 	params.set('shipping_options[0][shipping_rate_data][display_name]', `Shipping to ${zoneLabel(country)}`);
 	params.set('shipping_options[0][shipping_rate_data][fixed_amount][amount]', String(shippingInMinorUnits));
 	params.set('shipping_options[0][shipping_rate_data][fixed_amount][currency]', currency.toLowerCase());
-	params.set('custom_text[submit][message]', 'Sold by Dylan Haines, ABN 61 261 672 813. Not registered for GST, so no GST is charged.');
+	params.set('custom_text[submit][message]', 'Sold by Dylan Haines · ABN 61 261 672 813');
 	params.set('custom_text[shipping_address][message]', 'Preorder: ships by the end of January 2027. Please double-check your address.');
 	params.set('metadata[country]', country);
 	params.set('metadata[currency]', currency);
