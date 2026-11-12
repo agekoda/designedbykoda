@@ -32,7 +32,7 @@ export async function shareDialog(o: { deviceId: string; designId: string; name:
 	body.innerHTML =
 		'<div class="dz-link"><input class="x-dlg-field" readonly aria-label="Link" /><button type="button" class="dz-copy" data-act="copy">Copy</button></div>' +
 		'<p class="x-dlg-text">Saving the design updates what the link shows.</p>' +
-		'<div class="dz-acts"><a class="link" target="_blank" rel="noopener">Open it</a><button type="button" class="link danger" data-act="stop">Stop sharing</button></div>';
+		'<div class="dz-btns"><a class="dz-btn" target="_blank" rel="noopener">Open it</a><button type="button" class="dz-btn danger" data-act="stop">Stop sharing</button></div>';
 	const inp = body.querySelector('input')!;
 	inp.value = url;
 	(body.querySelector('a') as HTMLAnchorElement).href = url;

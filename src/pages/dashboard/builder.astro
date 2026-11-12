@@ -24,10 +24,13 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			<div class="tb-left">
 				<a class="back" id="back" href={`/dashboard/display?device=${encodeURIComponent(deviceId)}`}>← Customize display</a>
 				<div class="bld-title" id="title">Layout builder</div>
-				<!-- Your designs (schema-designs.sql): switch and new in the dropdown; rename, duplicate, delete under the pencil -->
+				<!-- Your designs (schema-designs.sql): switch and new in the dropdown; then rename, duplicate, share and delete -->
 				<div class="designs" id="designs" hidden>
 					<select id="design-pick" aria-label="Your designs"></select>
-					<button type="button" class="icon-btn" id="design-edit" title="Rename, duplicate or delete" aria-label="Rename, duplicate or delete this design"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z" /><path d="M13.5 6.5l4 4" /></svg></button>
+					<button type="button" class="icon-btn" id="design-edit" title="Rename" aria-label="Rename this design"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z" /><path d="M13.5 6.5l4 4" /></svg></button>
+					<button type="button" class="icon-btn" id="design-dup" title="Duplicate" aria-label="Duplicate this design"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></svg></button>
+					<button type="button" class="icon-btn" id="design-share" title="Share" aria-label="Share this design"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" /><path d="M16 6l-4-4-4 4" /><path d="M12 2v13" /></svg></button>
+					<button type="button" class="icon-btn danger" id="design-del" title="Delete" aria-label="Delete this design"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" /><path d="M9 7V4h6v3" /></svg></button>
 				</div>
 				<select id="device-pick" class="mini" aria-label="Which display" hidden></select>
 			</div>
@@ -1307,6 +1310,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		redoBtn.disabled = hi >= hist.length - 1;
 		const dirty = isDirty();
 		saveBtn.disabled = !dirty;
+		// share and delete need a saved design
+		($('design-share') as HTMLButtonElement).disabled = !designId;
+		($('design-del') as HTMLButtonElement).disabled = !designId;
 		if (dirty && saveMsg.textContent && !saveMsg.classList.contains('is-error')) saveMsg.textContent = ''; // the old "Saved" is out of date
 		const n = layoutNeeds(layout);
 		const types = new Set(layout.widgets.map((w) => w.t));
@@ -1484,21 +1490,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	$('design-edit').addEventListener('click', async () => {
 		const body = document.createElement('div');
 		body.className = 'dz-edit';
-		body.innerHTML = `<input class="x-dlg-field" maxlength="30" aria-label="Name" spellcheck="false" /><div class="dz-acts">${designId ? `<button type="button" class="link" data-act="share">${shares[designId] ? 'Shared link' : 'Share'}</button><button type="button" class="link" data-act="dup">Duplicate</button><button type="button" class="link danger" data-act="del">Delete</button>` : ''}</div>`;
+		body.innerHTML = `<input class="x-dlg-field" maxlength="30" aria-label="Name" spellcheck="false" />`;
 		const inp = body.querySelector('input')!;
 		inp.value = designName;
-		let act = '';
-		body.addEventListener('click', (e) => {
-			const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
-			if (!b) return;
-			act = b.dataset.act!;
-			closeDialog();
-		});
 		setTimeout(() => (inp.focus(), inp.select()), 30);
-		const ok = await ask('Name', { title: 'This design', ok: 'Done', body });
-		if (act === 'share') return shareDialog();
-		if (act === 'dup') return duplicateDesign();
-		if (act === 'del') return deleteDesign();
+		const ok = await ask('', { title: 'Rename', ok: 'Done', body });
 		if (!ok) return;
 		const name = inp.value.replace(/\s+/g, ' ').trim().slice(0, 30) || 'Untitled design';
 		if (name === designName) return;
@@ -1507,6 +1503,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		refreshChrome();
 		flash('Renamed. Save to keep it.');
 	});
+	$('design-dup').addEventListener('click', () => duplicateDesign());
+	$('design-share').addEventListener('click', () => shareDialog());
+	$('design-del').addEventListener('click', () => deleteDesign());
 	const openDesign = (id: string | 'new') => {
 		leaving = true;
 		location.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId) + '&design=' + id;
@@ -1613,6 +1612,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .icon-btn { display: inline-grid; place-items: center; width: 2.4em; height: 2.4em; border-radius: 999px; background: transparent; border: 1px solid var(--border); color: var(--fg); padding: 0; transition: background 0.15s, border-color 0.15s, opacity 0.15s; }
 	.bld .icon-btn:hover:not(:disabled) { background: var(--bg); border-color: var(--muted); }
 	.bld .icon-btn:disabled { opacity: 0.35; }
+	.bld .icon-btn.danger { color: #e08a8a; }
+	.bld .designs .icon-btn { width: 2.8em; height: 2.8em; }
+	.bld .designs .icon-btn svg { width: 1.3em; height: 1.3em; }
+	.bld .icon-btn.danger:hover:not(:disabled) { border-color: #e08a8a; }
 	.bld .icon-btn svg { width: 1.1em; height: 1.1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 	.bld .ur { display: flex; gap: 0.3em; margin-right: 0.3em; }
 	.bld .name-in { width: 13em; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 999px; padding: 0.45em 0.9em; font: inherit; font-weight: 700; font-size: 0.9em; }
