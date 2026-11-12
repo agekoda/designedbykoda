@@ -1,0 +1,52 @@
+---
+// What's new on the E-Ink Calendar (src/data/changelog.ts).
+import Layout from '../layouts/Layout.astro';
+import { CHANGELOG } from '../data/changelog';
+const KIND = { calendar: 'Calendar', dashboard: 'Dashboard', screens: 'Screens' } as const;
+---
+
+<Layout title="What's new - E-Ink Calendar" description="Everything new on the E-Ink Calendar: firmware updates, new screens and dashboard features.">
+	<div class="log">
+		<p class="kicker"><a href="/projects/eink-calendar/">E-Ink Calendar</a></p>
+		<h1>What's new</h1>
+		<p class="sub">New screens and dashboard features reach every calendar straight away. Calendar updates install themselves over Wi-Fi.</p>
+		{
+			CHANGELOG.map((m) => (
+				<section>
+					<h2>{m.month}</h2>
+					<ul>
+						{m.changes.map((c) => (
+							<li>
+								<span class={`tag ${c.kind}`}>{KIND[c.kind]}</span>
+								<div>
+									<h3>{c.title}</h3>
+									<p>{c.text}</p>
+								</div>
+							</li>
+						))}
+					</ul>
+				</section>
+			))
+		}
+	</div>
+</Layout>
+
+<style>
+	.log { max-width: 720px; margin: 0 auto; padding: 2.5em 0 5em; }
+	.kicker { margin: 0; font-size: 0.75em; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+	.kicker a { color: inherit; text-decoration: none; }
+	h1 { font-size: clamp(2em, 7vw, 2.8em); margin: 0.15em 0 0.3em; }
+	.sub { color: var(--muted); margin: 0 0 2.5em; }
+	h2 { font-size: 0.8em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 1em; padding-bottom: 0.6em; border-bottom: 1px solid var(--border); }
+	section { margin-bottom: 3em; }
+	ul { list-style: none; margin: 0; padding: 0; }
+	li { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 1em; padding: 1em 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+	li:last-child { border-bottom: 0; }
+	h3 { margin: 0 0 0.25em; font-size: 1.05em; }
+	li p { margin: 0; color: var(--muted); font-size: 0.95em; line-height: 1.55; }
+	.tag { align-self: start; justify-self: start; margin-top: 0.15em; padding: 0.2em 0.7em; border-radius: 999px; font-size: 0.72em; font-weight: 700; letter-spacing: 0.04em; border: 1px solid var(--border); color: var(--muted); }
+	.tag.calendar { color: #30a46c; border-color: color-mix(in srgb, #30a46c 45%, transparent); }
+	.tag.screens { color: #f5a524; border-color: color-mix(in srgb, #f5a524 45%, transparent); }
+	.tag.dashboard { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+	@media (max-width: 560px) { li { grid-template-columns: 1fr; gap: 0.5em; } }
+</style>

@@ -29,6 +29,15 @@ if (!userId) return Astro.redirect('/setup');
 			<p class="muted">Loading your devices…</p>
 		</div>
 
+		<div class="alerts" id="alerts" hidden>
+			<div class="alerts-title">Email alerts</div>
+			<p class="muted small" id="alerts-to"></p>
+			<label class="chk"><input type="checkbox" data-k="battery" /> <span><b>Battery low</b> · when a calendar gets down to 15%</span></label>
+			<label class="chk"><input type="checkbox" data-k="offline" /> <span><b>Stopped checking in</b> · when a calendar hasn't been heard from for 2 days</span></label>
+			<label class="chk"><input type="checkbox" data-k="update" /> <span><b>Updated</b> · when a calendar installs new firmware</span></label>
+			<p class="note" id="alerts-msg" aria-live="polite"></p>
+		</div>
+
 		<div class="danger">
 			<div class="danger-title">Delete my account</div>
 			<p class="muted">
@@ -461,6 +470,41 @@ if (!userId) return Astro.redirect('/setup');
 			list.innerHTML = '<p class="muted">Couldn\'t load your devices. Try refreshing.</p>';
 		});
 
+	// email alerts
+	fetch('/api/dashboard/alerts')
+		.then((r) => r.json())
+		.then((d) => {
+			if (!d.available) return;
+			const box = document.getElementById('alerts')!;
+			const to = document.getElementById('alerts-to')!;
+			const msg = document.getElementById('alerts-msg')!;
+			const boxes = [...box.querySelectorAll<HTMLInputElement>('input[data-k]')];
+			if (d.email) to.textContent = 'Sent to ' + d.email + ', your Google account\u2019s email.';
+			else {
+				to.innerHTML = 'To get email alerts, <a href="/api/auth/google/start?return=%2Fdashboard">sign in with Google again</a> so we know where to send them.';
+				boxes.forEach((b) => (b.disabled = true));
+			}
+			boxes.forEach((b) => {
+				b.checked = !!d.prefs?.[b.dataset.k!];
+				b.addEventListener('change', async () => {
+					const body: any = {};
+					boxes.forEach((x) => (body[x.dataset.k!] = x.checked));
+					msg.textContent = 'Saving\u2026';
+					try {
+						const r = await fetch('/api/dashboard/alerts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+						if (!r.ok) throw 0;
+						msg.textContent = 'Saved';
+						setTimeout(() => (msg.textContent = ''), 1500);
+					} catch {
+						msg.textContent = 'Couldn\u2019t save. Try again.';
+						b.checked = !b.checked;
+					}
+				});
+			});
+			box.hidden = false;
+		})
+		.catch(() => {});
+
 	// delete account: two taps
 	const delArea = document.getElementById('delete-area')!;
 	function askDelete() {
@@ -532,6 +576,15 @@ if (!userId) return Astro.redirect('/setup');
 	.dash .ord-line a { color: var(--fg); }
 	.dash .ord-note { margin: 0.7em 0 0; padding: 0.7em 0.9em; border-radius: 12px; background: var(--bg); font-size: 0.9em; }
 	.dash .ord-cancel { margin: 1em 0 0; color: var(--muted); }
+	.dash .alerts { margin-top: 2.5em; padding: 1.3em 1.4em; border: 1px solid var(--border); border-radius: 18px; background: var(--bg-raised); }
+	.dash .alerts[hidden] { display: none; }
+	.dash .alerts-title { font-weight: 700; margin-bottom: 0.3em; }
+	.dash .alerts .chk { display: flex; gap: 0.7em; align-items: flex-start; padding: 0.55em 0; cursor: pointer; font-size: 0.95em; }
+	.dash .alerts .chk input { margin-top: 0.25em; accent-color: var(--accent); width: 1.05em; height: 1.05em; flex: none; }
+	.dash .alerts .chk span { color: var(--muted); }
+	.dash .alerts .chk b { color: var(--fg); font-weight: 700; }
+	.dash .alerts a { color: var(--fg); }
+	.dash .alerts .note:empty { display: none; }
 	.dash .dev {
 		display: grid; grid-template-columns: 280px 1fr; gap: 1.6em; padding: 1.4em;
 		background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px;
