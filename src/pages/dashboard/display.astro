@@ -91,8 +91,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 					</div>
 
 						<div id="opt-design" hidden>
-							<a class="btn small" id="design-edit" href="#">Edit this design</a>
-							<p class="muted small hint">Opens it in the layout builder.</p>
+							<div class="design-acts">
+								<a class="btn small" id="design-edit" href="#">Edit this design</a>
+								<button type="button" class="btn small ghost" id="design-share" hidden>Share</button>
+							</div>
+							<p class="muted small hint" id="design-hint">Opens it in the layout builder.</p>
 						</div>
 					<div id="refresh-box" hidden>
 						<div class="label sub">How often it updates</div>
@@ -276,6 +279,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { batteryPercent } from '../../lib/eink/battery';
 	import { layoutNeeds } from '../../lib/eink/builder/model';
 	import { dropdown, type Dropdown } from '../../lib/dropdown';
+	import { shareDialog } from '../../lib/shareDialog';
 	import { MAX_REMINDERS, MAX_REMINDER_TEXT, repeatText, sampleReminders, sanitizeReminders, type Reminder } from '../../lib/eink/reminders';
 	import {
 		CORNER,
@@ -294,6 +298,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	// every screen there is: the ready-made ones, then Your designs ("design:<id>"). Rebuilt when designs load.
 	let styles: StyleInfo[] = baseStyles;
 	let designs: { id: string; name: string; layout: any }[] | null = null; // null until schema-designs.sql is run
+	let shares: Record<string, string> = {}; // design id -> shared link token
 	function rebuildStyles() {
 		const ready = baseStyles.filter((x) => !x.builder || designs === null);
 		const mine = (designs ?? []).map((d) => ({ id: 'design:' + d.id, label: d.name, note: 'Your design', corner: false, frame: false, builder: false, design: true }));
@@ -937,6 +942,12 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		designEdit.textContent = fs() === 'custom' && !customLayout?.widgets?.length ? 'Start designing' : 'Edit this design';
 		designEdit.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId) + (isDesign(fs()) ? '&design=' + fs().slice(7) : '');
 		designEdit.dataset.builder = '1';
+		// a saved design can be shared (a link anyone can open to copy it)
+		const shareId = isDesign(fs()) ? fs().slice(7) : null;
+		const shareBtn = $<HTMLButtonElement>('design-share');
+		shareBtn.hidden = !shareId || !designs?.some((x) => x.id === shareId);
+		shareBtn.textContent = shareId && shares[shareId] ? 'Shared link' : 'Share';
+		$('design-hint').textContent = shareId && shares[shareId] ? 'Opens it in the layout builder. Anyone with the shared link can copy it.' : 'Opens it in the layout builder.';
 		// nothing to set up for this screen? say so, rather than leave an empty box
 		const detailsEl = $('details');
 		detailsEl.classList.toggle('empty', [...detailsEl.children].every((c) => (c as HTMLElement).hidden));
@@ -1110,6 +1121,23 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 	signBuilder.addEventListener('click', (e) => openBuilder(e, true));
 	designEdit.addEventListener('click', (e) => openBuilder(e, false));
+	$('design-share').addEventListener('click', async () => {
+		if (!isDesign(fs())) return;
+		const id = fs().slice(7);
+		const d = designs?.find((x) => x.id === id);
+		if (!d) return;
+		const wifi = !!d.layout?.widgets?.some((w: any) => w.t === 'qr' && w.o?.mode === 'wifi' && (w.o.ssid || w.o.pass));
+		const t = await shareDialog({ deviceId, designId: id, name: d.name, token: shares[id] ?? null, hasWifi: wifi, onError: (m) => flash(m, true) });
+		if (t === undefined) return;
+		if (t) shares[id] = t;
+		else {
+			delete shares[id];
+			flash('Stopped sharing. The link no longer works.');
+		}
+		const b = $<HTMLButtonElement>('design-share');
+		b.textContent = shares[id] ? 'Shared link' : 'Share';
+		$('design-hint').textContent = shares[id] ? 'Opens it in the layout builder. Anyone with the shared link can copy it.' : 'Opens it in the layout builder.';
+	});
 
 	// ---------------------------------------------------------------- schedule
 	const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday first
@@ -1534,6 +1562,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			tasksGranted = !!info.tasksGranted;
 			customLayout = info.custom ?? null;
 			designs = info.designs ?? null;
+			shares = info.shares ?? {};
 			loadMsgSum();
 			$<HTMLAnchorElement>('row-msgs').href = '/dashboard/messages?device=' + encodeURIComponent(deviceId);
 			rebuildStyles();
@@ -1846,4 +1875,6 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust textarea.txt { resize: vertical; line-height: 1.45; }
 	.cust #opt-sign[hidden], .cust #opt-msgs[hidden] { display: none; }
 	.cust #opt-msgs .btn { margin-top: 0.8em; }
+	.cust .design-acts { display: flex; gap: 0.5em; flex-wrap: wrap; }
+	.cust #design-share[hidden] { display: none; }
 </style>

@@ -45,6 +45,9 @@ export async function POST({ request, locals }: any) {
 		const ds = await db.prepare('SELECT id, name, layout FROM designs WHERE device_id = ? ORDER BY created_at').bind(from).all();
 		const now = Math.floor(Date.now() / 1000);
 		const stmts = [db.prepare('DELETE FROM designs WHERE device_id = ?').bind(to)];
+		try {
+			await db.prepare('DELETE FROM shared_designs WHERE device_id = ?').bind(to).run(); // their old designs' links stop working
+		} catch {}
 		let i = 0;
 		for (const d of ds.results ?? []) {
 			const nid = newDesignId();

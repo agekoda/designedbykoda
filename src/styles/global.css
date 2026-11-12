@@ -575,3 +575,10 @@ html.has-custom-cursor .dd, html.has-custom-cursor .dd *, html.has-custom-cursor
 .dz-acts .link { background: none; border: none; padding: 0; font: inherit; font-size: 0.9em; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 .dz-acts .link:hover { color: var(--fg); }
 .dz-acts .link.danger { color: #e08a8a; }
+.x-dlg-text:empty { display: none; }
+.dz-share { margin: -0.3em 0 1.3em; }
+.dz-share .dz-link { display: flex; gap: 0.5em; align-items: center; margin-bottom: 0.9em; }
+.dz-share .dz-link .x-dlg-field { flex: 1; min-width: 0; margin: 0; }
+.dz-share .x-dlg-text { margin: 0; font-size: 0.9em; color: var(--muted); }
+.dz-copy { flex: none; padding: 0.6em 1.1em; border: 1px solid var(--border); border-radius: 999px; background: var(--fg); color: var(--bg); font: inherit; font-size: 0.85em; font-weight: 700; cursor: pointer; }
+.dz-share .dz-acts a.link { color: var(--muted); }

@@ -11,6 +11,7 @@ import { isTempUnit } from '../../../lib/eink/units';
 import { sanitizeSchedule } from '../../../lib/eink/schedule';
 import { sanitizeCfg } from '../../../lib/messages';
 import { designIdOf, listDesigns } from '../../../lib/designs';
+import { sharesForDevice } from '../../../lib/designShare';
 import { markSaved } from '../../../lib/screens';
 import { sanitizeLayout, sanitizeSign } from '../../../lib/eink/builder/model';
 export const prerender = false;
@@ -142,6 +143,7 @@ export async function GET({ request, locals }) {
 			reminders,
 			remindersReady,
 			designs: (await listDesigns(db, deviceId))?.map((d) => ({ id: d.id, name: d.name, layout: d.layout })) ?? null,
+			shares: await sharesForDevice(db, deviceId),
 			screensReady,
 			batteryAnchor,
 			refreshSec: isRefreshSec(dev.refresh_interval_sec) ? dev.refresh_interval_sec : 86400,
