@@ -1,0 +1,33 @@
+---
+// Where signed-out people land when they open the dashboard (or any page under it). One Google
+// button that comes straight back, plus ways in for people who don't want or need an account yet.
+export const prerender = false;
+import Layout from '../layouts/Layout.astro';
+import { getSessionUserId } from '../lib/session';
+
+const raw = Astro.url.searchParams.get('return') || '/dashboard';
+const back = raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/signin') ? raw : '/dashboard';
+const db = Astro.locals.runtime?.env?.DB;
+if (db && (await getSessionUserId(Astro.request, db).catch(() => null))) return Astro.redirect(back);
+Astro.response.headers.set('X-Robots-Tag', 'noindex');
+const signIn = '/api/auth/google/start?return=' + encodeURIComponent(back);
+---
+<Layout title="Sign in - designedbykoda" description="Sign in to see your E-Ink Calendars and track your order.">
+	<div class="signin">
+		<h1>Sign in</h1>
+		<p class="sub">See your calendars and orders.</p>
+		<a class="button" data-magnetic href={signIn}>Sign in with Google</a>
+		<p class="others"><a href="/track">Track an order</a><span>·</span><a href="/setup">Set up a calendar</a></p>
+	</div>
+</Layout>
+
+<style>
+	.signin { max-width: 420px; margin: 0 auto; padding: 6em 0; text-align: center; }
+	h1 { margin: 0 0 0.25em; }
+	.sub { color: var(--muted); margin: 0 0 1.8em; }
+	.button { display: inline-block; padding: 0.8em 1.7em; border-radius: 999px; background: var(--fg); color: var(--bg); font-weight: 700; text-decoration: none; }
+	.button:hover { background: var(--accent); color: var(--bg); }
+	.others { margin: 2.2em 0 0; font-size: 0.9em; display: flex; justify-content: center; gap: 0.7em; color: var(--muted-dim); }
+	.others a { color: var(--muted); }
+	.others a:hover { color: var(--fg); }
+</style>

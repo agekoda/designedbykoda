@@ -8,7 +8,7 @@ import { CHECK_CHOICES, EXPIRY_CHOICES, MAX_BODY, MAX_AUTHOR } from '../../lib/m
 
 const db = Astro.locals.runtime?.env?.DB;
 const userId = db ? await getSessionUserId(Astro.request, db) : null;
-if (!userId) return Astro.redirect('/setup');
+if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.url.pathname + Astro.url.search));
 const deviceId = Astro.url.searchParams.get('device') ?? '';
 // Whether the shared link is on, so the page arrives with the right button and panel
 // (no flicker while the script loads the rest).

@@ -39,6 +39,22 @@ if (id && validId(id) && db) {
 		o = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first();
 	} catch {}
 }
+// Signed in: this order joins their dashboard too (knowing the long checkout id is proof enough,
+// same as /api/orders/claim). Signed out: offer to sign in and do that.
+let signedIn = false;
+let onDashboard = false;
+if (o && db) {
+	try {
+		const { getSessionUserId } = await import('../lib/session');
+		const uid = await getSessionUserId(Astro.request, db);
+		signedIn = !!uid;
+		if (uid && !o.user_id) {
+			await db.prepare('UPDATE orders SET user_id = ? WHERE id = ? AND user_id IS NULL').bind(uid, o.id).run();
+			o.user_id = uid;
+		}
+		onDashboard = !!uid && o.user_id === uid;
+	} catch {}
+}
 if (id && !o && !error) error = 'That tracking link didn’t match an order. If you only just paid, give it a minute and refresh.';
 
 const tz = 'Australia/Perth';
@@ -144,7 +160,8 @@ const sub = !view
 
 		<p class="foot">
 			Questions? Reply to your receipt or email <a href="mailto:support@designedbykoda.com">support@designedbykoda.com</a>.
-			{view && <><br /><a href="/dashboard#orders">See it on your dashboard</a></>}
+			{view && onDashboard && <><br /><a href="/dashboard#orders">See it on your dashboard</a></>}
+			{view && !signedIn && !view.cancelled && <><br /><a href={'/api/auth/google/start?return=' + encodeURIComponent('/track?o=' + o.id)}>Sign in to keep it on your dashboard</a></>}
 		</p>
 	</div>
 </Layout>
