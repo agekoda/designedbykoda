@@ -5,12 +5,12 @@
 (() => {
 	const r2 = (n) => Math.round(n * 100) / 100;
 	const usd = (n) => r2(n * 1.42); // the costs sheet's rate
-	// From eink_calendar_costs_6.xlsx, 100-unit column. Expected cost is per piece, in A$.
+	// From eink_calendar_costs_7.xlsx, 100-unit column. Expected cost is per piece, in A$.
 	const SEED = [
 		['board', 'Assembled board', 'PCBWay', 1, usd((85.86 + 362.7 + 304.29) / 100), 'Bare PCB + parts + assembly. PCBWay quote 2 Nov: US$85.86 fab (after discount), US$362.70 parts, US$304.29 assembly for 100.'],
 		['screen', 'E-ink screen 4.2"', 'WeAct', 1, usd(12.5), 'US$12.50 each by bank transfer (email 29 Oct). Freight about US$75 per 100.'],
-		['case', 'Case', 'JLC 3D', 1, usd(6.61), 'Resin, with kickstand mount and wall-screw hole (7 Nov). No bulk discount at 100.'],
-		['kickstand', 'Kickstand', 'JLC 3D', 1, usd(1.66), 'JLC Black resin. LEDO 6060 white would be US$0.47.'],
+		['case', 'Case', 'JLC 3D', 1, usd(6.65), 'JLC Black resin, with kickstand cutout and wall-screw hole (13 Nov). No bulk discount at 100.'],
+		['kickstand', 'Kickstand', 'JLC 3D', 1, usd(1.14), 'Black resin (13 Nov). LEDO 6060 white would be US$0.32.'],
 		['lid', 'Lid', 'JLC 3D', 1, usd(1.68), ''],
 		['battery', 'Battery', 'AliExpress', 1, 3.28, 'A$32.75 per 10. May change after capacity testing.'],
 		['box', 'Mailer box', 'Pack Queen', 1, 1.31, '175 × 130 × 55 mm self-sealing. Estimate: confirm when bought.'],
