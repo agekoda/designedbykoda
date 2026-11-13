@@ -1,7 +1,7 @@
 // The frame around the screens: sign-in, the sidebar, loading, refreshing, Ctrl+K.
 'use strict';
 const NAV = [
-	['overview', 'Overview'], ['orders', 'Orders'], ['devices', 'Calendars'], ['firmware', 'Firmware'], ['status', 'Website'],
+	['overview', 'Overview'], ['orders', 'Orders'], ['devices', 'Calendars'], ['firmware', 'Firmware'], ['status', 'Website'], ['stats', 'Press stats'],
 ];
 const prefs = App.prefs;
 App.view = 'overview';
@@ -51,7 +51,7 @@ function renderShell() {
 	mount($('#app'), html`<div class="shell">
 		<nav class="side">
 			<div class="brand"><b>designedbykoda</b><span>Owner</span></div>
-			${NAV.map(([id, label]) => html`<button class="nav ${App.view === id ? 'on' : ''}" data-act="nav" data-view="${id}">${icon(id === 'status' ? 'status' : id)}${label}${navBadge(id)}</button>`)}
+			${NAV.map(([id, label]) => html`<button class="nav ${App.view === id ? 'on' : ''}" data-act="nav" data-view="${id}">${icon(id)}${label}${navBadge(id)}</button>`)}
 			<div class="side-foot">
 				<button class="kbd-hint" data-act="palette">${icon('search', 15)}Search<kbd>Ctrl K</kbd></button>
 				<button class="nav ${App.view === 'settings' ? 'on' : ''}" data-act="nav" data-view="settings">${icon('settings')}Settings</button>
@@ -148,7 +148,7 @@ App.actions.palette = () => {
 	let items = [], sel = 0;
 	const d = App.data;
 	const base = [
-		...NAV.map(([id, label]) => ({ icon: id === 'status' ? 'status' : id, label: 'Go to ' + label, run: () => App.go(id) })),
+		...NAV.map(([id, label]) => ({ icon: id, label: 'Go to ' + label, run: () => App.go(id) })),
 		{ icon: 'settings', label: 'Go to Settings', run: () => App.go('settings') },
 		{ icon: 'truck', label: 'Ship mode: post the orders that are ready', run: () => App.views.orders.shipMode() },
 		{ icon: 'down', label: 'Download the AusPost CSV (ready orders)', run: () => App.views.orders.exportCsv('auspost') },

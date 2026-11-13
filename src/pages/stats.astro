@@ -2,12 +2,11 @@
 export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 
-const env = Astro.locals.runtime?.env ?? {};
+import { loadStats } from '../lib/siteStats';
 
-// Plain Cloudflare "Variable" type — not secrets, since none of this is
-// sensitive (they're public follower/view counts). Update anytime via
-// Workers & Pages → Settings → Variables and Secrets → edit the value →
-// Deploy. No code change or redeploy-from-git needed for a number update.
+// The numbers start as the vars in wrangler.json. Once they've been saved from the owner app
+// (its Press stats tab) the saved ones are used instead, with no deploy (src/lib/siteStats.ts).
+const env = await loadStats(Astro.locals.runtime?.env ?? {});
 function formatNumber(raw: string | undefined): string {
 	const n = Number(raw);
 	if (!raw || isNaN(n)) return '—';

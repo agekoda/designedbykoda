@@ -4,6 +4,7 @@ import releases from '../data/firmware-releases.json';
 import { SHIPPING_FX } from '../data/preorderPricing';
 import { batteryPercent } from './eink/battery';
 import { orderNumber, statusOf, trackingUrl } from './orders';
+import { loadStats } from './siteStats';
 import { loadStatus } from './status';
 
 export const BATCH = 100; // first batch size
@@ -127,5 +128,6 @@ export async function loadAppData(env: any) {
 		incidents,
 		counts: { users, unpaired, designs, shared, messages, waitlist },
 		userSignups: userDays.map((u) => u.created_at),
+		stats: await loadStats(env),
 	};
 }
