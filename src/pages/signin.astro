@@ -1,0 +1,40 @@
+---
+// Where signed-out people land when they open the dashboard (or any page under it). One Google
+// button that comes straight back, plus ways in for people who don't want or need an account yet.
+export const prerender = false;
+import Layout from '../layouts/Layout.astro';
+import { getSessionUserId } from '../lib/session';
+
+const raw = Astro.url.searchParams.get('return') || '/dashboard';
+const back = raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/signin') ? raw : '/dashboard';
+const db = Astro.locals.runtime?.env?.DB;
+if (db && (await getSessionUserId(Astro.request, db).catch(() => null))) return Astro.redirect(back);
+Astro.response.headers.set('X-Robots-Tag', 'noindex');
+const signIn = '/api/auth/google/start?return=' + encodeURIComponent(back);
+---
+<Layout title="Sign in - designedbykoda" description="Sign in to see your E-Ink Calendars and track your order.">
+	<div class="signin">
+		<p class="kicker">Your account</p>
+		<h1>Sign in to your dashboard</h1>
+		<p class="sub">See your calendars and track your order.</p>
+		<a class="button" data-magnetic href={signIn}>Sign in with Google</a>
+		<p class="small">Use the Google account your calendar is set up with, or the one you'll set it up with. Pre-orders paid with the same email show up by themselves.</p>
+		<div class="others">
+			<a href="/track">Track an order without signing in</a>
+			<a href="/setup">Got a new calendar? Set it up</a>
+		</div>
+	</div>
+</Layout>
+
+<style>
+	.signin { max-width: 480px; margin: 0 auto; padding: 5em 0 6em; text-align: center; }
+	.kicker { margin: 0 0 0.5em; font-size: 0.8em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+	h1 { margin: 0 0 0.3em; }
+	.sub { color: var(--muted); margin: 0 0 1.8em; }
+	.button { display: inline-block; padding: 0.8em 1.7em; border-radius: 999px; background: var(--fg); color: var(--bg); font-weight: 700; text-decoration: none; }
+	.button:hover { background: var(--accent); color: var(--bg); }
+	.small { color: var(--muted-dim); font-size: 0.85em; margin: 1.2em auto 0; max-width: 380px; }
+	.others { display: flex; flex-direction: column; gap: 0.6em; margin-top: 2.4em; padding-top: 1.6em; border-top: 1px solid var(--border); font-size: 0.95em; }
+	.others a { color: var(--muted); }
+	.others a:hover { color: var(--fg); }
+</style>

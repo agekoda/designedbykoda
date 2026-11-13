@@ -22,8 +22,7 @@ const signIn = '/api/auth/google/start?return=' + encodeURIComponent('/preorder/
 	<div class="success-page">
 		<h1>Preorder confirmed</h1>
 		<p>
-			Thanks for preordering the E-Ink Calendar. You'll get an email receipt from Stripe
-			shortly, and I'll be in touch with updates as your order gets closer to shipping.
+			Thanks for preordering the E-Ink Calendar. You'll get a receipt by email shortly, and I'll be in touch with updates as your order gets closer to shipping.
 		</p>
 		{valid && signedIn && (
 			<div class="track" id="track" data-order={order}>
@@ -58,8 +57,8 @@ const signIn = '/api/auth/google/start?return=' + encodeURIComponent('/preorder/
 					return;
 				}
 			} catch {}
-			if (++tries < 10) setTimeout(go, 3000);
-			else text.textContent = 'It’ll show on your dashboard in a few minutes.';
+			if (++tries < 20) setTimeout(go, 3000);
+			else text.textContent = 'Still on its way to us. Open "Track your order" in your receipt email while signed in and it’s added to your dashboard.';
 		};
 		go();
 	}

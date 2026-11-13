@@ -6,7 +6,7 @@ import { FAMILIES, FAMILY_LABELS } from '../../lib/eink/fonts';
 
 const db = Astro.locals.runtime?.env?.DB;
 const userId = db ? await getSessionUserId(Astro.request, db) : null;
-if (!userId) return Astro.redirect('/setup');
+if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.url.pathname + Astro.url.search));
 
 const deviceId = Astro.url.searchParams.get('device') ?? '';
 if (!deviceId) return Astro.redirect('/dashboard');
@@ -1339,7 +1339,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	async function load() {
 		const want = new URLSearchParams(location.search).get('design');
 		const res = await fetch('/api/dashboard/builder?deviceId=' + encodeURIComponent(deviceId) + (want ? '&design=' + encodeURIComponent(want) : ''));
-		if (res.status === 401) return void (location.href = '/setup');
+		if (res.status === 401) return void (location.href = '/signin?return=' + encodeURIComponent(location.pathname + location.search));
 		if (!res.ok) {
 			banner.hidden = false;
 			banner.textContent = 'Could not load this display. Go back to the dashboard and try again.';

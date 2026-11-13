@@ -6,8 +6,8 @@ import CitySearchStyles from '../components/CitySearchStyles.astro';
 
 const db = Astro.locals.runtime?.env?.DB;
 const userId = db ? await getSessionUserId(Astro.request, db) : null;
-// Not signed in: the setup page is where signing in happens.
-if (!userId) return Astro.redirect('/setup');
+// Not signed in: sign in, then come straight back here.
+if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.url.pathname + Astro.url.search));
 ---
 
 <Layout title="My devices — designedbykoda" description="Manage your E-Ink Calendar devices.">

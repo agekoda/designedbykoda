@@ -9,7 +9,7 @@ import { REFRESH_CHOICES } from '../../data/calendarStyles';
 
 const db = Astro.locals.runtime?.env?.DB;
 const userId = db ? await getSessionUserId(Astro.request, db) : null;
-if (!userId) return Astro.redirect('/setup');
+if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.url.pathname + Astro.url.search));
 
 const deviceId = Astro.url.searchParams.get('device') ?? '';
 const styles = CALENDAR_STYLES.map((s) => ({ id: s.id, label: s.label, note: s.note, corner: !!s.corner, frame: !!s.frame, builder: !!s.builder }));
