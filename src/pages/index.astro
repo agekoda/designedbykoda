@@ -32,33 +32,6 @@ const stats = [
 
 // The project shown in the big "featured" panel.
 const spotlight = allProjects.find((p) => p.id === 'eink-calendar');
-
-const steps = [
-	{
-		n: '01',
-		title: 'Idea & research',
-		text: 'Start from a problem or a part I want to push. Datasheets, breadboards and a lot of reading.',
-		icon: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z',
-	},
-	{
-		n: '02',
-		title: 'Schematic & PCB',
-		text: 'Schematics, power design and routing in KiCad. Boards get made, then assembled by hand.',
-		icon: 'M4 6h5v5H4zM15 13h5v5h-5zM9 8.5h4a2 2 0 0 1 2 2V13M7 11v4a2 2 0 0 0 2 2h6',
-	},
-	{
-		n: '03',
-		title: 'Firmware',
-		text: 'ESP32 firmware written from scratch: wireless, low-power sleep and a UI that feels finished.',
-		icon: 'M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16',
-	},
-	{
-		n: '04',
-		title: 'Enclosure & test',
-		text: 'Custom enclosures that actually fit, then real-world battery and range testing before it ships.',
-		icon: 'M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM12 12l8-4.5M12 12v9M12 12L4 7.5',
-	},
-];
 ---
 
 <Layout title="designedbykoda" description={SITE_DESCRIPTION}>
@@ -143,35 +116,6 @@ const steps = [
 				))
 			}
 		</div>
-	</section>
-
-	<section class="process x-reveal" aria-labelledby="process-h">
-		<div class="featured-heading">
-			<h2 id="process-h">How I build</h2>
-		</div>
-		<ol class="steps">
-			{
-				steps.map((st) => (
-					<li class="step">
-						<span class="step-n">{st.n}</span>
-						<svg
-							class="step-icon"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="1.7"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							aria-hidden="true"
-						>
-							<path d={st.icon} />
-						</svg>
-						<h3>{st.title}</h3>
-						<p>{st.text}</p>
-					</li>
-				))
-			}
-		</ol>
 	</section>
 
 	<section class="collab x-reveal" aria-labelledby="collab-h">
@@ -302,76 +246,6 @@ const steps = [
 		gap: 0.7em;
 	}
 
-	/* ---------- How I build ---------- */
-	.process {
-		margin: 4.5em 0 0;
-	}
-	.steps {
-		position: relative;
-		display: grid;
-		grid-template-columns: repeat(4, 1fr);
-		gap: 1.2em;
-		list-style: none;
-		padding: 0;
-		margin: 0;
-	}
-	.steps::before {
-		content: '';
-		position: absolute;
-		top: 24px;
-		left: 6%;
-		right: 6%;
-		height: 1px;
-		background: linear-gradient(90deg, var(--accent), var(--border));
-		transform: scaleX(0);
-		transform-origin: 0 50%;
-		transition: transform 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.2s;
-	}
-	.process.is-visible .steps::before {
-		transform: scaleX(1);
-	}
-	.step {
-		position: relative;
-		margin: 0;
-		padding: 0 0.2em;
-	}
-	.step-n {
-		position: absolute;
-		top: -0.5em;
-		right: 0.2em;
-		font-size: 0.7em;
-		font-weight: 700;
-		letter-spacing: 0.1em;
-		color: var(--muted-dim);
-	}
-	.step-icon {
-		display: block;
-		width: 48px;
-		height: 48px;
-		padding: 12px;
-		margin-bottom: 0.9em;
-		border-radius: 50%;
-		background: var(--bg);
-		border: 1px solid var(--accent-dark);
-		color: var(--accent);
-		transition:
-			transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-			background 0.3s ease;
-	}
-	.step:hover .step-icon {
-		transform: translateY(-3px) scale(1.08);
-		background: color-mix(in srgb, var(--accent) 14%, var(--bg));
-	}
-	.step h3 {
-		font-size: 1.02em;
-		margin-bottom: 0.3em;
-	}
-	.step p {
-		font-size: 0.85em;
-		line-height: 1.55;
-		margin: 0;
-	}
-
 	/* ---------- Collaborate ---------- */
 	.collab {
 		margin: 5em 0 0;
@@ -399,18 +273,8 @@ const steps = [
 			grid-template-columns: 1fr;
 			gap: 1.2em;
 		}
-		.steps {
-			grid-template-columns: repeat(2, 1fr);
-			row-gap: 1.8em;
-		}
-		.steps::before {
-			display: none;
-		}
 	}
 	@media (max-width: 480px) {
-		.steps {
-			grid-template-columns: 1fr;
-		}
 		.hero-links {
 			flex-wrap: wrap;
 		}
