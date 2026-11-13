@@ -243,6 +243,10 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 </Layout>
 
 <script>
+	import { ask } from '../../lib/dialog';
+	import { dropdown } from '../../lib/dropdown';
+	// the site's own dropdowns instead of the browser's
+	document.querySelectorAll<HTMLSelectElement>('.admin select').forEach((s) => dropdown(s));
 	const list = document.getElementById('list');
 	if (list) {
 		let tab = 'open';
@@ -315,7 +319,8 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 			const status = (document.getElementById('bulk-status') as HTMLSelectElement).value;
 			const msg = document.getElementById('bulk-msg')!;
 			if (!ids.length) return;
-			if (!confirm(`Set ${ids.length} order${ids.length > 1 ? 's' : ''} to "${(document.getElementById('bulk-status') as HTMLSelectElement).selectedOptions[0].text}"? Buyers see this on their dashboard.${status === 'shipped' ? ' Orders with a tracking number also get an \u201con its way\u201d email.' : ''}`)) return;
+			const label = (document.getElementById('bulk-status') as HTMLSelectElement).selectedOptions[0].text;
+			if (!(await ask(`Buyers see this on their dashboard.${status === 'shipped' ? ' Orders with a tracking number also get an \u201con its way\u201d email.' : ''}`, { title: `Set ${ids.length} order${ids.length > 1 ? 's' : ''} to ${label}?`, ok: 'Set status' }))) return;
 			msg.textContent = 'Saving…';
 			try {
 				await post({ ids, status });
@@ -342,7 +347,7 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 				const tracking = o.querySelector<HTMLInputElement>('.track')!.value;
 				const hadTracking = (o.dataset.tracking ?? '') !== '';
 				const firstTracking = tracking.trim() !== '' && !hadTracking && o.dataset.status !== 'delivered';
-				if (firstTracking && !confirm('Save the tracking number? This marks it Shipped and emails the buyer that it\u2019s on its way, with the tracking link.')) return;
+				if (firstTracking && !(await ask('This marks the order Shipped and emails the buyer that it\u2019s on its way, with the tracking link.', { title: 'Save the tracking number?', ok: 'Save and email' }))) return;
 				el.textContent = 'Saving…';
 				try {
 					await post({
@@ -374,7 +379,12 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 	.head-actions form { margin: 0; }
 	.narrow label { display: block; font-size: 0.8rem; opacity: 0.6; margin: 14px 0 6px; }
 	.row { display: flex; gap: 8px; }
-	input, select { min-width: 0; padding: 9px 12px; border-radius: 8px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: transparent; color: inherit; font: inherit; font-size: 0.9rem; }
+	input:not([type='checkbox']), select { min-width: 0; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border); border-style: solid; background: var(--bg-raised); color: inherit; font: inherit; font-size: 0.9rem; box-shadow: none; outline: none; -webkit-appearance: none; appearance: none; }
+	input[type='checkbox'] { width: 1.05em; height: 1.05em; accent-color: var(--accent); margin: 0; }
+	input:not([type='checkbox']):focus { border-color: color-mix(in srgb, var(--fg) 45%, transparent); }
+	.edit :global(.dd), .bulk :global(.dd) { display: block; }
+	.edit :global(.dd-btn), .bulk :global(.dd-btn) { font-size: 0.9rem; padding: 0.62em 0.9em 0.62em 1.1em; }
+	.bulk :global(.dd) { display: inline-block; min-width: 160px; }
 	select option { color: #000; }
 	.narrow input { flex: 1; }
 	.btn, button.btn-p { padding: 9px 14px; border-radius: 8px; border: 1px solid color-mix(in srgb, currentColor 40%, transparent); background: transparent; color: inherit; font: inherit; font-size: 0.9rem; cursor: pointer; text-decoration: none; display: inline-block; }
@@ -415,7 +425,7 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 	.who a { color: var(--accent); }
 	.amt { text-align: right; }
 	.mid { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 12px 0; align-items: flex-start; }
-	.addr { margin: 0; padding: 0; background: none; font: inherit; font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; }
+	.addr { margin: 0; padding: 0; border: 0; background: none; font: inherit; font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; }
 	.meta { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; opacity: 0.85; align-items: flex-end; }
 	.pill { padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; background: color-mix(in srgb, currentColor 14%, transparent); }
 	.st-ordered.pill { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }

@@ -36,7 +36,7 @@ export function receiptEmail(env: any, o: OrderInfo) {
 	const date = new Date(o.createdAt * 1000).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Perth' });
 	const item = o.total - (o.shippingAmt ?? 0);
 	const first = (o.name || '').split(/\s+/)[0];
-	const track = `${ORIGIN}/preorder/success?order=${encodeURIComponent(o.id)}`;
+	const track = `${ORIGIN}/orders/track?order=${encodeURIComponent(o.id)}`;
 	const lines = [
 		`${first ? `Thanks, ${first}. ` : 'Thanks! '}Your E-Ink Calendar is reserved and ships by ${SHIPS_BY}. I'll email you again when it's on its way.`,
 	];
