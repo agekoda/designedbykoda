@@ -50,35 +50,36 @@ export interface Mail {
 }
 
 const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const TONE = { warn: '#b45309', bad: '#b91c1c', good: '#15803d' };
-const ICON = { battery: '🔋', offline: '📡', update: '✨' };
+// Colours from the website (src/styles/global.css), dark like the site.
+const SITE = { bg: '#0a0a0a', card: '#121212', border: '#262626', fg: '#f5f5f5', muted: '#a3a3a3', dim: '#737373', accent: '#5aa0dc' };
+const TONE = { warn: '#f5a524', bad: '#f06b6b', good: '#5bd08a' };
+const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
-// The HTML version: a simple card that works in Gmail, Outlook and Apple Mail (tables and
-// inline styles only), with the same words as the plain-text version.
+// The HTML version: dark, like the website, and light to load (no images or web fonts).
+// Tables and inline styles only, so it looks the same in Gmail, Outlook and Apple Mail.
 export function alertHtml(m: Mail, unsub: string): string {
-	const tone = m.stat ? TONE[m.stat.tone ?? 'warn'] : '#111111';
-	const para = (l: string) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#3f3f46">${escHtml(l)}</p>`;
-	return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>${escHtml(m.subject)}</title></head>
-<body style="margin:0;padding:0;background:#f4f4f5;-webkit-text-size-adjust:100%">
+	const tone = m.stat ? TONE[m.stat.tone ?? 'warn'] : SITE.fg;
+	const para = (l: string) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.65;color:${SITE.muted}">${escHtml(l)}</p>`;
+	return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>${escHtml(m.subject)}</title></head>
+<body style="margin:0;padding:0;background:${SITE.bg};-webkit-text-size-adjust:100%">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">${escHtml(m.lines[0] ?? '')}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:32px 14px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${SITE.bg}" style="background:${SITE.bg}"><tr><td align="center" style="padding:36px 14px 40px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px">
-	<tr><td style="padding:0 6px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;font-weight:800;letter-spacing:-0.2px;color:#111111">designedbykoda</td></tr>
-	<tr><td style="background:#ffffff;border:1px solid #e4e4e7;border-radius:18px;padding:30px 28px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif">
-		<div style="font-size:30px;line-height:1;margin:0 0 16px">${ICON[m.kind]}</div>
-		<div style="font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#71717a;margin:0 0 6px">${escHtml(m.device)}</div>
-		<h1 style="margin:0 0 18px;font-size:23px;line-height:1.25;font-weight:800;color:#111111">${escHtml(m.heading)}</h1>
+	<tr><td style="padding:0 4px 18px;font-family:${FONT};font-size:16px;font-weight:800;letter-spacing:-0.3px;color:${SITE.fg}">designedbykoda</td></tr>
+	<tr><td bgcolor="${SITE.card}" style="background:${SITE.card};border:1px solid ${SITE.border};border-radius:20px;padding:30px 28px 30px;font-family:${FONT}">
+		<div style="font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${SITE.accent};margin:0 0 8px">${escHtml(m.device)}</div>
+		<h1 style="margin:0 0 20px;font-size:24px;line-height:1.25;font-weight:800;letter-spacing:-0.3px;color:${SITE.fg}">${escHtml(m.heading)}</h1>
 		${
 			m.stat
-				? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px"><tr><td style="background:#fafafa;border:1px solid #e4e4e7;border-radius:12px;padding:12px 16px"><div style="font-size:12px;color:#71717a;margin:0 0 2px">${escHtml(m.stat.label)}</div><div style="font-size:22px;font-weight:800;color:${tone}">${escHtml(m.stat.value)}</div></td></tr></table>`
+				? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px"><tr><td bgcolor="${SITE.bg}" style="background:${SITE.bg};border:1px solid ${SITE.border};border-radius:14px;padding:13px 18px"><div style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${SITE.dim};margin:0 0 4px">${escHtml(m.stat.label)}</div><div style="font-size:24px;font-weight:800;letter-spacing:-0.3px;color:${tone}">${escHtml(m.stat.value)}</div></td></tr></table>`
 				: ''
 		}
 		${m.lines.map(para).join('')}
-		<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 0"><tr><td style="background:#111111;border-radius:999px"><a href="${escHtml(m.button.url)}" style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:999px">${escHtml(m.button.label)}</a></td></tr></table>
+		<table role="presentation" cellpadding="0" cellspacing="0" style="margin:10px 0 0"><tr><td bgcolor="${SITE.fg}" style="background:${SITE.fg};border-radius:999px"><a href="${escHtml(m.button.url)}" style="display:inline-block;padding:12px 24px;font-family:${FONT};font-size:14px;font-weight:800;color:${SITE.bg};text-decoration:none;border-radius:999px">${escHtml(m.button.label)}</a></td></tr></table>
 	</td></tr>
-	<tr><td style="padding:18px 8px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:12px;line-height:1.6;color:#a1a1aa;text-align:center">
+	<tr><td style="padding:20px 8px 0;font-family:${FONT};font-size:12px;line-height:1.7;color:${SITE.dim};text-align:center">
 		You get this because email alerts are on for your E-Ink Calendar.<br>
-		<a href="${ORIGIN}/dashboard" style="color:#71717a">Choose which emails you get</a> &nbsp;·&nbsp; <a href="${escHtml(unsub)}" style="color:#71717a">Unsubscribe</a>
+		<a href="${ORIGIN}/dashboard" style="color:${SITE.muted}">Choose which emails you get</a> &nbsp;·&nbsp; <a href="${escHtml(unsub)}" style="color:${SITE.muted}">Unsubscribe</a>
 	</td></tr>
 </table></td></tr></table></body></html>`;
 }
