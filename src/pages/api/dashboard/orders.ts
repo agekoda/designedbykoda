@@ -9,7 +9,15 @@ export async function GET({ request, locals }: any) {
 	const { getSessionUserId } = await import('../../../lib/session');
 	const userId = await getSessionUserId(request, db);
 	if (!userId) return json({ error: 'Not logged in.' }, 401);
-	const rows = await ordersForUser(db, userId);
+	// Delivered and cancelled orders drop off the dashboard two weeks later. They stay in the database
+	// (and in the owner area), and the /track link from the receipt keeps working.
+	const KEEP = 14 * 86400;
+	const now = Math.floor(Date.now() / 1000);
+	const rows = (await ordersForUser(db, userId)).filter((o) => {
+		const st = statusOf(o);
+		const at = st === 'delivered' ? (o.delivered_at ?? o.status_at) : st === 'cancelled' ? o.status_at : null;
+		return !at || now - at < KEEP;
+	});
 	return json({
 		orders: rows.map((o) => {
 			let a: any = {};
