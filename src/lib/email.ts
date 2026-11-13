@@ -74,7 +74,7 @@ export async function sendEmail(
 			headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json', accept: 'application/json' },
 			body: JSON.stringify({
 				sender: { name: o.fromName ?? 'designedbykoda', email: o.fromEmail },
-				replyTo: { email: supportEmail(env), name: 'designedbykoda support' },
+				replyTo: { email: supportEmail(env), name: 'support' },
 				to: [{ email: o.to }],
 				subject: o.subject,
 				textContent: o.text,
