@@ -200,3 +200,6 @@ dist
 
 ### Astro ###
 .astro/
+
+### Owner desktop app ###
+*.exe

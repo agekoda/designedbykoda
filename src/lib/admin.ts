@@ -29,8 +29,10 @@ export async function adminPasswordOk(input: string, env: any): Promise<boolean>
 	return safeEqual(await hmacHex('cmp', input), await hmacHex('cmp', secret));
 }
 
-export async function makeAdminToken(env: any): Promise<string> {
-	const exp = Math.floor(Date.now() / 1000) + ADMIN_SESSION_SEC;
+export const ADMIN_APP_SESSION_SEC = 60 * 60 * 24 * 30; // the desktop app stays signed in for 30 days
+
+export async function makeAdminToken(env: any, seconds = ADMIN_SESSION_SEC): Promise<string> {
+	const exp = Math.floor(Date.now() / 1000) + seconds;
 	return `${exp}.${await hmacHex(adminSecret(env), `admin-v1.${exp}`)}`;
 }
 
