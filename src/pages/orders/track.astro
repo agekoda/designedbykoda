@@ -1,24 +1,6 @@
 ---
-// "Track your order" in the receipt email. Signed in: link the order to this account (if it
-// isn't linked to someone else) and go straight to the dashboard. Signed out: sign in, then
-// come back here.
+// Older receipts linked here. The tracking page is /track now.
 export const prerender = false;
-
 const order = Astro.url.searchParams.get('order') ?? '';
-const valid = /^cs_(test|live)_[A-Za-z0-9]{10,200}$/.test(order);
-const db = Astro.locals.runtime?.env?.DB;
-let userId: string | null = null;
-if (db) {
-	try {
-		const { getSessionUserId } = await import('../../lib/session');
-		userId = await getSessionUserId(Astro.request, db);
-	} catch {}
-}
-if (!userId) return Astro.redirect('/api/auth/google/start?return=' + encodeURIComponent('/orders/track' + (valid ? '?order=' + order : '')), 302);
-if (valid && db) {
-	try {
-		await db.prepare('UPDATE orders SET user_id = ? WHERE id = ? AND user_id IS NULL').bind(userId, order).run();
-	} catch {}
-}
-return Astro.redirect('/dashboard#orders', 302);
+return Astro.redirect('/track' + (/^cs_(test|live)_[A-Za-z0-9]{10,200}$/.test(order) ? '?o=' + order : ''), 301);
 ---

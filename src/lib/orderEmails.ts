@@ -36,7 +36,7 @@ export function receiptEmail(env: any, o: OrderInfo) {
 	const date = new Date(o.createdAt * 1000).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Perth' });
 	const item = o.total - (o.shippingAmt ?? 0);
 	const first = (o.name || '').split(/\s+/)[0];
-	const track = `${ORIGIN}/orders/track?order=${encodeURIComponent(o.id)}`;
+	const track = `${ORIGIN}/track?o=${encodeURIComponent(o.id)}`;
 	const lines = [
 		`${first ? `Thanks, ${first}. ` : 'Thanks! '}Your E-Ink Calendar is reserved and ships by ${SHIPS_BY}. I'll email you again when it's on its way.`,
 	];
@@ -85,10 +85,11 @@ export function receiptEmail(env: any, o: OrderInfo) {
 export function shippedEmail(env: any, o: OrderInfo) {
 	const num = orderNumber(o.id);
 	const url = trackingUrl(o.tracking);
+	const page = `${ORIGIN}/track?o=${encodeURIComponent(o.id)}`;
 	const first = (o.name || '').split(/\s+/)[0];
 	const lines = [
 		`${first ? `Good news, ${first}: your` : 'Your'} E-Ink Calendar has been posted.`,
-		url ? 'Use the tracking number to see where it is. You can also follow it on your dashboard.' : 'You can follow it on your dashboard.',
+		url ? 'Use the tracking number to see where it is.' : 'You can follow it on your order page.',
 	];
 	const subject = `Your E-Ink Calendar is on its way (${num})`;
 	const html = emailHtml({
@@ -98,10 +99,10 @@ export function shippedEmail(env: any, o: OrderInfo) {
 		stat: o.tracking && !/^https?:/i.test(o.tracking) ? { label: 'Tracking number', value: o.tracking, tone: 'good' } : undefined,
 		lines,
 		blocks: [{ label: 'Going to', text: addressLines(o.name, o.addr) }],
-		button: url ? { label: 'Track it', url } : { label: 'See your order', url: `${ORIGIN}/dashboard` },
+		button: url ? { label: 'Track it', url } : { label: 'See your order', url: page },
 		footer: foot(env),
 	});
-	const text = ['It’s on its way', '', ...lines, '', o.tracking ? `Tracking: ${o.tracking}` : '', url ? `Track it: ${url}` : `Your order: ${ORIGIN}/dashboard`, '', `Questions? Reply to this email or write to ${supportEmail(env)}.`]
+	const text = ['It’s on its way', '', ...lines, '', o.tracking ? `Tracking: ${o.tracking}` : '', url ? `Track it: ${url}` : `Your order: ${page}`, '', `Questions? Reply to this email or write to ${supportEmail(env)}.`]
 		.filter((l, i, a) => l !== '' || a[i - 1] !== '')
 		.join('\n');
 	return { subject, html, text };
