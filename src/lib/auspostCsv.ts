@@ -67,6 +67,7 @@ export function rowFor(o: any, env: any): string[] {
 	const state = au ? String(a.state ?? '').toUpperCase() : cut(a.state, 30);
 	const r: Record<string, string> = {
 		'Send From Name': cut(from.name, 35),
+		'Send From Business Name': 'designedbykoda',
 		'Send From Address Line 1': cut(from.line1, 40),
 		'Send From Suburb': cut(from.suburb, 30),
 		'Send From State': from.state,
