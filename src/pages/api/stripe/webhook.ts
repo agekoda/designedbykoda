@@ -58,57 +58,11 @@ export async function POST({ request, locals }) {
 	}
 
 	if (!isNew) return new Response('ok', { status: 200 });
-	// The buyer's receipt (Stripe's own receipt emails are turned off) and the note to you.
+	// The buyer's receipt (Stripe's own receipt emails are turned off). You get one summary a day instead
+	// of an email per order: src/lib/dailySummary.ts.
 	const { sendReceipt } = await import('../../../lib/orderEmails');
 	await sendReceipt(env, { id: s.id, email, name, addr, currency, total, shippingAmt, createdAt: Math.floor(Date.now() / 1000) });
-	await notifyOwner(env, { id: s.id, name, email, phone, addr, currency, total, shippingAmt });
 	return new Response('ok', { status: 200 });
-}
-
-function money(cents: number, currency: string) {
-	return `${(cents / 100).toFixed(2)} ${currency}`;
-}
-
-// Emails the order details through Brevo. Optional: skipped (and logged) when
-// BREVO_API_KEY isn't set, and a failure here never fails the webhook.
-async function notifyOwner(env: any, o: any) {
-	if (!env.BREVO_API_KEY) {
-		console.log('New order (no BREVO_API_KEY set, so no email):', o.id);
-		return;
-	}
-	const a = o.addr || {};
-	const lines = [
-		`New preorder: ${money(o.total, o.currency)} (shipping ${money(o.shippingAmt, o.currency)})`,
-		'',
-		'Ship to:',
-		o.name,
-		a.line1,
-		a.line2,
-		[a.city, a.state, a.postal_code].filter(Boolean).join(' '),
-		a.country,
-		'',
-		`Email: ${o.email}`,
-		`Phone: ${o.phone || '(none)'}`,
-		'',
-		`Stripe: https://dashboard.stripe.com/payments (session ${o.id})`,
-	].filter((l) => l !== undefined && l !== null);
-	const from = env.ORDER_EMAIL_FROM || 'dylan@designedbykoda.com';
-	const to = env.ORDER_EMAIL_TO || from;
-	try {
-		const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-			method: 'POST',
-			headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json', accept: 'application/json' },
-			body: JSON.stringify({
-				sender: { name: 'designedbykoda orders', email: from },
-				to: [{ email: to }],
-				subject: `New preorder: ${o.name || o.email}`,
-				textContent: lines.join('\n'),
-			}),
-		});
-		if (!res.ok) console.error('Order email failed:', res.status, await res.text().catch(() => ''));
-	} catch (err) {
-		console.error('Order email failed:', err);
-	}
 }
 
 // Stripe signs "<timestamp>.<body>" with the webhook secret (HMAC-SHA256).
