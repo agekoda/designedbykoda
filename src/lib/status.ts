@@ -232,6 +232,7 @@ export type ComponentView = {
 	label: string;
 	blurb: string;
 	state: ComponentState;
+	detail: string | null; // why it isn't Operational, when we know (e.g. which part of Cloudflare)
 	ms: number | null;
 	avgMs: number | null;
 	uptime: number | null; // percent over the window, or null with no data
@@ -293,6 +294,7 @@ export async function loadStatus(env: any): Promise<StatusData> {
 		components: COMPONENTS.map((c) => ({
 			...c,
 			state: 'unknown',
+			detail: null,
 			ms: null,
 			avgMs: null,
 			uptime: null,
@@ -360,9 +362,13 @@ export async function loadStatus(env: any): Promise<StatusData> {
 			const fresh = l && now - l.ts < 20 * 60;
 			let state: ComponentState = 'unknown';
 			if (l && fresh) state = !l.ok ? 'outage' : l.ms > SLOW_MS || l.detail ? 'slow' : 'operational';
+			// Why: Cloudflare's own words for its feed, the failure reason for an outage, the time for a slow answer
+			const detail =
+				state === 'slow' ? (l.detail ? `Cloudflare reports: ${l.detail}` : `Answered in ${l.ms} ms, slower than usual`) : state === 'outage' ? (c.id === 'cloudflare' && l.detail ? `Cloudflare reports: ${l.detail}` : l.detail || null) : null;
 			return {
 				...c,
 				state,
+				detail,
 				ms: l?.ok ? l.ms : null,
 				avgMs: avgBy.has(c.id) ? Math.round(avgBy.get(c.id)!) : null,
 				uptime: checks ? (ok / checks) * 100 : null,
@@ -431,7 +437,8 @@ export function demoStatus(kind: string): StatusData {
 			state = 'slow';
 			ms = 4200;
 		}
-		return { ...c, state, ms, avgMs: 90 + Math.round(rnd(ci + 3) * 240), uptime, days: dayViews };
+		const detail = state === 'slow' ? `Answered in ${ms} ms, slower than usual` : null;
+		return { ...c, state, detail, ms, avgMs: 90 + Math.round(rnd(ci + 3) * 240), uptime, days: dayViews };
 	});
 	const incidents: IncidentView[] = [];
 	if (kind === 'outage') {

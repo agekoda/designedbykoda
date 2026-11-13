@@ -47,6 +47,7 @@
 
 			<div class="grid g3" style="margin-top:14px">${(st?.components || []).map((c) => html`<div class="card comp">
 				<div class="top"><b>${c.label}</b>${tone(c.state === 'operational' ? 'good' : c.state === 'outage' ? 'bad' : c.state === 'slow' ? 'warn' : 'dim', { operational: 'Working', slow: 'Slow', outage: 'Down', unknown: 'No data' }[c.state])}</div>
+				${c.detail ? html`<div class="muted" style="font-size:13.5px">${c.detail}${c.id === 'cloudflare' ? html` · <button class="link" data-act="open" data-url="https://www.cloudflarestatus.com/">Cloudflare's status page</button>` : ''}</div>` : ''}
 				${Charts.strip(c.days)}
 				<div class="foot"><span>90 days ago</span><span>${c.uptime === null ? 'no data' : c.uptime.toFixed(c.uptime === 100 ? 0 : 2) + '% up'}${c.avgMs ? ` · ${Math.round(c.avgMs)} ms` : ''}</span><span>today</span></div></div>`)}</div>
 

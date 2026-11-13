@@ -123,7 +123,7 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); c
 .board100 i.f { box-shadow: none; cursor: pointer; } .board100 i.f:hover { outline: 2px solid var(--fg); outline-offset: 1px; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; font-size: 13.5px; color: var(--muted); } .legend b { color: var(--fg); }
 .big { font-size: 44px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; } .big small { font-size: 20px; color: var(--dim); font-weight: 400; letter-spacing: 0; }
-.strip { display: flex; gap: 1.5px; height: 26px; } .strip i { flex: 1; border-radius: 2px; background: #222; } .strip i.g { background: var(--good); opacity: .8; } .strip i.w { background: var(--warn); } .strip i.b { background: var(--bad); } .strip i:hover { opacity: 1; outline: 1px solid var(--fg); }
+.strip { display: flex; gap: 1.5px; height: 26px; } .strip i { flex: 1; border-radius: 2px; background: #222; } .strip i.g { background: var(--good); opacity: .8; } .strip i.w { background: var(--warn); } .strip i.b { background: var(--bad); } .strip:hover i { opacity: .4; } .strip i:hover { opacity: 1; outline: 1px solid var(--fg); transform: scaleY(1.15); }
 
 /* attention list */
 .todo { display: grid; } .todo button { display: flex; align-items: center; gap: 12px; padding: 11px 4px; border: 0; border-top: 1px solid var(--border); background: none; text-align: left; width: 100%; } .todo button:first-child { border-top: 0; } .todo button:hover { background: #161616; }
