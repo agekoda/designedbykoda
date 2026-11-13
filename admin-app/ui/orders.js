@@ -180,7 +180,7 @@
 					$('#ship-go').disabled = true;
 					if (await save([o.id], { tracking: t })) { sent++; i++; draw(); } else $('#ship-go').disabled = false;
 				};
-				input.onkeydown = (e) => { if (e.key === 'Enter') go(); };
+				input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } };
 				$('#ship-go').onclick = go;
 				$('#ship-skip').onclick = () => { i++; draw(); };
 				$('#ship-copy').onclick = () => copyText(addressText(o), 'Address copied');

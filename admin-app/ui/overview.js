@@ -87,6 +87,8 @@ App.views.overview = {
 		add(low.length, 'warn', `${plural(low.length, 'calendar')} low on battery`, '15% or less', 'devices-filter', 'problems');
 		const behind = d.devices.filter(fwBehind);
 		add(behind.length, '', `${plural(behind.length, 'calendar')} on old firmware`, 'They update on their next wake', 'devices-filter', 'behind');
+		const short = App.inv ? App.inv.get().parts.filter((p) => App.inv.short(p) > 0) : [];
+		add(short.length, 'warn', `${plural(short.length, 'part')} short for the calendars sold`, short.slice(0, 3).map((p) => p.name).join(', ') + (short.length > 3 ? '…' : ''), 'nav', 'parts');
 		const ch = d.firmware.channels;
 		if (ch.beta?.version && ch.stable?.version && cmpVer(ch.beta.version, ch.stable.version) > 0) add(1, 'info', `Beta is on ${ch.beta.version}, everyone on ${ch.stable.version}`, 'Send it to everyone when you are happy with it', 'nav', 'firmware');
 		if (App.local.repo && !App.local.repo.ok) add(1, '', 'Project folder not found', 'Needed for firmware releases: set it in Settings', 'nav', 'settings');

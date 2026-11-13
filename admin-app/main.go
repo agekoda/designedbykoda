@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	appVersion  = "1.1.0"
+	appVersion  = "1.2.0"
 	appName     = "designedbykoda-admin"
 	defaultSite = "https://designedbykoda.com"
 	defaultPort = 47615
@@ -151,6 +151,7 @@ var sitePaths = map[string]string{
 	"/api/admin/app/incident": "POST",
 	"/api/admin/app/email":    "POST",
 	"/api/admin/app/stats":    "POST",
+	"/api/admin/app/store":    "POST",
 	"/api/admin/orders":       "POST",
 }
 
