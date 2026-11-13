@@ -274,8 +274,14 @@ const hasData = data.lastCheck !== null;
 		const r = bar.getBoundingClientRect();
 		const x = Math.min(window.innerWidth - tip.offsetWidth - 8, Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2));
 		const y = r.top - tip.offsetHeight - 10 < 8 ? r.bottom + 10 : r.top - tip.offsetHeight - 10;
-		tip.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
-		if (fresh) requestAnimationFrame(() => !tip.hidden && tip.classList.add('glide'));
+		if (!fresh) tip.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+		if (fresh) {
+			// appear in place: no glide for this first move, then glide from here on
+			tip.classList.remove('glide');
+			tip.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+			void tip.offsetWidth;
+			tip.classList.add('glide');
+		}
 	};
 	document.querySelectorAll<HTMLElement>('.bars').forEach((bars) => {
 		bars.addEventListener('pointermove', (e) => {
