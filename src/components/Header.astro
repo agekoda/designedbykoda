@@ -1,4 +1,5 @@
 ---
+const onDash = Astro.url.pathname.startsWith('/dashboard');
 import HeaderLink from './HeaderLink.astro';
 import { SITE_TITLE, GITHUB_URL, TIKTOK_URL, YOUTUBE_URL, INSTAGRAM_URL } from '../consts';
 ---
@@ -11,6 +12,7 @@ import { SITE_TITLE, GITHUB_URL, TIKTOK_URL, YOUTUBE_URL, INSTAGRAM_URL } from '
 			<HeaderLink href="/projects">Projects</HeaderLink>
 			<HeaderLink href="/about">About</HeaderLink>
 		</div>
+		<div class="right">
 		<div class="social-links">
 			<a href={TIKTOK_URL} target="_blank" rel="noopener">
 				<span class="sr-only">Follow on TikTok</span>
@@ -48,6 +50,11 @@ import { SITE_TITLE, GITHUB_URL, TIKTOK_URL, YOUTUBE_URL, INSTAGRAM_URL } from '
 					></path></svg
 				>
 			</a>
+		</div>
+		<a class:list={['dash', { active: onDash }]} href="/dashboard" aria-current={onDash ? 'page' : undefined}>
+			<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></svg>
+			Dashboard
+		</a>
 		</div>
 	</nav>
 </header>
@@ -103,6 +110,32 @@ import { SITE_TITLE, GITHUB_URL, TIKTOK_URL, YOUTUBE_URL, INSTAGRAM_URL } from '
 	}
 	.social-links a:hover {
 		color: var(--fg);
+	}
+	.right {
+		display: flex;
+		align-items: center;
+		gap: 0.6em;
+	}
+	nav a.dash {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45em;
+		padding: 0.42em 0.95em;
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		color: var(--fg);
+		font-weight: 700;
+		font-size: 0.9em;
+		white-space: nowrap;
+		transition: border-color 0.15s ease, background 0.15s ease;
+	}
+	nav a.dash:hover {
+		border-color: var(--accent);
+		background: color-mix(in srgb, var(--accent) 10%, transparent);
+	}
+	nav a.dash.active {
+		border-color: var(--accent);
+		color: var(--accent);
 	}
 	@media (max-width: 520px) {
 		nav {
