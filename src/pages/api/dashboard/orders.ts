@@ -9,7 +9,18 @@ export async function GET({ request, locals }: any) {
 	const { getSessionUserId } = await import('../../../lib/session');
 	const userId = await getSessionUserId(request, db);
 	if (!userId) return json({ error: 'Not logged in.' }, 401);
-	const rows = await ordersForUser(db, userId);
+	// A delivered order leaves the dashboard at midnight (Perth time) at the end of the day it was
+	// delivered, so the calendar is back at the top the next morning. Cancelled ones stay 14 days.
+	// Nothing is deleted: the owner area still has them, and the receipt's /track link still works.
+	const PERTH = 8 * 3600;
+	const now = Math.floor(Date.now() / 1000);
+	const midnightAfter = (t: number) => t + PERTH - ((t + PERTH) % 86400) + 86400 - PERTH;
+	const rows = (await ordersForUser(db, userId)).filter((o) => {
+		const st = statusOf(o);
+		if (st === 'delivered') return now < midnightAfter(o.delivered_at ?? o.status_at ?? now);
+		if (st === 'cancelled') return now - (o.status_at ?? now) < 14 * 86400;
+		return true;
+	});
 	return json({
 		orders: rows.map((o) => {
 			let a: any = {};
