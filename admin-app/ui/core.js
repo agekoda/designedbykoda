@@ -133,6 +133,7 @@ const ICONS = {
 	devices: '<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9h4M7 13h10M9 21h6"/>',
 	firmware: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',
 	status: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+	stats: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
 	settings: '<path d="M4 6h9M19 6h1M4 12h3M13 12h7M4 18h11M20 18h0"/><circle cx="16" cy="6" r="2.200"/><circle cx="10" cy="12" r="2.200"/><circle cx="17.500" cy="18" r="2.200"/>',
 	refresh: '<path d="M20 11a8 8 0 1 0-2.300 6.300M20 4v7h-7"/>',
 	search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.500-4.500"/>',

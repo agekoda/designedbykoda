@@ -212,6 +212,8 @@ const hasData = data.lastCheck !== null;
 <style is:global>
 	.bar-tip {
 		position: fixed;
+		left: 0;
+		top: 0;
 		z-index: 50;
 		pointer-events: none;
 		padding: 0.4em 0.7em;
@@ -222,6 +224,16 @@ const hasData = data.lastCheck !== null;
 		color: var(--fg);
 		font-size: 0.82em;
 		white-space: nowrap;
+		will-change: transform;
+	}
+	/* glides between days; it appears in place first, then eases to wherever the pointer goes */
+	.bar-tip.glide {
+		transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.bar-tip.glide {
+			transition: none;
+		}
 	}
 	.bar-tip b {
 		display: block;
@@ -240,9 +252,13 @@ const hasData = data.lastCheck !== null;
 		lit?.parentElement?.classList.remove('touch');
 		lit = null;
 		tip.hidden = true;
+		tip.classList.remove('glide');
 	};
 	const show = (bar: HTMLElement, touch: boolean) => {
-		if (lit !== bar) clear();
+		if (lit === bar) return;
+		// moving to another day in the same row keeps the pop-up up, so it can glide across
+		if (lit && lit.parentElement === bar.parentElement) lit.classList.remove('on');
+		else clear();
 		lit = bar;
 		bar.classList.add('on');
 		if (touch) bar.parentElement!.classList.add('touch');
@@ -253,11 +269,13 @@ const hasData = data.lastCheck !== null;
 		const s = document.createElement('span');
 		s.textContent = what || '';
 		tip.append(b, s);
+		const fresh = tip.hidden;
 		tip.hidden = false;
 		const r = bar.getBoundingClientRect();
 		const x = Math.min(window.innerWidth - tip.offsetWidth - 8, Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2));
-		tip.style.left = x + 'px';
-		tip.style.top = (r.top - tip.offsetHeight - 10 < 8 ? r.bottom + 10 : r.top - tip.offsetHeight - 10) + 'px';
+		const y = r.top - tip.offsetHeight - 10 < 8 ? r.bottom + 10 : r.top - tip.offsetHeight - 10;
+		tip.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+		if (fresh) requestAnimationFrame(() => !tip.hidden && tip.classList.add('glide'));
 	};
 	document.querySelectorAll<HTMLElement>('.bars').forEach((bars) => {
 		bars.addEventListener('pointermove', (e) => {
@@ -559,7 +577,7 @@ const hasData = data.lastCheck !== null;
 	}
 	.bars:hover .bar,
 	.bars.touch .bar {
-		opacity: 0.45;
+		opacity: 0.72;
 	}
 	.bars .bar.on {
 		opacity: 1;
