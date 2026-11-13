@@ -31,15 +31,19 @@ export async function POST({ request, locals, cookies }) {
 		if (!row) continue;
 		const sets: string[] = [];
 		const vals: unknown[] = [];
-		if (status && status !== statusOf(row)) {
+		// Adding a tracking number to an order that hasn't shipped yet means it has shipped.
+		let st = status;
+		const before = statusOf(row);
+		if (tracking && !row.tracking && (!st || st === before) && ['ordered', 'making', 'ready'].includes(before)) st = 'shipped';
+		if (st && st !== before) {
 			sets.push('shipped_at = ?', 'delivered_at = ?');
 			// keep the dates that go with the status
-			const shippedAt = status === 'shipped' || status === 'delivered' ? (row.shipped_at ?? now) : null;
-			const deliveredAt = status === 'delivered' ? (row.delivered_at ?? now) : null;
+			const shippedAt = st === 'shipped' || st === 'delivered' ? (row.shipped_at ?? now) : null;
+			const deliveredAt = st === 'delivered' ? (row.delivered_at ?? now) : null;
 			vals.push(shippedAt, deliveredAt);
 			if ('status' in row) {
 				sets.push('status = ?', 'status_at = ?');
-				vals.push(status, now);
+				vals.push(st, now);
 			}
 		}
 		if (tracking !== undefined) (sets.push('tracking = ?'), vals.push(tracking));
@@ -47,11 +51,14 @@ export async function POST({ request, locals, cookies }) {
 		if (anote !== undefined && 'admin_note' in row) (sets.push('admin_note = ?'), vals.push(anote));
 		if (!sets.length) continue;
 		await db.prepare(`UPDATE orders SET ${sets.join(', ')} WHERE id = ?`).bind(...vals, id).run();
-		// Moved to Shipped: email the buyer, with the tracking number if there is one.
-		const was = statusOf(row);
-		if (status === 'shipped' && was !== 'shipped' && was !== 'delivered') {
+		// Shipped and it has a tracking number: email the buyer once ("It's on its way" + tracking).
+		const finalStatus = st ?? before;
+		const finalTracking = tracking !== undefined ? tracking : row.tracking;
+		const alreadySent = 'shipped_email_at' in row ? !!row.shipped_email_at : before === 'shipped' || before === 'delivered';
+		if (finalStatus === 'shipped' && finalTracking && !alreadySent) {
 			const { sendShipped, fromRow } = await import('../../../lib/orderEmails');
-			await sendShipped(env, fromRow({ ...row, tracking: tracking !== undefined ? tracking : row.tracking }));
+			if ((await sendShipped(env, fromRow({ ...row, tracking: finalTracking }))) && 'shipped_email_at' in row)
+				await db.prepare('UPDATE orders SET shipped_email_at = ? WHERE id = ?').bind(now, id).run();
 		}
 	}
 	return json({ ok: true });

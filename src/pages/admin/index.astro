@@ -187,7 +187,7 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 
 				<div id="list">
 					{orders.map((o) => (
-						<article class="order" data-id={o.id} data-status={o.status}
+						<article class="order" data-id={o.id} data-status={o.status} data-tracking={o.tracking ?? ''}
 							data-search={`${addressText(o)} ${o.email} ${o.phone} ${o.id} ${orderNumber(o.id)} ${o.tracking ?? ''}`.toLowerCase()}>
 							<div class="top">
 								<label class="pick"><input type="checkbox" class="sel" aria-label="Select order" /></label>
@@ -217,7 +217,7 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 										{STATUSES.map((st) => <option value={st} selected={st === o.status}>{ADMIN_LABEL[st]}</option>)}
 									</select>
 								</label>
-								<label><span>Tracking number or link {o.tracking && trackingUrl(o.tracking) && <a href={trackingUrl(o.tracking)} target="_blank" rel="noopener">open</a>}</span>
+								<label><span>Tracking number (emails the buyer when first added) {o.tracking && trackingUrl(o.tracking) && <a href={trackingUrl(o.tracking)} target="_blank" rel="noopener">open</a>}</span>
 									<input class="track" type="text" placeholder="e.g. 33ABC1234567" value={o.tracking ?? ''} maxlength="300" />
 								</label>
 								<label class="wide"><span>Note to the buyer (shows on their dashboard)</span>
@@ -315,7 +315,7 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 			const status = (document.getElementById('bulk-status') as HTMLSelectElement).value;
 			const msg = document.getElementById('bulk-msg')!;
 			if (!ids.length) return;
-			if (!confirm(`Set ${ids.length} order${ids.length > 1 ? 's' : ''} to "${(document.getElementById('bulk-status') as HTMLSelectElement).selectedOptions[0].text}"? Buyers see this on their dashboard${status === 'shipped' ? ', and each one gets an email that it\u2019s on its way' : ''}.`)) return;
+			if (!confirm(`Set ${ids.length} order${ids.length > 1 ? 's' : ''} to "${(document.getElementById('bulk-status') as HTMLSelectElement).selectedOptions[0].text}"? Buyers see this on their dashboard.${status === 'shipped' ? ' Orders with a tracking number also get an \u201con its way\u201d email.' : ''}`)) return;
 			msg.textContent = 'Saving…';
 			try {
 				await post({ ids, status });
@@ -340,10 +340,9 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 			} else if (t.classList.contains('save')) {
 				const status = o.querySelector<HTMLSelectElement>('.status')!.value;
 				const tracking = o.querySelector<HTMLInputElement>('.track')!.value;
-				if (status === 'shipped' && o.dataset.status !== 'shipped' && o.dataset.status !== 'delivered') {
-					const q = tracking.trim() ? 'Mark as shipped? This emails the buyer that it\u2019s on its way, with the tracking number.' : 'Mark as shipped without a tracking number? This emails the buyer that it\u2019s on its way.';
-					if (!confirm(q)) return;
-				}
+				const hadTracking = (o.dataset.tracking ?? '') !== '';
+				const firstTracking = tracking.trim() !== '' && !hadTracking && o.dataset.status !== 'delivered';
+				if (firstTracking && !confirm('Save the tracking number? This marks it Shipped and emails the buyer that it\u2019s on its way, with the tracking link.')) return;
 				el.textContent = 'Saving…';
 				try {
 					await post({
@@ -354,7 +353,7 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 						admin_note: o.querySelector<HTMLInputElement>('.anote')!.value,
 					});
 					el.textContent = 'Saved';
-					if (status !== o.dataset.status) setTimeout(() => location.reload(), 500);
+					if (status !== o.dataset.status || firstTracking) setTimeout(() => location.reload(), 500);
 				} catch (e: any) {
 					el.textContent = 'Could not save: ' + e.message;
 				}
