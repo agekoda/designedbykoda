@@ -1,11 +1,11 @@
 {
   "channels": {
     "stable": {
-      "version": "1.0.2",
+      "version": "1.0.3",
       "auto": true
     },
     "beta": {
-      "version": "1.0.2",
+      "version": "1.0.3",
       "auto": true
     }
   },
