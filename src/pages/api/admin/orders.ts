@@ -47,6 +47,12 @@ export async function POST({ request, locals, cookies }) {
 		if (anote !== undefined && 'admin_note' in row) (sets.push('admin_note = ?'), vals.push(anote));
 		if (!sets.length) continue;
 		await db.prepare(`UPDATE orders SET ${sets.join(', ')} WHERE id = ?`).bind(...vals, id).run();
+		// Moved to Shipped: email the buyer, with the tracking number if there is one.
+		const was = statusOf(row);
+		if (status === 'shipped' && was !== 'shipped' && was !== 'delivered') {
+			const { sendShipped, fromRow } = await import('../../../lib/orderEmails');
+			await sendShipped(env, fromRow({ ...row, tracking: tracking !== undefined ? tracking : row.tracking }));
+		}
 	}
 	return json({ ok: true });
 }

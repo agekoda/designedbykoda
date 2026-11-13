@@ -4,6 +4,7 @@
 // - firmware updated: optional, off unless they turn it on
 // Each email has a one-click unsubscribe link (signed, no login needed).
 import { batteryPercent } from './eink/battery';
+import { emailHtml, footLink, ORIGIN, sendEmail } from './email';
 
 export interface AlertPrefs {
 	battery: boolean;
@@ -21,7 +22,6 @@ export function parsePrefs(raw: unknown): AlertPrefs {
 	}
 }
 
-const ORIGIN = 'https://designedbykoda.com';
 const LOW = 15; // %
 const CHARGED = 40; // % before a new low-battery email can go out
 const OFFLINE_SEC = 48 * 3600;
@@ -49,65 +49,31 @@ export interface Mail {
 	button: { label: string; url: string };
 }
 
-const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-// Colours from the website (src/styles/global.css), dark like the site.
-const SITE = { bg: '#0a0a0a', card: '#121212', border: '#262626', fg: '#f5f5f5', muted: '#a3a3a3', dim: '#737373', accent: '#5aa0dc' };
-const TONE = { warn: '#f5a524', bad: '#f06b6b', good: '#5bd08a' };
-const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-
-// The HTML version: dark, like the website, and light to load (no images or web fonts).
-// Tables and inline styles only, so it looks the same in Gmail, Outlook and Apple Mail.
+// The HTML version: the shared email look (src/lib/email.ts).
 export function alertHtml(m: Mail, unsub: string): string {
-	const tone = m.stat ? TONE[m.stat.tone ?? 'warn'] : SITE.fg;
-	const para = (l: string) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.65;color:${SITE.muted}">${escHtml(l)}</p>`;
-	return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>${escHtml(m.subject)}</title></head>
-<body style="margin:0;padding:0;background:${SITE.bg};-webkit-text-size-adjust:100%">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0">${escHtml(m.lines[0] ?? '')}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${SITE.bg}" style="background:${SITE.bg}"><tr><td align="center" style="padding:36px 14px 40px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px">
-	<tr><td style="padding:0 4px 18px;font-family:${FONT};font-size:16px;font-weight:800;letter-spacing:-0.3px;color:${SITE.fg}">designedbykoda</td></tr>
-	<tr><td bgcolor="${SITE.card}" style="background:${SITE.card};border:1px solid ${SITE.border};border-radius:20px;padding:30px 28px 30px;font-family:${FONT}">
-		<div style="font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${SITE.accent};margin:0 0 8px">${escHtml(m.device)}</div>
-		<h1 style="margin:0 0 20px;font-size:24px;line-height:1.25;font-weight:800;letter-spacing:-0.3px;color:${SITE.fg}">${escHtml(m.heading)}</h1>
-		${
-			m.stat
-				? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px"><tr><td bgcolor="${SITE.bg}" style="background:${SITE.bg};border:1px solid ${SITE.border};border-radius:14px;padding:13px 18px"><div style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${SITE.dim};margin:0 0 4px">${escHtml(m.stat.label)}</div><div style="font-size:24px;font-weight:800;letter-spacing:-0.3px;color:${tone}">${escHtml(m.stat.value)}</div></td></tr></table>`
-				: ''
-		}
-		${m.lines.map(para).join('')}
-		<table role="presentation" cellpadding="0" cellspacing="0" style="margin:10px 0 0"><tr><td bgcolor="${SITE.fg}" style="background:${SITE.fg};border-radius:999px"><a href="${escHtml(m.button.url)}" style="display:inline-block;padding:12px 24px;font-family:${FONT};font-size:14px;font-weight:800;color:${SITE.bg};text-decoration:none;border-radius:999px">${escHtml(m.button.label)}</a></td></tr></table>
-	</td></tr>
-	<tr><td style="padding:20px 8px 0;font-family:${FONT};font-size:12px;line-height:1.7;color:${SITE.dim};text-align:center">
-		You get this because email alerts are on for your E-Ink Calendar.<br>
-		<a href="${ORIGIN}/dashboard" style="color:${SITE.muted}">Choose which emails you get</a> &nbsp;·&nbsp; <a href="${escHtml(unsub)}" style="color:${SITE.muted}">Unsubscribe</a>
-	</td></tr>
-</table></td></tr></table></body></html>`;
+	return emailHtml({
+		title: m.subject,
+		label: m.device,
+		heading: m.heading,
+		stat: m.stat,
+		lines: m.lines,
+		button: m.button,
+		footer: `You get this because email alerts are on for your E-Ink Calendar.<br>${footLink(ORIGIN + '/dashboard', 'Choose which emails you get')} &nbsp;·&nbsp; ${footLink(unsub, 'Unsubscribe')}`,
+	});
 }
 
 async function send(env: any, to: string, m: Mail, userId: string): Promise<boolean> {
-	if (!env.BREVO_API_KEY) return false;
 	const unsub = `${ORIGIN}/api/alerts/unsubscribe?u=${encodeURIComponent(userId)}&k=${await unsubToken(env, userId)}`;
 	const text = [m.heading, '', ...m.lines, '', `${m.button.label}: ${m.button.url}`, '', '—', 'Change which emails you get: ' + ORIGIN + '/dashboard', 'Unsubscribe: ' + unsub].join('\n');
-	try {
-		const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-			method: 'POST',
-			headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json', accept: 'application/json' },
-			body: JSON.stringify({
-				sender: { name: 'designedbykoda', email: env.ALERT_EMAIL_FROM || env.ORDER_EMAIL_FROM || 'hello@designedbykoda.com' },
-				to: [{ email: to }],
-				subject: m.subject,
-				textContent: text,
-				htmlContent: alertHtml(m, unsub),
-				headers: { 'List-Unsubscribe': `<${unsub}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
-				tags: ['alert', m.kind],
-			}),
-		});
-		if (!res.ok) console.error('alert email failed', res.status, await res.text().catch(() => ''));
-		return res.ok;
-	} catch (e) {
-		console.error('alert email failed', e);
-		return false;
-	}
+	return sendEmail(env, {
+		to,
+		fromEmail: env.ALERT_EMAIL_FROM || 'alerts@designedbykoda.com',
+		subject: m.subject,
+		text,
+		html: alertHtml(m, unsub),
+		headers: { 'List-Unsubscribe': `<${unsub}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+		tags: ['alert', m.kind],
+	});
 }
 
 // The three emails (also used by scripts to preview them).
@@ -131,7 +97,7 @@ export const mails = {
 			'It may be showing an old screen. Press its button to wake it.',
 			'If the screen doesn’t change, charge it for an hour and press it again. If it still doesn’t, it may not be reaching your Wi-Fi.',
 		],
-		button: { label: 'Get help', url: ORIGIN + '/projects/eink-calendar/help' },
+		button: { label: 'Get help', url: ORIGIN + '/help' },
 	}),
 	update: (name: string, from: string | null, to: string): Mail => {
 		const back = !!from && cmpVer(to, from) < 0;

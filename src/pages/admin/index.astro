@@ -315,7 +315,7 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 			const status = (document.getElementById('bulk-status') as HTMLSelectElement).value;
 			const msg = document.getElementById('bulk-msg')!;
 			if (!ids.length) return;
-			if (!confirm(`Set ${ids.length} order${ids.length > 1 ? 's' : ''} to "${(document.getElementById('bulk-status') as HTMLSelectElement).selectedOptions[0].text}"? Buyers see this on their dashboard.`)) return;
+			if (!confirm(`Set ${ids.length} order${ids.length > 1 ? 's' : ''} to "${(document.getElementById('bulk-status') as HTMLSelectElement).selectedOptions[0].text}"? Buyers see this on their dashboard${status === 'shipped' ? ', and each one gets an email that it\u2019s on its way' : ''}.`)) return;
 			msg.textContent = 'Saving…';
 			try {
 				await post({ ids, status });
@@ -340,7 +340,10 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 			} else if (t.classList.contains('save')) {
 				const status = o.querySelector<HTMLSelectElement>('.status')!.value;
 				const tracking = o.querySelector<HTMLInputElement>('.track')!.value;
-				if (status === 'shipped' && !tracking.trim() && !confirm('Mark as shipped without a tracking number?')) return;
+				if (status === 'shipped' && o.dataset.status !== 'shipped' && o.dataset.status !== 'delivered') {
+					const q = tracking.trim() ? 'Mark as shipped? This emails the buyer that it\u2019s on its way, with the tracking number.' : 'Mark as shipped without a tracking number? This emails the buyer that it\u2019s on its way.';
+					if (!confirm(q)) return;
+				}
 				el.textContent = 'Saving…';
 				try {
 					await post({
