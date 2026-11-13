@@ -35,7 +35,7 @@ const signIn = '/api/auth/google/start?return=' + encodeURIComponent('/preorder/
 			<div class="track">
 				<p class="t">Track your order on your dashboard: see when it's being made, when it ships, and its tracking number.</p>
 				<a class="button" href={signIn}>Sign in with Google to track it</a>
-				<p class="small">Use the Google account you'll set your calendar up with.</p>
+				<p class="small">Use the Google account you'll set your calendar up with. Or <a href={'/track?o=' + order}>track it without signing in</a>.</p>
 			</div>
 		)}
 		<a class={valid ? 'back' : 'button'} href="/projects/eink-calendar">Back to the project page</a>
