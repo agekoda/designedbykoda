@@ -1,0 +1,185 @@
+---
+export const prerender = false;
+import Layout from '../layouts/Layout.astro';
+import { BUYER_STEPS, buyerStep, orderNumber, statusOf, trackingUrl } from '../lib/orders';
+
+// designedbykoda.com/track: follow an order without signing in.
+// ?o=<Stripe checkout id> comes from the receipt email (the id is long and random, so it works as a
+// private link). Without it, look an order up by order number + the email it was paid with.
+Astro.response.headers.set('X-Robots-Tag', 'noindex');
+Astro.response.headers.set('Referrer-Policy', 'same-origin');
+
+const db = Astro.locals.runtime?.env?.DB;
+const validId = (s: string) => /^cs_(test|live)_[A-Za-z0-9]{10,200}$/.test(s);
+let error = '';
+let numIn = '';
+let emailIn = '';
+
+if (Astro.request.method === 'POST' && db) {
+	const f = await Astro.request.formData().catch(() => null);
+	numIn = String(f?.get('number') ?? '').trim().slice(0, 40);
+	emailIn = String(f?.get('email') ?? '').trim().slice(0, 200);
+	const num = numIn.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+	const email = emailIn.toLowerCase();
+	if (!num || !email) error = 'Enter your order number and email.';
+	else {
+		try {
+			const r = await db.prepare('SELECT id FROM orders WHERE lower(email) = ?').bind(email).all();
+			const hit = (r.results ?? []).find((x: any) => orderNumber(x.id) === num);
+			if (hit) return Astro.redirect('/track?o=' + encodeURIComponent(hit.id), 303);
+		} catch {}
+		error = 'No order matches that order number and email. Check your receipt, or reply to it and I’ll help.';
+	}
+}
+
+const id = Astro.url.searchParams.get('o') ?? Astro.url.searchParams.get('order') ?? '';
+let o: any = null;
+if (id && validId(id) && db) {
+	try {
+		o = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first();
+	} catch {}
+}
+if (id && !o && !error) error = 'That tracking link didn’t match an order. If you only just paid, give it a minute and refresh.';
+
+const tz = 'Australia/Perth';
+const day = (t: number | null | undefined) => (t ? new Date(t * 1000).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: tz }) : '');
+let view: any = null;
+if (o) {
+	const status = statusOf(o);
+	let addr: any = {};
+	try {
+		addr = o.address_json ? JSON.parse(o.address_json) : {};
+	} catch {}
+	const place = [addr.city, addr.state, addr.country && addr.country !== 'AU' ? addr.country : ''].filter(Boolean).join(', ');
+	const timeline = [
+		{ label: 'Ordered', at: o.created_at },
+		{ label: 'Posted', at: o.shipped_at },
+		{ label: 'Delivered', at: o.delivered_at },
+	].filter((e) => e.at);
+	view = {
+		num: orderNumber(o.id),
+		status,
+		step: buyerStep(status),
+		cancelled: status === 'cancelled',
+		first: (o.name || '').split(/\s+/)[0],
+		place,
+		tracking: o.tracking && !/^https?:/i.test(o.tracking) ? o.tracking : '',
+		trackUrl: trackingUrl(o.tracking),
+		note: o.customer_note || '',
+		timeline,
+	};
+}
+const headline = !view
+	? 'Track your order'
+	: view.cancelled
+		? 'This order was cancelled'
+		: ['Order received', 'Being made', 'On its way', 'Delivered'][view.step] ?? 'Your order';
+const sub = !view
+	? 'Use the order number from your receipt and the email you paid with.'
+	: view.cancelled
+		? 'If you weren’t expecting this, reply to your receipt email.'
+		: view.step === 0
+			? 'Your E-Ink Calendar is reserved. It ships by the end of February 2027.'
+			: view.step === 1
+				? 'Your calendar is being put together. I’ll email you when it’s posted.'
+				: view.step === 2
+					? `It’s with Australia Post${view.place ? ', heading to ' + view.place : ''}.`
+					: `It arrived${view.timeline.find((e: any) => e.label === 'Delivered') ? ' on ' + day(view.timeline.find((e: any) => e.label === 'Delivered').at) : ''}. Enjoy it.`;
+---
+<Layout title="Track your order - designedbykoda" description="Follow your E-Ink Calendar pre-order.">
+	<div class="trk">
+		<p class="kicker">{view ? `Order ${view.num}` : 'E-Ink Calendar'}</p>
+		<h1>{headline}</h1>
+		<p class="sub">{sub}</p>
+
+		{view && (
+			<div class="card">
+				{!view.cancelled && (
+					<ol class="steps">
+						{BUYER_STEPS.map((label, i) => (
+							<li class={i < view.step ? 'done' : i === view.step ? 'now' : ''}>
+								<span class="dot" />
+								<span class="lab">{label}</span>
+							</li>
+						))}
+					</ol>
+				)}
+				{view.trackUrl && (
+					<div class="row">
+						<div>
+							<p class="lbl">Tracking number</p>
+							<p class="val">{view.tracking || 'Australia Post'}</p>
+						</div>
+						<a class="button" href={view.trackUrl} target="_blank" rel="noopener">Track with AusPost</a>
+					</div>
+				)}
+				{view.note && (
+					<div class="note">
+						<p class="lbl">Note from Koda</p>
+						<p>{view.note}</p>
+					</div>
+				)}
+				<ul class="time">
+					{view.timeline.map((e: any) => (
+						<li><span>{e.label}</span><span>{day(e.at)}</span></li>
+					))}
+				</ul>
+			</div>
+		)}
+
+		{!view && (
+			<form class="card look" method="post" action="/track">
+				{error && <p class="err">{error}</p>}
+				<label>
+					<span>Order number</span>
+					<input name="number" value={numIn} placeholder="e.g. A1B2C3D4" autocomplete="off" spellcheck="false" maxlength="40" required />
+				</label>
+				<label>
+					<span>Email</span>
+					<input name="email" type="email" value={emailIn} placeholder="The one you paid with" autocomplete="email" maxlength="200" required />
+				</label>
+				<button class="button" type="submit">Find my order</button>
+			</form>
+		)}
+
+		<p class="foot">
+			Questions? Reply to your receipt or email <a href="mailto:support@designedbykoda.com">support@designedbykoda.com</a>.
+			{view && <><br /><a href="/dashboard#orders">See it on your dashboard</a></>}
+		</p>
+	</div>
+</Layout>
+
+<style>
+	.trk { max-width: 560px; margin: 0 auto; padding: 4.5em 0 5em; }
+	.kicker { margin: 0 0 0.4em; font-size: 0.8em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+	h1 { margin: 0 0 0.35em; }
+	.sub { color: var(--muted); margin: 0 0 1.8em; }
+	.card { padding: 1.5em; border: 1px solid var(--border); border-radius: 18px; background: var(--bg-raised); }
+	.steps { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); margin: 0.3em 0 0.4em; padding: 0; }
+	.steps li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.5em; font-size: 0.8em; color: var(--muted-dim, var(--muted)); text-align: center; }
+	.steps li::before { content: ''; position: absolute; top: 6px; left: -50%; width: 100%; height: 2px; background: var(--border); z-index: 0; }
+	.steps li:first-child::before { display: none; }
+	.steps li.done::before, .steps li.now::before { background: var(--fg); }
+	.steps .dot { position: relative; z-index: 1; width: 14px; height: 14px; border-radius: 50%; background: var(--bg-raised); border: 2px solid var(--border); box-sizing: border-box; }
+	.steps li.done .dot { background: var(--fg); border-color: var(--fg); }
+	.steps li.now .dot { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+	.steps li.done, .steps li.now { color: var(--fg); }
+	.steps li.now .lab { font-weight: 700; }
+	.row { display: flex; align-items: center; justify-content: space-between; gap: 1em; flex-wrap: wrap; margin-top: 1.4em; padding-top: 1.3em; border-top: 1px solid var(--border); }
+	.lbl { margin: 0 0 0.25em; font-size: 0.75em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+	.val { margin: 0; font-family: ui-monospace, monospace; font-size: 1.05em; }
+	.note { margin-top: 1.3em; padding-top: 1.3em; border-top: 1px solid var(--border); }
+	.note p:last-child { margin: 0; }
+	.time { list-style: none; margin: 1.3em 0 0; padding: 1.1em 0 0; border-top: 1px solid var(--border); font-size: 0.9em; }
+	.time li { display: flex; justify-content: space-between; padding: 0.25em 0; color: var(--muted); }
+	.time li span:first-child { color: var(--fg); }
+	.look { display: grid; gap: 1em; }
+	.look label { display: grid; gap: 0.4em; font-size: 0.9em; color: var(--muted); }
+	.look input { padding: 0.75em 0.9em; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); font: inherit; box-shadow: none; }
+	.look input:focus { outline: none; border-color: var(--accent); }
+	.look .button { justify-self: start; border: 0; cursor: pointer; font: inherit; font-weight: 700; }
+	.err { margin: 0; color: #ef6b6b; font-size: 0.9em; }
+	.button { display: inline-block; padding: 0.7em 1.4em; border-radius: 999px; background: var(--fg); color: var(--bg); font-weight: 700; font-size: 0.95em; text-decoration: none; }
+	.button:hover { background: var(--accent); color: var(--bg); }
+	.foot { margin-top: 1.8em; color: var(--muted); font-size: 0.88em; text-align: center; line-height: 1.8; }
+</style>
