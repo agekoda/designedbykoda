@@ -9,7 +9,7 @@ export const PARCEL = {
 	lengthCm: 20,
 	widthCm: 16,
 	heightCm: 8,
-	weightKg: 0.5,
+	weightKg: 0.25,
 	description: 'E-Ink Calendar', // Item Description and customs description (max 40)
 	sku: 'EINK-CAL-42',
 	hsTariff: '852859', // customs code: check this with AusPost's HS lookup before the first international send
