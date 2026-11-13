@@ -7,7 +7,7 @@ import { BUYER_STEPS, buyerStep, orderNumber, statusOf, trackingUrl } from '../l
 // ?o=<Stripe checkout id> comes from the receipt email (the id is long and random, so it works as a
 // private link). Without it, look an order up by order number + the email it was paid with.
 Astro.response.headers.set('X-Robots-Tag', 'noindex');
-Astro.response.headers.set('Referrer-Policy', 'no-referrer');
+Astro.response.headers.set('Referrer-Policy', 'same-origin');
 
 const db = Astro.locals.runtime?.env?.DB;
 const validId = (s: string) => /^cs_(test|live)_[A-Za-z0-9]{10,200}$/.test(s);
