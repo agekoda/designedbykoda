@@ -129,5 +129,14 @@ export async function loadAppData(env: any) {
 		counts: { users, unpaired, designs, shared, messages, waitlist },
 		userSignups: userDays.map((u) => u.created_at),
 		stats: await loadStats(env),
+		store: await (async () => {
+			const out: Record<string, unknown> = {};
+			for (const r of await rows(db, 'SELECT key, value FROM owner_store')) {
+				try {
+					out[r.key] = JSON.parse(r.value);
+				} catch {}
+			}
+			return out;
+		})(),
 	};
 }

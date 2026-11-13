@@ -79,7 +79,8 @@ button.tile:hover { border-color: var(--border-2); background: var(--card-2); }
 .link { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 700; } .link:hover { text-decoration: underline; }
 .icon-btn { background: none; border: 0; padding: 6px; border-radius: 8px; color: var(--muted); display: inline-grid; place-items: center; } .icon-btn:hover { background: #1c1c1c; color: var(--fg); }
 input[type=text], input[type=password], input:not([type]), textarea { width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border-2); background: #0c0c0c; outline: none; }
-input:focus, textarea:focus { border-color: var(--accent); }
+select { width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border-2); background: #0c0c0c; color: var(--fg); outline: none; font: inherit; }
+select:focus, input:focus, textarea:focus { border-color: var(--accent); }
 textarea { resize: vertical; min-height: 64px; }
 .field { display: grid; gap: 6px; margin-top: 14px; } .field > span { font-size: 13px; color: var(--muted); font-weight: 700; } .field small { color: var(--dim); font-size: 12.5px; }
 .search { position: relative; } .search .ic { position: absolute; left: 11px; top: 50%; margin-top: -8px; color: var(--dim); } .search input { padding-left: 34px; width: 260px; border-radius: 999px; }

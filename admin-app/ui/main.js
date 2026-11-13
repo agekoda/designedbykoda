@@ -1,7 +1,7 @@
 // The frame around the screens: sign-in, the sidebar, loading, refreshing, Ctrl+K.
 'use strict';
 const NAV = [
-	['overview', 'Overview'], ['orders', 'Orders'], ['devices', 'Calendars'], ['firmware', 'Firmware'], ['status', 'Website'], ['stats', 'Press stats'],
+	['overview', 'Overview'], ['orders', 'Orders'], ['devices', 'Calendars'], ['firmware', 'Firmware'], ['status', 'Website'], ['parts', 'Parts & stock'], ['money', 'Money'], ['stats', 'Press stats'],
 ];
 const prefs = App.prefs;
 App.view = 'overview';
@@ -77,7 +77,7 @@ function renderSignIn(err = '') {
 		<p class="dim" style="margin-top:18px;font-size:13px">Talking to ${App.local?.site || ''}</p>
 	</div></div>`);
 	$('#pw').focus();
-	$('#pw').onkeydown = (e) => { if (e.key === 'Enter') App.actions.signin(); };
+	$('#pw').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); App.actions.signin(); } };
 }
 App.actions.signin = async () => {
 	const pw = $('#pw').value;
@@ -178,7 +178,7 @@ App.actions.palette = () => {
 	input.oninput = () => { items = find(input.value); sel = 0; draw(); };
 	input.onkeydown = (e) => {
 		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % Math.max(1, items.length); draw(); $('#pal-results .sel')?.scrollIntoView({ block: 'nearest' }); }
-		else if (e.key === 'Enter') run(sel);
+		else if (e.key === 'Enter') { e.preventDefault(); run(sel); }
 	};
 	$('#pal-results').onclick = (e) => { const b = e.target.closest('.item'); if (b) run(+b.dataset.i); };
 };

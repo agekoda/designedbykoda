@@ -133,6 +133,8 @@ const ICONS = {
 	devices: '<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9h4M7 13h10M9 21h6"/>',
 	firmware: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',
 	status: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+	parts: '<path d="M21 8l-9-5-9 5 9 5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M7.500 5.500l9 5"/>',
+	money: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.600"/><path d="M6 9v.01M18 15v.01"/>',
 	stats: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
 	settings: '<path d="M4 6h9M19 6h1M4 12h3M13 12h7M4 18h11M20 18h0"/><circle cx="16" cy="6" r="2.200"/><circle cx="10" cy="12" r="2.200"/><circle cx="17.500" cy="18" r="2.200"/>',
 	refresh: '<path d="M20 11a8 8 0 1 0-2.300 6.300M20 4v7h-7"/>',
@@ -218,7 +220,7 @@ function askBox({ title, body, label, value = '', ok = 'Save', placeholder = '',
 		const go = () => { const v = $('#ask-in').value.trim(); if (v || optional) finish(v); };
 		$('[data-dlg=yes]').onclick = go;
 		$('[data-dlg=no]').onclick = () => finish(null);
-		$('#ask-in').onkeydown = (e) => { if (e.key === 'Enter') go(); };
+		$('#ask-in').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } };
 	});
 }
 
