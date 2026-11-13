@@ -18,7 +18,7 @@ if (!userId) return Astro.redirect('/setup');
 				<div class="dash-title">My devices</div>
 			</div>
 			<div class="head-btns">
-				<a class="btn ghost" href="/projects/eink-calendar/help">Help</a>
+				<a class="btn ghost" href="/help">Help</a>
 				<a class="btn" data-magnetic href="/setup?new=1">Add a device</a>
 			</div>
 		</div>
@@ -159,7 +159,7 @@ if (!userId) return Astro.redirect('/setup');
 			status = `<span class="dot ${late ? 'bad' : 'on'}"></span>Checked in ${ago(d.lastSeenAt)}`;
 			if (late) {
 				el.classList.add('warn');
-				alert = `<div class="alert"><b>Hasn\'t checked in since ${esc(dayTime(d.lastSeenAt))}.</b> Press its button. If the screen doesn\'t change, charge it for an hour. If it still doesn\'t, it may not be reaching your Wi-Fi. <a href="/projects/eink-calendar/help#trouble">More help</a></div>`;
+				alert = `<div class="alert"><b>Hasn\'t checked in since ${esc(dayTime(d.lastSeenAt))}.</b> Press its button. If the screen doesn\'t change, charge it for an hour. If it still doesn\'t, it may not be reaching your Wi-Fi. <a href="/help#trouble">More help</a></div>`;
 			}
 		}
 		let battery = '';

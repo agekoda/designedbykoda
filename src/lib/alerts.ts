@@ -4,6 +4,7 @@
 // - firmware updated: optional, off unless they turn it on
 // Each email has a one-click unsubscribe link (signed, no login needed).
 import { batteryPercent } from './eink/battery';
+import { emailHtml, footLink, ORIGIN, sendEmail } from './email';
 
 export interface AlertPrefs {
 	battery: boolean;
@@ -21,7 +22,6 @@ export function parsePrefs(raw: unknown): AlertPrefs {
 	}
 }
 
-const ORIGIN = 'https://designedbykoda.com';
 const LOW = 15; // %
 const CHARGED = 40; // % before a new low-battery email can go out
 const OFFLINE_SEC = 48 * 3600;
@@ -39,35 +39,86 @@ export async function unsubOk(env: any, userId: string, token: string) {
 	return (await unsubToken(env, userId)) === token;
 }
 
-async function send(env: any, to: string, subject: string, lines: string[], userId: string): Promise<boolean> {
-	if (!env.BREVO_API_KEY) return false;
+export interface Mail {
+	subject: string;
+	kind: 'battery' | 'offline' | 'update';
+	heading: string;
+	device: string;
+	lines: string[];
+	stat?: { label: string; value: string; tone?: 'warn' | 'bad' | 'good' };
+	button: { label: string; url: string };
+}
+
+// The HTML version: the shared email look (src/lib/email.ts).
+export function alertHtml(m: Mail, unsub: string): string {
+	return emailHtml({
+		title: m.subject,
+		label: m.device,
+		heading: m.heading,
+		stat: m.stat,
+		lines: m.lines,
+		button: m.button,
+		footer: `You get this because email alerts are on for your E-Ink Calendar.<br>${footLink(ORIGIN + '/dashboard', 'Choose which emails you get')} &nbsp;·&nbsp; ${footLink(unsub, 'Unsubscribe')}`,
+	});
+}
+
+async function send(env: any, to: string, m: Mail, userId: string): Promise<boolean> {
 	const unsub = `${ORIGIN}/api/alerts/unsubscribe?u=${encodeURIComponent(userId)}&k=${await unsubToken(env, userId)}`;
-	const text = [...lines, '', '—', 'Change which emails you get: ' + ORIGIN + '/dashboard', 'Stop all of these emails: ' + unsub].join('\n');
-	const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-	const html =
-		`<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.55;color:#111;max-width:520px">` +
-		lines.map((l) => (l ? `<p style="margin:0 0 12px">${esc(l).replace(/(https:\/\/\S+)/g, '<a href="$1">$1</a>')}</p>` : '')).join('') +
-		`<p style="margin:24px 0 0;font-size:12px;color:#777">You get this because email alerts are on for your E-Ink Calendar. <a href="${ORIGIN}/dashboard" style="color:#777">Choose which emails you get</a> · <a href="${unsub}" style="color:#777">Stop all of these emails</a></p></div>`;
-	try {
-		const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-			method: 'POST',
-			headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json', accept: 'application/json' },
-			body: JSON.stringify({
-				sender: { name: 'designedbykoda', email: env.ALERT_EMAIL_FROM || env.ORDER_EMAIL_FROM || 'hello@designedbykoda.com' },
-				to: [{ email: to }],
-				subject,
-				textContent: text,
-				htmlContent: html,
-				headers: { 'List-Unsubscribe': `<${unsub}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
-				tags: ['alert'],
-			}),
-		});
-		if (!res.ok) console.error('alert email failed', res.status, await res.text().catch(() => ''));
-		return res.ok;
-	} catch (e) {
-		console.error('alert email failed', e);
-		return false;
-	}
+	const text = [m.heading, '', ...m.lines, '', `${m.button.label}: ${m.button.url}`, '', '—', 'Change which emails you get: ' + ORIGIN + '/dashboard', 'Unsubscribe: ' + unsub].join('\n');
+	return sendEmail(env, {
+		to,
+		fromEmail: env.ALERT_EMAIL_FROM || 'alerts@designedbykoda.com',
+		subject: m.subject,
+		text,
+		html: alertHtml(m, unsub),
+		headers: { 'List-Unsubscribe': `<${unsub}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+		tags: ['alert', m.kind],
+	});
+}
+
+// The three emails (also used by scripts to preview them).
+export const mails = {
+	battery: (name: string, pct: number): Mail => ({
+		kind: 'battery',
+		subject: `${name}: battery at ${pct}%`,
+		device: name,
+		heading: 'Time to charge your calendar',
+		stat: { label: 'Battery', value: `${pct}%`, tone: pct <= 5 ? 'bad' : 'warn' },
+		lines: ['Charge it over USB-C for a few hours when you get a chance.', 'It keeps working until the battery runs out, then shows a “Battery low” screen.'],
+		button: { label: 'Open your dashboard', url: ORIGIN + '/dashboard' },
+	}),
+	offline: (name: string, days: number): Mail => ({
+		kind: 'offline',
+		subject: `${name} hasn't checked in for ${days} days`,
+		device: name,
+		heading: `It hasn’t checked in for ${days} days`,
+		stat: { label: 'Last heard from', value: `${days} days ago`, tone: 'bad' },
+		lines: [
+			'It may be showing an old screen. Press its button to wake it.',
+			'If the screen doesn’t change, charge it for an hour and press it again. If it still doesn’t, it may not be reaching your Wi-Fi.',
+		],
+		button: { label: 'Get help', url: ORIGIN + '/help' },
+	}),
+	update: (name: string, from: string | null, to: string): Mail => {
+		const back = !!from && cmpVer(to, from) < 0;
+		return {
+			kind: 'update',
+			subject: back ? `${name} went back to version ${to}` : `${name} updated to ${to}`,
+			device: name,
+			heading: back ? `Back on version ${to}` : `Updated to version ${to}`,
+			stat: { label: 'Firmware', value: from ? `${from}  →  ${to}` : to, tone: 'good' },
+			lines: back
+				? ['It went back to an earlier version by itself, while a fix is on the way. You don’t need to do anything.']
+				: ['It installed the update by itself over Wi-Fi. You don’t need to do anything.'],
+			button: { label: 'See what’s new', url: ORIGIN + '/changelog' },
+		};
+	},
+};
+
+function cmpVer(a: string, b: string) {
+	const x = a.split('.').map(Number), y = b.split('.').map(Number);
+	for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0);
+	return 0;
 }
 
 // Called from the cron (every 5 minutes); does its work once an hour.
@@ -99,10 +150,7 @@ export async function runAlerts(env: any, force = false) {
 		if (pct !== null && pct >= CHARGED && d.alert_batt_at) await db.prepare('UPDATE devices SET alert_batt_at = NULL WHERE id = ?').bind(d.id).run();
 		if (pct !== null && pct <= LOW && !d.alert_batt_at) {
 			if (prefs.battery && email && sent < MAX_PER_RUN) {
-				const ok = await send(env, email, `${d.name}: battery at ${pct}%`, [
-					`Your calendar "${d.name}" is down to ${pct}% battery.`,
-					'Charge it over USB-C for a few hours when you get a chance. It keeps working until the battery runs out, then shows a "Battery low" screen.',
-				], d.user_id);
+				const ok = await send(env, email, mails.battery(d.name, pct), d.user_id);
 				if (ok) sent++;
 				else continue; // try again next hour
 			}
@@ -116,11 +164,7 @@ export async function runAlerts(env: any, force = false) {
 		else if (quiet && !d.alert_offline_at) {
 			if (prefs.offline && email && sent < MAX_PER_RUN) {
 				const days = Math.floor((now - d.last_seen_at) / 86400);
-				const ok = await send(env, email, `${d.name} hasn't checked in for ${days} days`, [
-					`Your calendar "${d.name}" last checked in ${days} days ago, so it may be showing an old screen.`,
-					'Press its button. If the screen doesn’t change, charge it for an hour and press it again. If it still doesn’t, it may not be reaching your Wi-Fi.',
-					`More help: ${ORIGIN}/projects/eink-calendar/help`,
-				], d.user_id);
+				const ok = await send(env, email, mails.offline(d.name, days), d.user_id);
 				if (ok) sent++;
 				else continue;
 			}
@@ -130,10 +174,7 @@ export async function runAlerts(env: any, force = false) {
 		// firmware updated
 		if (d.firmware && d.firmware !== d.alert_fw) {
 			if (d.alert_fw && prefs.update && email && sent < MAX_PER_RUN) {
-				const ok = await send(env, email, `${d.name} updated to ${d.firmware}`, [
-					`Your calendar "${d.name}" installed firmware ${d.firmware} by itself.`,
-					`See what's new: ${ORIGIN}/changelog`,
-				], d.user_id);
+				const ok = await send(env, email, mails.update(d.name, d.alert_fw, d.firmware), d.user_id);
 				if (ok) sent++;
 				else continue;
 			}

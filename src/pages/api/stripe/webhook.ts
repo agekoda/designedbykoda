@@ -42,19 +42,25 @@ export async function POST({ request, locals }) {
 	const total = s.amount_total ?? 0;
 	const shippingAmt = s.total_details?.amount_shipping ?? s.shipping_cost?.amount_total ?? 0;
 
+	let isNew = false;
 	try {
-		await db
+		const ins = await db
 			.prepare(
 				`INSERT OR IGNORE INTO orders (id, created_at, email, name, phone, address_json, country, currency, amount_total, shipping_amount)
 				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 			)
 			.bind(s.id, Math.floor(Date.now() / 1000), email, name, phone, addr ? JSON.stringify(addr) : null, country, currency, total, shippingAmt)
 			.run();
+		isNew = (ins?.meta?.changes ?? 1) > 0; // Stripe can send the same event twice
 	} catch (err) {
 		console.error('Saving order failed:', err);
 		return new Response('Database error', { status: 500 }); // Stripe will try again
 	}
 
+	if (!isNew) return new Response('ok', { status: 200 });
+	// The buyer's receipt (Stripe's own receipt emails are turned off) and the note to you.
+	const { sendReceipt } = await import('../../../lib/orderEmails');
+	await sendReceipt(env, { id: s.id, email, name, addr, currency, total, shippingAmt, createdAt: Math.floor(Date.now() / 1000) });
 	await notifyOwner(env, { id: s.id, name, email, phone, addr, currency, total, shippingAmt });
 	return new Response('ok', { status: 200 });
 }
