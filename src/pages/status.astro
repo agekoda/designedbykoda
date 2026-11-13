@@ -135,7 +135,7 @@ const hasData = data.lastCheck !== null;
 							</div>
 							<div class="bars" role="img" aria-label={`${c.label}: ${pct(c.uptime)} uptime over the last 90 days`}>
 								{c.days.map((d) => (
-									<span class={`bar ${barClass(d.pct)}`} title={barTitle(d)} />
+									<span class={`bar ${barClass(d.pct)}`} data-tip={barTitle(d)} />
 								))}
 							</div>
 							<div class="bar-foot">
@@ -143,6 +143,11 @@ const hasData = data.lastCheck !== null;
 								<span class="uptime">{pct(c.uptime)} uptime</span>
 								<span>Today</span>
 							</div>
+							{c.detail && (c.state === 'slow' || c.id === 'cloudflare') && (
+								<p class="why">
+									{c.detail}.{c.id === 'cloudflare' && <> <a href="https://www.cloudflarestatus.com/" target="_blank" rel="noopener">Cloudflare's status page</a></>}
+								</p>
+							)}
 							{c.avgMs !== null && c.id !== 'cloudflare' && <p class="resp">Average response, last 24 h: {c.avgMs} ms</p>}
 						</article>
 					))
@@ -201,6 +206,73 @@ const hasData = data.lastCheck !== null;
 		</p>
 	</div>
 </Layout>
+
+<div id="bar-tip" class="bar-tip" hidden></div>
+
+<style is:global>
+	.bar-tip {
+		position: fixed;
+		z-index: 50;
+		pointer-events: none;
+		padding: 0.4em 0.7em;
+		border-radius: 9px;
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		box-shadow: var(--box-shadow);
+		color: var(--fg);
+		font-size: 0.82em;
+		white-space: nowrap;
+	}
+	.bar-tip b {
+		display: block;
+	}
+	.bar-tip span {
+		color: var(--muted);
+	}
+</style>
+
+<script>
+	// Hover (or tap) a day in the 90-day bars: it lights up and shows its date and uptime.
+	const tip = document.getElementById('bar-tip')!;
+	let lit: Element | null = null;
+	const clear = () => {
+		lit?.classList.remove('on');
+		lit?.parentElement?.classList.remove('touch');
+		lit = null;
+		tip.hidden = true;
+	};
+	const show = (bar: HTMLElement, touch: boolean) => {
+		if (lit !== bar) clear();
+		lit = bar;
+		bar.classList.add('on');
+		if (touch) bar.parentElement!.classList.add('touch');
+		const [day, what] = (bar.dataset.tip || '').split(': ');
+		tip.textContent = '';
+		const b = document.createElement('b');
+		b.textContent = day;
+		const s = document.createElement('span');
+		s.textContent = what || '';
+		tip.append(b, s);
+		tip.hidden = false;
+		const r = bar.getBoundingClientRect();
+		const x = Math.min(window.innerWidth - tip.offsetWidth - 8, Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2));
+		tip.style.left = x + 'px';
+		tip.style.top = (r.top - tip.offsetHeight - 10 < 8 ? r.bottom + 10 : r.top - tip.offsetHeight - 10) + 'px';
+	};
+	document.querySelectorAll<HTMLElement>('.bars').forEach((bars) => {
+		bars.addEventListener('pointermove', (e) => {
+			const bar = (e.target as HTMLElement).closest<HTMLElement>('.bar');
+			if (bar) show(bar, e.pointerType !== 'mouse');
+		});
+		bars.addEventListener('pointerleave', (e) => {
+			if (e.pointerType === 'mouse') clear();
+		});
+	});
+	document.addEventListener('pointerdown', (e) => {
+		if (!(e.target as HTMLElement).closest('.bars')) clear();
+	});
+	window.addEventListener('scroll', clear, { passive: true });
+</script>
 
 <script>
 	const fmtAbs = (ts: number) =>
@@ -485,8 +557,20 @@ const hasData = data.lastCheck !== null;
 	.bar.bad {
 		background: var(--bad);
 	}
-	.bar:hover {
-		filter: brightness(1.25);
+	.bars:hover .bar,
+	.bars.touch .bar {
+		opacity: 0.45;
+	}
+	.bars .bar.on {
+		opacity: 1;
+		filter: brightness(1.2);
+		transform: scaleY(1.18);
+		box-shadow: 0 0 0 1px var(--fg);
+	}
+	.why {
+		margin: 0.7em 0 0;
+		font-size: 0.85em;
+		color: var(--muted);
 	}
 	.bar-foot {
 		display: flex;
