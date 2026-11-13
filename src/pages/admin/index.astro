@@ -77,7 +77,7 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 <Layout title="Admin - designedbykoda" description="Owner only.">
 	<div class="admin">
 		{!configured && (
-			<div class="card narrow">
+			<div class="narrow">
 				<h1>Admin isn't set up</h1>
 				<p>Add a password as a Cloudflare secret, then reload:</p>
 				<pre>npx wrangler secret put ADMIN_PASSWORD</pre>
@@ -85,7 +85,7 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 		)}
 
 		{configured && !unlocked && (
-			<div class="card narrow">
+			<div class="narrow">
 				<h1>Owner area</h1>
 				<form method="post" action="/api/admin/login" autocomplete="off">
 					<label for="pw">Password</label>
@@ -106,6 +106,7 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 						<h1>Overview</h1>
 					</div>
 					<div class="head-actions">
+						<a class="btn" href="/api/admin/auspost" download title="Orders marked Ready to ship, for MyPost Business > Import CSV">AusPost CSV</a>
 						<a class="btn" href="/api/admin/orders" download>Download CSV</a>
 						<form method="post" action="/api/admin/logout"><button type="submit" class="btn">Lock</button></form>
 					</div>
@@ -180,6 +181,7 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 						{STATUSES.map((st) => <option value={st}>{ADMIN_LABEL[st]}</option>)}
 					</select>
 					<button class="btn btn-p" type="button" id="bulk-go">Set status</button>
+					<button class="btn" type="button" id="bulk-auspost">AusPost CSV</button>
 					<button class="btn" type="button" id="bulk-clear">Clear</button>
 					<span class="msg" id="bulk-msg" role="status"></span>
 				</div>
@@ -264,6 +266,10 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 		});
 
 		const selected = () => orders.filter((o) => !o.hidden && o.querySelector<HTMLInputElement>('.sel')!.checked);
+		document.getElementById('bulk-auspost')?.addEventListener('click', () => {
+			const ids = selected().map((o) => o.dataset.id).join(',');
+			if (ids) location.href = '/api/admin/auspost?ids=' + encodeURIComponent(ids);
+		});
 		const syncBulk = () => {
 			const n = selected().length;
 			bulk.hidden = n === 0;
