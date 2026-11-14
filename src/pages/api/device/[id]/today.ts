@@ -136,7 +136,9 @@ export async function GET({ params, request, locals }) {
 				.prepare('SELECT pairing_code, pairing_code_expires_at FROM devices WHERE id = ?')
 				.bind(deviceId)
 				.first();
-			if (row?.pairing_code && row.pairing_code_expires_at > nowS) {
+			// A calendar waiting to be paired only checks in about once a day, so the code it shows
+			// must last until its next check-in: hand it a fresh one once there are under 30 hours left (a day, plus room for its clock drifting).
+			if (row?.pairing_code && row.pairing_code_expires_at > nowS + 30 * 3600) {
 				pairingCode = row.pairing_code;
 			} else {
 				const { issuePairingCode } = await import('../../../../lib/pairing');
