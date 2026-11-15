@@ -1,0 +1,250 @@
+---
+// designedbykoda.com/e-ink: the E-Ink Calendar's product overview, laid out like a printed magazine
+// page sitting on the dark site. Links out to pre-orders, the dashboard, setup, help, the spec sheet
+// and the build story.
+import Layout from '../layouts/Layout.astro';
+import { CALENDAR_STYLES } from '../data/calendarStyles';
+import { EARLY_PRICES, STANDARD_PRICES, PREORDER_OPENS, earlyBirdActive } from '../data/preorderPricing';
+
+const now = Date.now();
+const open = now >= Date.parse(PREORDER_OPENS);
+const early = earlyBirdActive(now);
+const price = `A$${early ? EARLY_PRICES.AUD : STANDARD_PRICES.AUD}`;
+const screens = CALENDAR_STYLES.length - 1; // ready-made screens; the last is "your own design"
+
+// The little screen in the cover: the morning pre-orders open, or today once they have.
+const perth = (opts: Intl.DateTimeFormatOptions, t: number) => new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Perth', ...opts }).format(new Date(t));
+const shown = open ? now : Date.parse(PREORDER_OPENS) + 9 * 3600 * 1000;
+const scrDay = perth({ day: 'numeric' }, shown);
+const scrWeekday = perth({ weekday: 'long' }, shown).toUpperCase();
+const scrTop = perth({ weekday: 'short', day: 'numeric', month: 'short' }, shown).toUpperCase();
+const scrRows = open
+	? [['Pre-orders are open', 'now', true], [early ? `Early bird ${price}` : `${price}`, early ? 'this week' : 'today'], ['Ships', 'by end of Feb'], ['Made in Perth', 'by hand'], ['Pick your screen', 'any time']]
+	: [['Pre-orders open', 'today', true], [`Early bird A$${EARLY_PRICES.AUD}`, 'first 3 days'], ['Ships', 'by end of Feb'], ['Made in Perth', 'by hand'], ['Pick your screen', 'any time']];
+
+const gallery = ['agenda', 'week', 'month', 'countdown', 'timeline', 'moon', 'planner', 'quote'].map((id) => CALENDAR_STYLES.find((s) => s.id === id)!).filter(Boolean);
+const cta = open ? 'Pre-order now' : 'Join the waitlist';
+---
+
+<Layout title="The E-Ink Calendar — designedbykoda" description="A 4.2-inch e-ink calendar that shows your Google Calendar, hangs on your wall from one screw, and runs for months between charges. Designed and assembled in Perth." image="/images/projects/eink-calendar/preorder-hero.jpg">
+	<article class="paper">
+		<div class="mast">
+			<span>Perth, Western Australia</span>
+			<span>The E-Ink Calendar</span>
+			<span class="r">{open ? 'Pre-orders open now' : 'Pre-orders open 30 November'}</span>
+		</div>
+
+		<section class="cover">
+			<div class="tx">
+				<p class="kick">designedbykoda · product overview</p>
+				<h1>Your day, on paper that <i>updates itself.</i></h1>
+				<p class="lede">
+					I wanted something on the wall that shows me what my day looks like without lighting up, buzzing, or
+					asking for anything back, so I designed one from the circuit board to the case. It reads your Google
+					Calendar, hangs from a single screw, and goes months between charges.
+				</p>
+				<div class="go">
+					<a class="b" href="/preorder/eink-calendar">{cta}</a>
+					<a class="l" href="/projects/eink-calendar/">Read the build story</a>
+				</div>
+			</div>
+			<figure class="dev" aria-label="The calendar's screen">
+				<div class="scr">
+					<div class="t"><span>{scrTop}</span><span>HIGH 27° LOW 16°</span><span>BATT 100%</span></div>
+					<div class="big">
+						<div class="day"><b>{scrDay}</b><span>{scrWeekday}</span></div>
+						<ul>
+							{scrRows.map(([a, b, hl]) => <li class={hl ? 'hl' : ''}><span>{a}</span><span>{b}</span></li>)}
+						</ul>
+					</div>
+					<div class="foot"><span>NEXT</span><span>YOUR DAY, EVERY MORNING</span></div>
+				</div>
+				<figcaption>{open ? 'Fig. 1 — The screen, this morning.' : 'Fig. 1 — The screen, on the morning of the 30th.'}</figcaption>
+			</figure>
+		</section>
+
+		<div class="facts">
+			<div><b>4.2″</b><span>e-ink, easy to read in daylight</span></div>
+			<div><b>5–6 mo</b><span>between charges, updating daily</span></div>
+			<div><b>{screens}</b><span>screens, or design your own</span></div>
+			<div><b>{price}</b><span>{early ? 'early-bird price' : 'price'}</span></div>
+		</div>
+
+		<section class="cols">
+			<div>
+				<div class="n">i.</div>
+				<h2>On the wall, or the desk</h2>
+				<p>A keyhole on the back takes one screw, and it sits flat against the wall like a framed print. If you'd rather keep it on a desk or a bedside table, the kickstand folds out and tucks away again.</p>
+			</div>
+			<div>
+				<div class="n">ii.</div>
+				<h2>It reads your Google Calendar</h2>
+				<p>Sign in once and your events turn up on their own. It wakes, draws your day, and goes back to sleep, and the picture stays on the screen even with the power off.</p>
+			</div>
+			<div>
+				<div class="n">iii.</div>
+				<h2>Made one at a time</h2>
+				<p>Every board is checked, every case fitted and every screen tested by me in Perth before it's packed. Pre-orders ship by the end of February.</p>
+			</div>
+		</section>
+
+		<figure class="band">
+			<img src="/images/projects/eink-calendar/3.jpg" alt="The E-Ink Calendar hanging on a white brick wall" loading="lazy" />
+			<figcaption>Fig. 2 — Hanging from a single screw. No cable, no glow.</figcaption>
+		</figure>
+
+		<section class="screens">
+			<div class="intro">
+				<h2>{screens} faces for <i>one screen.</i></h2>
+				<p>Pick a screen from your dashboard, change the font, go dark, swap screens at set times, or drag together your own in the builder and share it with a link.</p>
+				<a class="l" href="/dashboard">Open your dashboard</a>
+			</div>
+			<div class="sg">
+				{gallery.map((s) => (
+					<figure>
+						<img src={s.image} alt={`${s.label} screen`} loading="lazy" />
+						<figcaption>{s.label}</figcaption>
+					</figure>
+				))}
+			</div>
+		</section>
+
+		<section class="spec">
+			<h2>At a glance</h2>
+			<dl>
+				<div><dt>Screen</dt><dd>4.2″ e-paper, 400 × 300</dd></div>
+				<div><dt>Size</dt><dd>95.8 × 93.8 × 19 mm, 114 g</dd></div>
+				<div><dt>Battery</dt><dd>450 mAh, about 5–6 months</dd></div>
+				<div><dt>Charging</dt><dd>USB-C, about 2.5 hours</dd></div>
+				<div><dt>Mounting</dt><dd>Keyhole, kickstand, adhesive strips</dd></div>
+				<div><dt>Connects to</dt><dd>2.4 GHz Wi-Fi, Google Calendar</dd></div>
+				<div><dt>Languages</dt><dd>English, 日本語</dd></div>
+				<div><dt>Warranty</dt><dd>1 year</dd></div>
+			</dl>
+			<a class="l" href="/projects/eink-calendar/specs">The full spec sheet</a>
+		</section>
+
+		<section class="toc">
+			<h2>Everything else</h2>
+			<a class="row" href="/preorder/eink-calendar"><span>01</span><b>{open ? 'Pre-order' : 'Pre-orders and the waitlist'}</b><em>{open ? `${price}, ships by the end of February` : 'Opening 30 November'}</em></a>
+			<a class="row" href="/projects/eink-calendar/"><span>02</span><b>The build story</b><em>How it was designed, from the board up</em></a>
+			<a class="row" href="/dashboard"><span>03</span><b>Your dashboard</b><em>Screens, settings and your orders</em></a>
+			<a class="row" href="/setup"><span>04</span><b>Set up a calendar</b><em>Pair a new one in about five minutes</em></a>
+			<a class="row" href="/help"><span>05</span><b>Help</b><em>Charging, Wi-Fi, and what to do if it's stuck</em></a>
+			<a class="row" href="/track"><span>06</span><b>Track an order</b><em>No sign-in needed</em></a>
+		</section>
+
+		<section class="end">
+			<h2>Your day, on the wall.</h2>
+			<a class="b" href="/preorder/eink-calendar">{cta}</a>
+		</section>
+	</article>
+</Layout>
+
+<style>
+	@font-face { font-family: 'Instrument'; src: url('/fonts/instrument-serif.woff2') format('woff2'); font-display: swap; }
+	@font-face { font-family: 'Instrument'; src: url('/fonts/instrument-serif-italic.woff2') format('woff2'); font-style: italic; font-display: swap; }
+	@font-face { font-family: 'Fraunces'; src: url('/fonts/fraunces-300.woff2') format('woff2'); font-weight: 300; font-display: swap; }
+	@font-face { font-family: 'Pix'; src: url('/fonts/silkscreen.woff2') format('woff2'); font-display: swap; }
+
+	.paper {
+		--ink: #1b1a17; --muted: #5b564d; --rust: #a0472b; --cream: #efe9df;
+		background: var(--cream); color: var(--ink);
+		margin: 1em 0 4em; width: min(1240px, calc(100vw - 48px)); position: relative; left: 50%; transform: translateX(-50%); border-radius: 4px;
+		box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+	}
+	.paper a { color: inherit; }
+	.mast { display: grid; grid-template-columns: 1fr auto 1fr; padding: 1.1em 2.5em; border-bottom: 3px double var(--ink); font-size: 0.72em; letter-spacing: 0.16em; text-transform: uppercase; }
+	.mast span:nth-child(2) { text-align: center; } .mast .r { text-align: right; }
+
+	.cover { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--ink); }
+	.cover .tx { padding: 3em 2.5em; border-right: 1px solid var(--ink); }
+	.kick { margin: 0; font-size: 0.75em; letter-spacing: 0.2em; text-transform: uppercase; color: var(--rust); }
+	h1 { font-family: 'Instrument', serif; font-weight: 400; font-size: clamp(3.2em, 6.4vw, 5.6em); line-height: 0.92; letter-spacing: -0.025em; margin: 0.25em 0 0.35em; color: var(--ink); }
+	h1 i, h2 i { color: var(--rust); }
+	.lede { font-family: 'Fraunces', serif; font-weight: 300; font-size: 1.2em; line-height: 1.55; margin: 0 0 1.6em; }
+	.lede::first-letter { font-family: 'Instrument', serif; font-size: 3.6em; float: left; line-height: 0.8; margin: 0.08em 0.12em 0 0; }
+	.go { display: flex; gap: 1.2em; align-items: center; flex-wrap: wrap; }
+	.b { display: inline-block; background: var(--ink); color: var(--cream) !important; padding: 0.9em 1.5em; font-weight: 700; text-decoration: none; }
+	.b:hover { background: var(--rust); }
+	.l { border-bottom: 1px solid var(--ink); text-decoration: none; font-size: 0.95em; }
+	.l:hover { color: var(--rust) !important; border-color: var(--rust); }
+
+	.dev { margin: 0; padding: 2.5em; display: flex; flex-direction: column; justify-content: center; }
+	.scr { background: #e8e7e1; aspect-ratio: 4 / 3; border: 14px solid #262626; border-radius: 10px; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25); padding: 1em 1.2em; position: relative; color: #111; }
+	.scr .t { display: flex; justify-content: space-between; font-family: 'Pix', monospace; font-size: 0.68em; border-bottom: 2px solid #111; padding-bottom: 0.35em; }
+	.scr .big { display: grid; grid-template-columns: 28% 1fr; gap: 1em; margin-top: 0.8em; }
+	.scr .day { text-align: center; border-right: 2px solid #111; }
+	.scr .day b { display: block; font-size: clamp(2.6em, 5vw, 4.4em); line-height: 0.95; }
+	.scr .day span { font-family: 'Pix', monospace; font-size: 0.66em; }
+	.scr ul { list-style: none; margin: 0; padding: 0; font-size: 0.9em; }
+	.scr li { display: flex; justify-content: space-between; gap: 0.6em; padding: 0.28em 0; border-bottom: 1px solid #111; }
+	.scr li.hl { background: #111; color: #e8e7e1; padding: 0.28em 0.45em; margin: 0 -0.45em; font-weight: 700; }
+	.scr .foot { position: absolute; left: 1.2em; right: 1.2em; bottom: 0.7em; border-top: 2px solid #111; padding-top: 0.3em; display: flex; justify-content: space-between; font-family: 'Pix', monospace; font-size: 0.62em; }
+	.dev figcaption, .band figcaption, .sg figcaption { font-family: 'Instrument', serif; font-style: italic; color: var(--muted); }
+	.dev figcaption { margin-top: 0.9em; font-size: 1.05em; }
+
+	.facts { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--ink); }
+	.facts div { padding: 1.3em 1.5em 1.4em 2.5em; border-right: 1px solid var(--ink); }
+	.facts div:last-child { border-right: 0; }
+	.facts b { display: block; font-family: 'Instrument', serif; font-weight: 400; font-size: 2.4em; line-height: 1; }
+	.facts span { font-size: 0.85em; color: var(--muted); }
+
+	.cols { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--ink); }
+	.cols > div { padding: 2.2em 2.5em 2.5em; border-right: 1px solid var(--ink); }
+	.cols > div:last-child { border-right: 0; }
+	.cols .n { font-family: 'Instrument', serif; font-size: 3.2em; color: var(--rust); line-height: 1; }
+	.cols h2 { font-family: 'Fraunces', serif; font-weight: 300; font-size: 1.45em; margin: 0.4em 0 0.4em; color: var(--ink); }
+	.cols p { margin: 0; line-height: 1.6; color: #3c3934; }
+
+	.band { margin: 0; padding: 2.5em; border-bottom: 1px solid var(--ink); }
+	.band img { width: 100%; height: 520px; object-fit: cover; display: block; filter: sepia(0.12); }
+	.band figcaption { margin-top: 0.7em; font-size: 1.05em; }
+
+	.screens { display: grid; grid-template-columns: 280px 1fr; gap: 3em; padding: 3em 2.5em; border-bottom: 1px solid var(--ink); }
+	.screens h2, .spec h2, .toc h2, .end h2 { font-family: 'Instrument', serif; font-weight: 400; font-size: 3.2em; line-height: 0.95; margin: 0 0 0.35em; color: var(--ink); letter-spacing: -0.01em; }
+	.screens p { line-height: 1.6; color: #3c3934; margin: 0 0 1.2em; }
+	.sg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.4em 1.2em; }
+	.sg figure { margin: 0; }
+	.sg img { width: 100%; display: block; border: 1px solid var(--ink); background: #fff; filter: grayscale(1); }
+	.sg figcaption { margin-top: 0.3em; }
+
+	.spec { padding: 3em 2.5em; border-bottom: 1px solid var(--ink); }
+	.spec dl { display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 3em; margin: 0.5em 0 1.6em; }
+	.spec dl div { display: flex; justify-content: space-between; gap: 1em; border-top: 1px solid var(--ink); padding: 0.75em 0; }
+	.spec dt { color: var(--muted); } .spec dd { margin: 0; text-align: right; }
+
+	.toc { padding: 3em 2.5em 2.5em; border-bottom: 1px solid var(--ink); }
+	.toc .row { display: grid; grid-template-columns: 4em 1fr 1fr; align-items: center; border-top: 1px solid var(--ink); padding: 1em 0; text-decoration: none; }
+	.toc .row:hover b { color: var(--rust); }
+	.toc .row span { font-family: 'Instrument', serif; font-size: 1.7em; color: var(--rust); }
+	.toc .row b { font-family: 'Fraunces', serif; font-weight: 300; font-size: 1.35em; }
+	.toc .row em { font-style: normal; color: var(--muted); }
+
+	.end { padding: 3.5em 2.5em; text-align: center; }
+	.end h2 { font-size: 3.6em; }
+
+	@media (max-width: 900px) {
+		.paper { margin: 0.5em 0 3em; width: 100vw; border-radius: 0; }
+		.mast { grid-template-columns: 1fr; gap: 0.3em; text-align: center; padding: 0.9em 1.2em; }
+		.mast span, .mast .r { text-align: center; }
+		.mast span:first-child { display: none; }
+		.cover, .cols, .screens { grid-template-columns: 1fr; }
+		.cover .tx { border-right: 0; border-bottom: 1px solid var(--ink); padding: 2em 1.3em; }
+		.dev { padding: 1.5em 1.3em; }
+		.scr { font-size: 0.8em; border-width: 10px; }
+		.facts { grid-template-columns: 1fr 1fr; }
+		.facts div { padding: 1em 1.3em; border-bottom: 1px solid var(--ink); }
+		.facts div:nth-child(2n) { border-right: 0; }
+		.cols > div { border-right: 0; border-bottom: 1px solid var(--ink); padding: 1.6em 1.3em; }
+		.cols > div:last-child { border-bottom: 0; }
+		.band { padding: 1.3em; } .band img { height: 300px; }
+		.screens, .spec, .toc { padding: 2em 1.3em; gap: 1.5em; }
+		.sg { grid-template-columns: 1fr 1fr; }
+		.spec dl { grid-template-columns: 1fr; }
+		.toc .row { grid-template-columns: 3em 1fr; }
+		.toc .row em { grid-column: 2; font-size: 0.9em; }
+		.screens h2, .spec h2, .toc h2 { font-size: 2.5em; }
+		.end h2 { font-size: 2.6em; }
+	}
+</style>
