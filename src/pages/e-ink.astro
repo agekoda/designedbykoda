@@ -73,7 +73,7 @@ const cta = open ? 'Pre-order now' : 'Join the waitlist';
 		</section>
 
 		<section class="model">
-			<div class="model-box"><ProjectModel src="/models/projects/eink-calendar/model.glb" alt="3D model of the E-Ink Calendar" cameraOrbit="0deg 78deg 105%" rotationSpeed="-12deg/s" freeOrbit kickstand /></div>
+			<div class="model-box"><ProjectModel src="/models/projects/eink-calendar/model.glb" alt="3D model of the E-Ink Calendar" cameraOrbit="0deg 78deg 92%" rotationSpeed="-12deg/s" freeOrbit kickstand /></div>
 			<p class="cap">Fig. 2 — The case, in 3D. Drag to turn it around and see the keyhole and kickstand.</p>
 		</section>
 
@@ -246,8 +246,9 @@ const cta = open ? 'Pre-order now' : 'Join the waitlist';
 	.cols p { margin: 0; line-height: 1.6; color: #3c3934; }
 
 	.model { border-bottom: 1px solid var(--ink); padding: 1.5em 2.5em 2em; }
-	.model-box { height: 520px; margin-bottom: 3.4em; } /* room for the kickstand button under the viewer */
+	.model-box { height: 700px; margin-bottom: 3.4em; } /* room for the kickstand button under the viewer */
 	.model-box :global(.model-slot), .model-box :global(model-viewer) { width: 100%; height: 100%; background: transparent; }
+	.model-box :global(.model-slot) { max-width: none; aspect-ratio: auto; } /* full width, so a turned case isn't cut off at the sides */
 	.model .cap { margin: 0.4em 0 0; font-size: 1.05em; text-align: center; }
 	.photos { display: grid; grid-template-columns: 1.4fr 1fr 1fr; grid-template-rows: auto auto; gap: 1.6em 1.6em; padding: 2.5em; border-bottom: 1px solid var(--ink); }
 	.photos figure { margin: 0; }
@@ -291,7 +292,7 @@ const cta = open ? 'Pre-order now' : 'Join the waitlist';
 		.facts div:nth-child(2n) { border-right: 0; }
 		.cols > div { border-right: 0; border-bottom: 1px solid var(--ink); padding: 1.6em 1.3em; }
 		.cols > div:last-child { border-bottom: 0; }
-		.model { padding: 1em 1.3em 1.5em; } .model-box { height: 340px; }
+		.model { padding: 1em 1.3em 1.5em; } .model-box { height: 420px; }
 		.photos { grid-template-columns: 1fr 1fr; padding: 1.3em; gap: 1.2em; }
 		.photos .p-big { grid-column: span 2; grid-row: auto; } .photos .p-big img { height: 260px; }
 		.photos img { height: 150px; }
