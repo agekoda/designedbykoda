@@ -13,6 +13,7 @@ interface Props {
 	poster?: string;
 	cameraOrbit?: string;
 	rotationSpeed?: string;
+	freeOrbit?: boolean; // turn all the way over the top and underneath, not just around the sides
 }
 
 const {
@@ -21,6 +22,7 @@ const {
 	poster,
 	cameraOrbit = '0deg 55deg auto',
 	rotationSpeed = '-8deg/s',
+	freeOrbit = false,
 } = Astro.props;
 const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 ---
@@ -45,6 +47,8 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 				auto-rotate-delay="0"
 				rotation-per-second={rotationSpeed}
 				camera-orbit={cameraOrbit}
+				min-camera-orbit={freeOrbit ? 'auto 0deg auto' : undefined}
+				max-camera-orbit={freeOrbit ? 'auto 180deg auto' : undefined}
 			>
 				<div slot="progress-bar" />
 			</model-viewer>

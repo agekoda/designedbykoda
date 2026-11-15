@@ -73,7 +73,7 @@ const cta = open ? 'Pre-order now' : 'Join the waitlist';
 		</section>
 
 		<section class="model">
-			<div class="model-box"><ProjectModel src="/models/projects/eink-calendar/model.glb" alt="3D model of the E-Ink Calendar" cameraOrbit="180deg 48deg 110%" rotationSpeed="-12deg/s" /></div>
+			<div class="model-box"><ProjectModel src="/models/projects/eink-calendar/model.glb" alt="3D model of the E-Ink Calendar" cameraOrbit="180deg 48deg 110%" rotationSpeed="-12deg/s" freeOrbit /></div>
 			<p class="cap">Fig. 2 — The case, in 3D. Drag to turn it around and see the keyhole and kickstand.</p>
 		</section>
 
@@ -133,29 +133,34 @@ const cta = open ? 'Pre-order now' : 'Join the waitlist';
 	</article>
 
 	{!open && (
-		<dialog id="wl" class="wl" aria-label="Join the waitlist">
+		<div id="wl" class="wl-scrim" hidden><div class="wl" role="dialog" aria-modal="true" aria-label="Join the waitlist">
 			<button type="button" class="x" data-close aria-label="Close">×</button>
 			<p class="kick">Pre-orders open 30 November</p>
 			<h2>Get first dibs.</h2>
 			<p class="sub">Leave your email and I'll let you know the moment pre-orders open, while the early-bird price of A${EARLY_PRICES.AUD} is still on.</p>
 			<WaitlistForm label="" listKey="eink-calendar" />
-		</dialog>
+		</div></div>
 	)}
 </Layout>
 
 <script>
 	// Before pre-orders open, the buttons open the waitlist pop-up instead of the (closed) pre-order page.
-	const wl = document.getElementById('wl') as HTMLDialogElement | null;
+	// A plain overlay rather than <dialog>: a modal dialog sits above everything, including the
+	// site's custom cursor, which then disappears behind it.
+	const wl = document.getElementById('wl');
 	if (wl) {
+		const close = () => { wl.hidden = true; document.documentElement.style.overflow = ''; };
 		document.querySelectorAll('[data-waitlist]').forEach((el) =>
 			el.addEventListener('click', (e) => {
 				e.preventDefault();
-				wl.showModal();
+				wl.hidden = false;
+				document.documentElement.style.overflow = 'hidden';
 				(wl.querySelector('input[type=email]') as HTMLInputElement | null)?.focus();
 			})
 		);
-		wl.querySelector('[data-close]')?.addEventListener('click', () => wl.close());
-		wl.addEventListener('click', (e) => { if (e.target === wl) wl.close(); });
+		wl.querySelector('[data-close]')?.addEventListener('click', close);
+		wl.addEventListener('click', (e) => { if (e.target === wl) close(); });
+		document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !wl.hidden) close(); });
 	}
 
 	import { renderPreview, paintScreen } from '../lib/eink/previewKit';
@@ -208,8 +213,9 @@ const cta = open ? 'Pre-order now' : 'Join the waitlist';
 	.b { display: inline-block; background: var(--ink); color: var(--cream) !important; padding: 0.9em 1.5em; font-weight: 700; text-decoration: none; }
 	.b:hover { background: var(--rust); }
 	button.b { border: 0; cursor: pointer; font: inherit; font-weight: 700; font-size: 1em; }
-	.wl { border: 1px solid var(--ink, #1b1a17); border-radius: 4px; background: #efe9df; color: #1b1a17; padding: 2.4em 2.2em 2em; width: min(460px, calc(100vw - 2em)); box-shadow: 0 30px 80px rgba(40, 25, 10, 0.35); }
-	.wl::backdrop { background: rgba(27, 26, 23, 0.45); }
+	.wl-scrim { position: fixed; inset: 0; z-index: 10004; background: rgba(27, 26, 23, 0.45); display: grid; place-items: center; padding: 1em; }
+	.wl-scrim[hidden] { display: none; }
+	.wl { position: relative; border: 1px solid var(--ink, #1b1a17); border-radius: 4px; background: #efe9df; color: #1b1a17; padding: 2.4em 2.2em 2em; width: min(460px, calc(100vw - 2em)); box-shadow: 0 30px 80px rgba(40, 25, 10, 0.35); }
 	.wl .x { position: absolute; top: 0.5em; right: 0.7em; background: none; border: 0; font-size: 1.6em; color: #5b564d; cursor: pointer; }
 	.wl .kick { margin: 0; font-size: 0.72em; letter-spacing: 0.2em; text-transform: uppercase; color: #a0472b; }
 	.wl h2 { font-family: 'Instrument', serif; font-weight: 400; font-size: 2.6em; margin: 0.15em 0 0.25em; color: #1b1a17; }
