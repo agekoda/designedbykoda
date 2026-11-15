@@ -41,7 +41,7 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 				disable-tap
 				interaction-prompt="none"
 				interpolation-decay="35"
-				shadow-intensity="1"
+				shadow-intensity={freeOrbit ? '0' : '1'}
 				exposure="1"
 				environment-image="neutral"
 				auto-rotate-delay="0"
@@ -68,7 +68,7 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 					const mv = box && box.querySelector('model-viewer');
 					if (mv) {
 						mv.style.touchAction = 'none';
-						let q = [0, 0, 0, 1]; // x, y, z, w
+						let q = [0, 0, 0, 1]; // x, y, z, w, set below once the helpers exist
 						const mul = (a, b) => [
 							a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
 							a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
@@ -76,25 +76,29 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 							a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
 						];
 						const axis = (x, y, z, ang) => { const s = Math.sin(ang / 2); return [x * s, y * s, z * s, Math.cos(ang / 2)]; };
-						const deg = (r) => (r * 180) / Math.PI;
+						// Set the rotation straight on the 3D scene. Changing model-viewer's "orientation"
+						// attribute every frame trips a bug in its AR code, after which it stops redrawing.
+						const sceneOf = () => {
+							const k = Object.getOwnPropertySymbols(mv).find((s) => s.description === 'scene');
+							return k ? mv[k] : null;
+						};
 						const apply = () => {
-							const [x, y, z, w] = q;
-							const m13 = 2 * (x * z + w * y), m33 = 1 - 2 * (x * x + y * y), m23 = 2 * (y * z - w * x);
-							const m21 = 2 * (x * y + w * z), m22 = 1 - 2 * (x * x + z * z), m31 = 2 * (x * z - w * y), m11 = 1 - 2 * (y * y + z * z);
-							const pitch = Math.asin(-Math.max(-1, Math.min(1, m23)));
-							let yaw, roll;
-							if (Math.abs(m23) < 0.9999999) { yaw = Math.atan2(m13, m33); roll = Math.atan2(m21, m22); }
-							else { yaw = Math.atan2(-m31, m11); roll = 0; }
-							mv.setAttribute('orientation', `${deg(roll)}deg ${deg(pitch)}deg ${deg(yaw)}deg`);
+							const sc = sceneOf();
+							if (!sc || !sc.models || !sc.models.length) return;
+							for (const m of sc.models) m.quaternion.set(q[0], q[1], q[2], q[3]);
+							if (sc.updateShadow) sc.updateShadow();
+							if (sc.queueRender) sc.queueRender();
 						};
 						// turn about the screen's up axis (left/right drag) and its right axis (up/down drag)
 						const turn = (dx, dy) => {
 							const k = 0.009;
 							q = mul(axis(0, 1, 0, dx * k), q);
-							q = mul(axis(-1, 0, 0, dy * k), q);
+							q = mul(axis(1, 0, 0, dy * k), q);
 							const n = Math.hypot(...q); q = q.map((v) => v / n);
 							apply();
 						};
+						// The case's model lies flat (screen up), so stand it up to face the camera first.
+						q = axis(1, 0, 0, -Math.PI / 2);
 						let spinning = true, last = 0;
 						const spin = (t) => {
 							if (!spinning) return;
@@ -103,6 +107,7 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 							requestAnimationFrame(spin);
 						};
 						requestAnimationFrame(spin);
+						mv.addEventListener('load', apply);
 						let drag = null;
 						mv.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, id: e.pointerId }; mv.setPointerCapture(e.pointerId); });
 						mv.addEventListener('pointermove', (e) => {
