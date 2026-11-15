@@ -73,7 +73,7 @@ const cta = open ? 'Pre-order now' : 'Join the waitlist';
 		</section>
 
 		<section class="model">
-			<div class="model-box"><ProjectModel src="/models/projects/eink-calendar/model.glb" alt="3D model of the E-Ink Calendar" cameraOrbit="180deg 48deg 110%" rotationSpeed="-12deg/s" freeOrbit /></div>
+			<div class="model-box"><ProjectModel src="/models/projects/eink-calendar/model.glb" alt="3D model of the E-Ink Calendar" cameraOrbit="0deg 78deg 105%" rotationSpeed="-12deg/s" freeOrbit /></div>
 			<p class="cap">Fig. 2 — The case, in 3D. Drag to turn it around and see the keyhole and kickstand.</p>
 		</section>
 
@@ -149,13 +149,14 @@ const cta = open ? 'Pre-order now' : 'Join the waitlist';
 	// site's custom cursor, which then disappears behind it.
 	const wl = document.getElementById('wl');
 	if (wl) {
-		const close = () => { wl.hidden = true; document.documentElement.style.overflow = ''; };
+		// straight under <body>, so it covers the whole window rather than the page's centred column
+		document.body.appendChild(wl);
+		const close = () => { wl.hidden = true; };
 		document.querySelectorAll('[data-waitlist]').forEach((el) =>
 			el.addEventListener('click', (e) => {
 				e.preventDefault();
 				wl.hidden = false;
-				document.documentElement.style.overflow = 'hidden';
-				(wl.querySelector('input[type=email]') as HTMLInputElement | null)?.focus();
+				(wl.querySelector('input[type=email]') as HTMLInputElement | null)?.focus({ preventScroll: true });
 			})
 		);
 		wl.querySelector('[data-close]')?.addEventListener('click', close);
@@ -188,6 +189,15 @@ const cta = open ? 'Pre-order now' : 'Join the waitlist';
 	}
 	body.paper-theme header nav > a:first-child, body.paper-theme header .logo, body.paper-theme header h2 a { font-family: 'Instrument', serif; font-weight: 400; font-size: 1.5em; letter-spacing: -0.01em; }
 	body.paper-theme footer { border-top: 3px double #1b1a17; }
+	.wl-scrim { position: fixed; inset: 0; z-index: 10004; background: rgba(27, 26, 23, 0.45); display: grid; place-items: center; padding: 1em; }
+	.wl-scrim[hidden] { display: none; }
+	.wl { position: relative; border: 1px solid var(--ink, #1b1a17); border-radius: 4px; background: #efe9df; color: #1b1a17; padding: 2.4em 2.2em 2em; width: min(460px, calc(100vw - 2em)); box-shadow: 0 30px 80px rgba(40, 25, 10, 0.35); }
+	.wl .x { position: absolute; top: 0.5em; right: 0.7em; background: none; border: 0; font-size: 1.6em; color: #5b564d; cursor: pointer; }
+	.wl .kick { margin: 0; font-size: 0.72em; letter-spacing: 0.2em; text-transform: uppercase; color: #a0472b; }
+	.wl h2 { font-family: 'Instrument', serif; font-weight: 400; font-size: 2.6em; margin: 0.15em 0 0.25em; color: #1b1a17; }
+	.wl .sub { margin: 0 0 1.2em; color: #5b564d; line-height: 1.55; }
+	.wl .waitlist-label:empty { display: none; }
+	.wl .waitlist { margin: 0; padding: 0; border: 0; background: none; }
 </style>
 
 <style>
@@ -213,15 +223,7 @@ const cta = open ? 'Pre-order now' : 'Join the waitlist';
 	.b { display: inline-block; background: var(--ink); color: var(--cream) !important; padding: 0.9em 1.5em; font-weight: 700; text-decoration: none; }
 	.b:hover { background: var(--rust); }
 	button.b { border: 0; cursor: pointer; font: inherit; font-weight: 700; font-size: 1em; }
-	.wl-scrim { position: fixed; inset: 0; z-index: 10004; background: rgba(27, 26, 23, 0.45); display: grid; place-items: center; padding: 1em; }
-	.wl-scrim[hidden] { display: none; }
-	.wl { position: relative; border: 1px solid var(--ink, #1b1a17); border-radius: 4px; background: #efe9df; color: #1b1a17; padding: 2.4em 2.2em 2em; width: min(460px, calc(100vw - 2em)); box-shadow: 0 30px 80px rgba(40, 25, 10, 0.35); }
-	.wl .x { position: absolute; top: 0.5em; right: 0.7em; background: none; border: 0; font-size: 1.6em; color: #5b564d; cursor: pointer; }
-	.wl .kick { margin: 0; font-size: 0.72em; letter-spacing: 0.2em; text-transform: uppercase; color: #a0472b; }
-	.wl h2 { font-family: 'Instrument', serif; font-weight: 400; font-size: 2.6em; margin: 0.15em 0 0.25em; color: #1b1a17; }
-	.wl .sub { margin: 0 0 1.2em; color: #5b564d; line-height: 1.55; }
-	.wl :global(.waitlist-label:empty) { display: none; }
-	.wl :global(.waitlist) { margin: 0; padding: 0; border: 0; background: none; }
+
 	.l { border-bottom: 1px solid var(--ink); text-decoration: none; font-size: 0.95em; }
 	.l:hover { color: var(--rust) !important; border-color: var(--rust); }
 

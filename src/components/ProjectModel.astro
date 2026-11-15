@@ -34,21 +34,19 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 				src={src}
 				alt={alt}
 				poster={poster}
-				camera-controls
+				{...(freeOrbit ? {} : { 'camera-controls': '', 'auto-rotate': '' })}
+				data-free-orbit={freeOrbit ? '' : undefined}
 				disable-zoom
 				disable-pan
 				disable-tap
 				interaction-prompt="none"
 				interpolation-decay="35"
-				shadow-intensity="1"
+				shadow-intensity={freeOrbit ? '0' : '1'}
 				exposure="1"
 				environment-image="neutral"
-				auto-rotate
 				auto-rotate-delay="0"
 				rotation-per-second={rotationSpeed}
 				camera-orbit={cameraOrbit}
-				min-camera-orbit={freeOrbit ? 'auto 0deg auto' : undefined}
-				max-camera-orbit={freeOrbit ? 'auto 180deg auto' : undefined}
 			>
 				<div slot="progress-bar" />
 			</model-viewer>
@@ -61,6 +59,70 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 				<span>3D model coming soon</span>
 			</div>
 			<script src="/scripts/model-viewer.min.js" type="module"></script>
+			{freeOrbit && (
+				<script define:vars={{ id }}>
+					// Free turning: the camera stays put and the case itself rotates, trackball style, so it
+					// can go right over the top and underneath without stopping (an orbiting camera can't
+					// pass straight above or below). It spins slowly until someone grabs it.
+					const box = document.getElementById(id);
+					const mv = box && box.querySelector('model-viewer');
+					if (mv) {
+						mv.style.touchAction = 'none';
+						let q = [0, 0, 0, 1]; // x, y, z, w, set below once the helpers exist
+						const mul = (a, b) => [
+							a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+							a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+							a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+							a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
+						];
+						const axis = (x, y, z, ang) => { const s = Math.sin(ang / 2); return [x * s, y * s, z * s, Math.cos(ang / 2)]; };
+						// Set the rotation straight on the 3D scene. Changing model-viewer's "orientation"
+						// attribute every frame trips a bug in its AR code, after which it stops redrawing.
+						const sceneOf = () => {
+							const k = Object.getOwnPropertySymbols(mv).find((s) => s.description === 'scene');
+							return k ? mv[k] : null;
+						};
+						const apply = () => {
+							const sc = sceneOf();
+							if (!sc || !sc.models || !sc.models.length) return;
+							for (const m of sc.models) m.quaternion.set(q[0], q[1], q[2], q[3]);
+							if (sc.updateShadow) sc.updateShadow();
+							if (sc.queueRender) sc.queueRender();
+						};
+						// turn about the screen's up axis (left/right drag) and its right axis (up/down drag)
+						const turn = (dx, dy) => {
+							const k = 0.009;
+							q = mul(axis(0, 1, 0, dx * k), q);
+							q = mul(axis(1, 0, 0, dy * k), q);
+							const n = Math.hypot(...q); q = q.map((v) => v / n);
+							apply();
+						};
+						// The case's model lies flat (screen up), so stand it up to face the camera first.
+						q = axis(1, 0, 0, -Math.PI / 2);
+						let spinning = true, last = 0;
+						const spin = (t) => {
+							if (!spinning) return;
+							if (last) turn(-(t - last) * 0.025, 0);
+							last = t;
+							requestAnimationFrame(spin);
+						};
+						requestAnimationFrame(spin);
+						mv.addEventListener('load', apply);
+						let drag = null;
+						mv.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, id: e.pointerId }; mv.setPointerCapture(e.pointerId); });
+						mv.addEventListener('pointermove', (e) => {
+							if (!drag || e.pointerId !== drag.id) return;
+							const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+							if (spinning && Math.hypot(dx, dy) > 3) spinning = false;
+							drag.x = e.clientX; drag.y = e.clientY;
+							if (!spinning) turn(dx, dy);
+						});
+						const end = (e) => { if (drag && e.pointerId === drag.id) drag = null; };
+						mv.addEventListener('pointerup', end);
+						mv.addEventListener('pointercancel', end);
+					}
+				</script>
+			)}
 			<script define:vars={{ id, src, cameraOrbit }}>
 				const wrap = document.getElementById(id);
 				if (wrap) {
