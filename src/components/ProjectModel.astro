@@ -14,6 +14,7 @@ interface Props {
 	cameraOrbit?: string;
 	rotationSpeed?: string;
 	freeOrbit?: boolean; // turn all the way over the top and underneath, not just around the sides
+	kickstand?: boolean; // show a button that turns the case round and plays the model's KickstandOpen animation (freeOrbit only)
 }
 
 const {
@@ -23,12 +24,14 @@ const {
 	cameraOrbit = '0deg 55deg auto',
 	rotationSpeed = '-8deg/s',
 	freeOrbit = false,
+	kickstand = false,
 } = Astro.props;
 const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 ---
 
 {
 	src && (
+		<>
 		<div class="model-slot" id={id}>
 			<model-viewer
 				src={src}
@@ -120,6 +123,42 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 						const end = (e) => { if (drag && e.pointerId === drag.id) drag = null; };
 						mv.addEventListener('pointerup', end);
 						mv.addEventListener('pointercancel', end);
+
+						// Kickstand button (under the viewer): plays the model's KickstandOpen animation from wherever
+						// the case is being viewed; pressing again plays it backwards. It never changes the view.
+						// (The button comes after this script in the page, so look for it once the page has parsed.)
+						const hookKick = () => {
+							const kb = document.querySelector(`[data-kick-for="${id}"]`);
+							if (!kb) return;
+							let open = false, busy = false;
+							// Drive the clip by hand while paused: when model-viewer finishes a one-shot play() it
+							// drops back to the rest pose, and a time equal to the duration wraps round to 0.
+							// Choose the clip up front: model-viewer applies a new animationName a frame later and
+							// resets the time to 0 when it does, which would undo the first few frames of the swing.
+							const pick = () => { if (typeof mv.pause !== 'function') return; mv.animationName = 'KickstandOpen'; mv.pause(); };
+							mv.addEventListener('load', pick); pick();
+							const swing = () => {
+								mv.pause();
+								const D = Math.max(0, mv.duration - 0.001), a = open ? D : 0, b = open ? 0 : D, t0 = performance.now();
+								const tick = (t) => {
+									const k = Math.min(1, (t - t0) / (D * 1000 || 1));
+									mv.currentTime = a + (b - a) * k;
+									if (k < 1) requestAnimationFrame(tick);
+								};
+								requestAnimationFrame(tick);
+								open = !open;
+								kb.textContent = open ? 'Fold kickstand' : 'Open kickstand';
+								kb.setAttribute('aria-pressed', String(open));
+								setTimeout(() => { busy = false; }, 750);
+							};
+							kb.addEventListener('click', () => {
+								if (busy) return;
+								busy = true;
+								swing();
+							});
+						};
+						if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hookKick);
+						else hookKick();
 					}
 				</script>
 			)}
@@ -208,6 +247,12 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 				}
 			</script>
 		</div>
+		{kickstand && freeOrbit && (
+			<div class="kick-row">
+				<button type="button" class="kick-btn" data-kick-for={id} aria-pressed="false">Open kickstand</button>
+			</div>
+		)}
+		</>
 	)
 }
 {
@@ -258,6 +303,23 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 		text-align: center;
 		padding: 1em;
 	}
+	.kick-row {
+		display: flex;
+		justify-content: center;
+		margin-top: 0.8em;
+	}
+	.kick-btn {
+		border: 1px solid currentColor;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		font-size: 0.85em;
+		padding: 0.5em 1.1em;
+		border-radius: 999px;
+		cursor: pointer;
+	}
+	.kick-btn:hover { background: rgba(0, 0, 0, 0.06); }
+	:global(html.has-custom-cursor) .kick-btn { cursor: none; }
 	.model-slot .placeholder svg {
 		width: 28px;
 		height: 28px;
