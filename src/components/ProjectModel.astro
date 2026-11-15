@@ -31,6 +31,7 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 
 {
 	src && (
+		<>
 		<div class="model-slot" id={id}>
 			<model-viewer
 				src={src}
@@ -52,7 +53,6 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 			>
 				<div slot="progress-bar" />
 			</model-viewer>
-			{kickstand && freeOrbit && <button type="button" class="kick-btn" aria-pressed="false">Open kickstand</button>}
 			<div class="placeholder">
 				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
 					<path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z" />
@@ -124,19 +124,12 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 						mv.addEventListener('pointerup', end);
 						mv.addEventListener('pointercancel', end);
 
-						// Kickstand button: turn the case round to a three-quarter back view (so the stand is
-						// actually in sight), then play the model's KickstandOpen animation. Again plays it backwards.
-						const kb = box.querySelector('.kick-btn');
-						if (kb) {
-							const slerp = (a, b, t) => {
-								let d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
-								if (d < 0) { b = b.map((v) => -v); d = -d; }
-								if (d > 0.9995) { const r = a.map((v, i) => v + (b[i] - v) * t); const n = Math.hypot(...r); return r.map((v) => v / n); }
-								const th = Math.acos(d), s0 = Math.sin((1 - t) * th) / Math.sin(th), s1 = Math.sin(t * th) / Math.sin(th);
-								return a.map((v, i) => v * s0 + b[i] * s1);
-							};
-							const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
-							const BACK = mul(axis(1, 0, 0, 0.18), mul(axis(0, 1, 0, -1.15), axis(1, 0, 0, -Math.PI / 2)));
+						// Kickstand button (under the viewer): plays the model's KickstandOpen animation from wherever
+						// the case is being viewed; pressing again plays it backwards. It never changes the view.
+						// (The button comes after this script in the page, so look for it once the page has parsed.)
+						const hookKick = () => {
+							const kb = document.querySelector(`[data-kick-for="${id}"]`);
+							if (!kb) return;
 							let open = false, busy = false;
 							// Drive the clip by hand while paused: when model-viewer finishes a one-shot play() it
 							// drops back to the rest pose, and a time equal to the duration wraps round to 0.
@@ -160,17 +153,12 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 							};
 							kb.addEventListener('click', () => {
 								if (busy) return;
-								busy = true; spinning = false;
-								if (open) { swing(); return; }
-								const from = q.slice(), t0 = performance.now(), dur = 700;
-								const step = (t) => {
-									const k = Math.min(1, (t - t0) / dur);
-									q = slerp(from, BACK, ease(k)); apply();
-									if (k < 1) requestAnimationFrame(step); else swing();
-								};
-								requestAnimationFrame(step);
+								busy = true;
+								swing();
 							});
-						}
+						};
+						if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hookKick);
+						else hookKick();
 					}
 				</script>
 			)}
@@ -259,6 +247,12 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 				}
 			</script>
 		</div>
+		{kickstand && freeOrbit && (
+			<div class="kick-row">
+				<button type="button" class="kick-btn" data-kick-for={id} aria-pressed="false">Open kickstand</button>
+			</div>
+		)}
+		</>
 	)
 }
 {
@@ -309,10 +303,12 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 		text-align: center;
 		padding: 1em;
 	}
+	.kick-row {
+		display: flex;
+		justify-content: center;
+		margin-top: 0.8em;
+	}
 	.kick-btn {
-		position: absolute;
-		right: 0.9em;
-		bottom: 0.9em;
 		border: 1px solid currentColor;
 		background: transparent;
 		color: inherit;
