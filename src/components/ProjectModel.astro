@@ -37,7 +37,7 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 				src={src}
 				alt={alt}
 				poster={poster}
-				{...(freeOrbit ? {} : { 'camera-controls': '', 'auto-rotate': '' })}
+				{...(freeOrbit ? { 'max-camera-orbit': 'auto auto 300%' } : { 'camera-controls': '', 'auto-rotate': '' })}
 				data-free-orbit={freeOrbit ? '' : undefined}
 				disable-zoom
 				disable-pan
@@ -85,11 +85,23 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 							const k = Object.getOwnPropertySymbols(mv).find((s) => s.description === 'scene');
 							return k ? mv[k] : null;
 						};
+						// Turn about the middle of the case, not the model's origin (a corner), so it stays
+						// centred in the frame however it's turned.
+						let pivot = null; // { p0: model's starting position, c: centre relative to it }
 						const apply = () => {
 							const sc = sceneOf();
 							if (!sc || !sc.models || !sc.models.length) return;
-							for (const m of sc.models) m.quaternion.set(q[0], q[1], q[2], q[3]);
+							if (!pivot && sc.boundingBox && sc.boundingBox.min) {
+								const m0 = sc.models[0];
+								const c = sc.boundingBox.min.clone().add(sc.boundingBox.max).multiplyScalar(0.5);
+								pivot = { p0: m0.position.clone(), c: c.sub(m0.position) };
+							}
+							for (const m of sc.models) {
+								m.quaternion.set(q[0], q[1], q[2], q[3]);
+								if (pivot) m.position.copy(pivot.p0).add(pivot.c).sub(pivot.c.clone().applyQuaternion(m.quaternion));
+							}
 							if (sc.updateShadow) sc.updateShadow();
+							if (sc.updateMatrixWorld) sc.updateMatrixWorld(true);
 							if (sc.queueRender) sc.queueRender();
 						};
 						// turn about the screen's up axis (left/right drag) and its right axis (up/down drag)
