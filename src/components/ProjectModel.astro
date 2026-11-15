@@ -14,6 +14,7 @@ interface Props {
 	cameraOrbit?: string;
 	rotationSpeed?: string;
 	freeOrbit?: boolean; // turn all the way over the top and underneath, not just around the sides
+	kickstand?: boolean; // show a button that turns the case round and plays the model's KickstandOpen animation (freeOrbit only)
 }
 
 const {
@@ -23,6 +24,7 @@ const {
 	cameraOrbit = '0deg 55deg auto',
 	rotationSpeed = '-8deg/s',
 	freeOrbit = false,
+	kickstand = false,
 } = Astro.props;
 const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 ---
@@ -50,6 +52,7 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 			>
 				<div slot="progress-bar" />
 			</model-viewer>
+			{kickstand && freeOrbit && <button type="button" class="kick-btn" aria-pressed="false">Open kickstand</button>}
 			<div class="placeholder">
 				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
 					<path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z" />
@@ -120,6 +123,54 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 						const end = (e) => { if (drag && e.pointerId === drag.id) drag = null; };
 						mv.addEventListener('pointerup', end);
 						mv.addEventListener('pointercancel', end);
+
+						// Kickstand button: turn the case round to a three-quarter back view (so the stand is
+						// actually in sight), then play the model's KickstandOpen animation. Again plays it backwards.
+						const kb = box.querySelector('.kick-btn');
+						if (kb) {
+							const slerp = (a, b, t) => {
+								let d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+								if (d < 0) { b = b.map((v) => -v); d = -d; }
+								if (d > 0.9995) { const r = a.map((v, i) => v + (b[i] - v) * t); const n = Math.hypot(...r); return r.map((v) => v / n); }
+								const th = Math.acos(d), s0 = Math.sin((1 - t) * th) / Math.sin(th), s1 = Math.sin(t * th) / Math.sin(th);
+								return a.map((v, i) => v * s0 + b[i] * s1);
+							};
+							const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+							const BACK = mul(axis(1, 0, 0, 0.18), mul(axis(0, 1, 0, -1.15), axis(1, 0, 0, -Math.PI / 2)));
+							let open = false, busy = false;
+							// Drive the clip by hand while paused: when model-viewer finishes a one-shot play() it
+							// drops back to the rest pose, and a time equal to the duration wraps round to 0.
+							// Choose the clip up front: model-viewer applies a new animationName a frame later and
+							// resets the time to 0 when it does, which would undo the first few frames of the swing.
+							const pick = () => { if (typeof mv.pause !== 'function') return; mv.animationName = 'KickstandOpen'; mv.pause(); };
+							mv.addEventListener('load', pick); pick();
+							const swing = () => {
+								mv.pause();
+								const D = Math.max(0, mv.duration - 0.001), a = open ? D : 0, b = open ? 0 : D, t0 = performance.now();
+								const tick = (t) => {
+									const k = Math.min(1, (t - t0) / (D * 1000 || 1));
+									mv.currentTime = a + (b - a) * k;
+									if (k < 1) requestAnimationFrame(tick);
+								};
+								requestAnimationFrame(tick);
+								open = !open;
+								kb.textContent = open ? 'Fold kickstand' : 'Open kickstand';
+								kb.setAttribute('aria-pressed', String(open));
+								setTimeout(() => { busy = false; }, 750);
+							};
+							kb.addEventListener('click', () => {
+								if (busy) return;
+								busy = true; spinning = false;
+								if (open) { swing(); return; }
+								const from = q.slice(), t0 = performance.now(), dur = 700;
+								const step = (t) => {
+									const k = Math.min(1, (t - t0) / dur);
+									q = slerp(from, BACK, ease(k)); apply();
+									if (k < 1) requestAnimationFrame(step); else swing();
+								};
+								requestAnimationFrame(step);
+							});
+						}
 					}
 				</script>
 			)}
@@ -258,6 +309,21 @@ const id = `model-${Math.random().toString(36).slice(2, 9)}`;
 		text-align: center;
 		padding: 1em;
 	}
+	.kick-btn {
+		position: absolute;
+		right: 0.9em;
+		bottom: 0.9em;
+		border: 1px solid currentColor;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		font-size: 0.85em;
+		padding: 0.5em 1.1em;
+		border-radius: 999px;
+		cursor: pointer;
+	}
+	.kick-btn:hover { background: rgba(0, 0, 0, 0.06); }
+	:global(html.has-custom-cursor) .kick-btn { cursor: none; }
 	.model-slot .placeholder svg {
 		width: 28px;
 		height: 28px;
