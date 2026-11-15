@@ -10,9 +10,10 @@ interface Props {
 	description: string;
 	image?: string;
 	noindex?: boolean; // keep the page out of search engines (private pages such as message links)
+	bodyClass?: string; // a page-wide look, e.g. 'paper-theme' on /e-ink
 }
 
-const { title, description, image, noindex } = Astro.props;
+const { title, description, image, noindex, bodyClass } = Astro.props;
 
 // Project list for the command palette (title + url), ordered like the site.
 const paletteProjects = (await getCollection('projects'))
@@ -26,7 +27,7 @@ const paletteProjects = (await getCollection('projects'))
 		<link rel="stylesheet" href="/styles/extras.css" />
 		{noindex && <meta name="robots" content="noindex, nofollow" />}
 	</head>
-	<body>
+	<body class={bodyClass}>
 		<a class="x-skip" href="#main">Skip to content</a>
 		<BackgroundFX />
 		<Header />
