@@ -138,9 +138,8 @@ export async function allFeedEvents(db: any, deviceId: string, tz: string, nowMs
 	if (!feeds.length) return [];
 	const lists = await Promise.all(feeds.map((f) => feedEvents(db, deviceId, f, tz, nowMs).catch(() => ({ events: [] as IcsEvent[] }))));
 	const out: { title: string; ms: number; allDay: boolean; dateOnly?: string; endMs?: number; endDateOnly?: string }[] = [];
-	for (const [i, l] of lists.entries())
+	for (const l of lists)
 		for (const e of l.events) {
-			if (isTimetable(feeds[i]) && isAllDayish(e)) continue; // classes only: no "Year 11" or term notices filling the day
 			const end = e.allDay ? (e.endDateOnly ? Date.parse(e.endDateOnly + 'T00:00:00Z') : e.ms + 86400000) : e.endMs ?? e.ms;
 			if (Math.max(end, e.ms + 1) <= fromMs) continue; // already over (ones still going count, as with Google)
 			out.push(e);
@@ -149,14 +148,9 @@ export async function allFeedEvents(db: any, deviceId: string, tz: string, nowMs
 	return out.slice(0, 30);
 }
 
-// Compass timetables: only the classes go on the screen. Its all-day entries (year group notices,
-// term events) would cover the whole day on the Timeline.
-const isTimetable = (f: Feed) => !!f.url && /(^|\.)compass\.education$/i.test((() => { try { return new URL(f.url!).hostname; } catch { return ''; } })());
-const isAllDayish = (e: IcsEvent) => e.allDay || (e.endMs !== undefined && e.endMs - e.ms >= 20 * 3600000);
-
 export async function statusOf(db: any, deviceId: string, f: Feed, tz: string, nowMs: number, force = false): Promise<FeedStatus> {
 	const r = await feedEvents(db, deviceId, f, tz, nowMs, force);
-	const upcoming = r.events.filter((e) => !(isTimetable(f) && isAllDayish(e))).filter((e) => (e.allDay ? Date.parse((e.endDateOnly ?? e.dateOnly) + 'T00:00:00Z') > nowMs : e.ms >= nowMs));
+	const upcoming = r.events.filter((e) => (e.allDay ? Date.parse((e.endDateOnly ?? e.dateOnly) + 'T00:00:00Z') > nowMs : e.ms >= nowMs));
 	let host: string | null = null;
 	if (f.url) {
 		try {
