@@ -3,6 +3,7 @@
 // against the logged-in user, so you can only touch your own devices.
 import { isStyleId, isRefreshSec, DEFAULT_STYLE } from '../../../data/calendarStyles';
 import { sanitizeReminders } from '../../../lib/eink/reminders';
+import { sanitizeHabits } from '../../../lib/eink/habits';
 import { isFamily } from '../../../lib/eink/fonts';
 import { b64ToBytes, decodePic, FRAME_BYTES, cleanSettings } from '../../../lib/eink/image';
 import { cleanText } from '../../../lib/eink/draw';
@@ -80,6 +81,14 @@ export async function GET({ request, locals }) {
 	} catch {
 		remindersReady = false;
 	} // schema-reminders.sql
+	let habits: unknown = [];
+	let habitsReady = true;
+	try {
+		const hq = await db.prepare('SELECT habits FROM devices WHERE id = ?').bind(deviceId).first();
+		habits = sanitizeHabits(hq?.habits);
+	} catch {
+		habitsReady = false;
+	} // schema-habits.sql
 	let screensReady = true;
 	let batteryAnchor: { mv: number; at: number } | null = null;
 	try {
@@ -142,6 +151,8 @@ export async function GET({ request, locals }) {
 			msgCheck,
 			reminders,
 			remindersReady,
+			habits,
+			habitsReady,
 			designs: (await listDesigns(db, deviceId))?.map((d) => ({ id: d.id, name: d.name, layout: d.layout })) ?? null,
 			shares: await sharesForDevice(db, deviceId),
 			screensReady,
@@ -288,6 +299,13 @@ export async function POST({ request, locals }) {
 			await db.prepare('UPDATE devices SET reminders = ? WHERE id = ? AND user_id = ?').bind(JSON.stringify(sanitizeReminders(body.reminders)), deviceId, o.userId).run();
 		} catch {
 			return json({ error: 'Reminders need a one-off database update on the server (schema-reminders.sql).' }, 500);
+		}
+	}
+	if (body.habits !== undefined) {
+		try {
+			await db.prepare('UPDATE devices SET habits = ? WHERE id = ? AND user_id = ?').bind(JSON.stringify(sanitizeHabits(body.habits)), deviceId, o.userId).run();
+		} catch {
+			return json({ error: 'Habits need a one-off database update on the server (schema-habits.sql).' }, 500);
 		}
 	}
 	if (body.schedule !== undefined) {

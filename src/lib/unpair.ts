@@ -37,6 +37,8 @@ export async function releaseDevice(db: any, deviceId: string, userId: string): 
 		'UPDATE devices SET schedule = NULL, screen_override = NULL, override_until = NULL, temp_unit = NULL, sign_cfg = NULL WHERE id = ?',
 		'UPDATE devices SET clock = NULL WHERE id = ?',
 		'UPDATE devices SET reminders = NULL WHERE id = ?',
+		'UPDATE devices SET habits = NULL WHERE id = ?',
+		'DELETE FROM device_feeds WHERE device_id = ?', // school timetables and other calendar links
 		'UPDATE devices SET msg_token = NULL, msg_cfg = NULL WHERE id = ?', // the shared message link stops working
 		'DELETE FROM messages WHERE device_id = ?',
 		'DELETE FROM designs WHERE device_id = ?',

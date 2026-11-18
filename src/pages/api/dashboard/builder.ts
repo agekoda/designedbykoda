@@ -2,6 +2,7 @@
 // Everything is checked against the logged-in user, so you can only touch your own devices.
 import { isFamily } from '../../../lib/eink/fonts';
 import { sanitizeReminders } from '../../../lib/eink/reminders';
+import { sanitizeHabits } from '../../../lib/eink/habits';
 import { cleanSettings } from '../../../lib/eink/image';
 import { MAX_JSON, sanitizeLayout } from '../../../lib/eink/builder/model';
 import { markSaved } from '../../../lib/screens';
@@ -96,6 +97,11 @@ export async function GET({ request, locals }: any) {
 		const rq = await db.prepare('SELECT reminders FROM devices WHERE id = ?').bind(deviceId).first();
 		reminders = sanitizeReminders(rq?.reminders);
 	} catch {} // schema-reminders.sql
+	let habits: unknown = [];
+	try {
+		const hq = await db.prepare('SELECT habits FROM devices WHERE id = ?').bind(deviceId).first();
+		habits = sanitizeHabits(hq?.habits);
+	} catch {} // schema-habits.sql
 	let countdown: { title: string; date: string } | null = null;
 	try {
 		const x = await db.prepare('SELECT countdown_title, countdown_date FROM devices WHERE id = ?').bind(deviceId).first();
@@ -132,6 +138,7 @@ export async function GET({ request, locals }: any) {
 		hasWeather: lat !== null,
 		countdown,
 		reminders,
+		habits,
 		tasksGranted,
 		devices,
 		designs: designs ? designs.map((d) => ({ id: d.id, name: d.name })) : null,

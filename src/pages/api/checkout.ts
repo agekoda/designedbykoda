@@ -3,6 +3,7 @@
 // server-side, never trusted from the client — a client could otherwise
 // submit any amount it wanted for the "AUD" price, for example.
 import { canViewPreorder } from '../../lib/preview';
+import { sanitizeGift, type Gift } from '../../lib/gift';
 import { STANDARD_PRICES, countryByCode, productPrice, shippingPrice, zoneLabel } from '../../data/preorderPricing';
 
 export const prerender = false;
@@ -20,10 +21,12 @@ export async function POST({ request, locals, cookies }) {
 
 	let currency = 'USD';
 	let country = '';
+	let gift: Gift | null = null;
 	try {
 		const body = await request.json();
 		if (typeof body.currency === 'string') currency = body.currency.toUpperCase();
 		if (typeof body.country === 'string') country = body.country.toUpperCase();
+		if (body.gift) gift = sanitizeGift(body.gift);
 	} catch {
 		return json({ error: 'Invalid request.' }, 400);
 	}
@@ -61,10 +64,22 @@ export async function POST({ request, locals, cookies }) {
 	params.set('shipping_options[0][shipping_rate_data][fixed_amount][amount]', String(shippingInMinorUnits));
 	params.set('shipping_options[0][shipping_rate_data][fixed_amount][currency]', currency.toLowerCase());
 	params.set('custom_text[submit][message]', 'ABN 61 261 672 813');
-	params.set('custom_text[shipping_address][message]', 'Preorder: ships by the end of February 2027. Please double-check your address.');
+	params.set(
+		'custom_text[shipping_address][message]',
+		gift
+			? 'A gift: to send it straight to them, put their name and address here. It comes with no prices inside. Ships by the end of February 2027.'
+			: 'Preorder: ships by the end of February 2027. Please double-check your address.'
+	);
 	params.set('metadata[country]', country);
 	params.set('metadata[currency]', currency);
-	params.set('success_url', `${origin}/preorder/success?order={CHECKOUT_SESSION_ID}`);
+	if (gift) {
+		// Stripe keeps metadata values up to 500 characters
+		params.set('metadata[gift]', '1');
+		if (gift.to) params.set('metadata[gift_to]', gift.to);
+		if (gift.from) params.set('metadata[gift_from]', gift.from);
+		if (gift.msg) params.set('metadata[gift_msg]', gift.msg);
+	}
+	params.set('success_url', `${origin}/preorder/success?order={CHECKOUT_SESSION_ID}${gift ? '&gift=1' : ''}`);
 	params.set('cancel_url', `${origin}/preorder/eink-calendar`);
 
 	const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {

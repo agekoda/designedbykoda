@@ -2,6 +2,7 @@
 // sample events, and paints the 1-bit screen onto a canvas.
 import { renderEink } from './render';
 import { sanitizeReminders } from './reminders';
+import { sanitizeHabits } from './habits';
 import { loadFontPack, renderDrawList, SCREEN_W, SCREEN_H, type Rendered } from './preview';
 import { renderLayout } from './layouts';
 import type { CalEvent, TaskItem } from './context';
@@ -103,6 +104,7 @@ export interface PreviewOptions {
 	sign?: unknown; // Meeting room / Guest welcome / Desk name plate words
 	messages?: { author: string; body: string; atLocal: number }[]; // message board, newest first
 	reminders?: unknown; // repeating reminders (bin day...)
+	habits?: unknown; // habits and the days they were done
 }
 
 export function drawListFor(o: PreviewOptions): string {
@@ -134,6 +136,7 @@ export function drawListFor(o: PreviewOptions): string {
 			sign: o.sign ?? null,
 			messages: o.messages ?? [],
 			reminders: sanitizeReminders(o.reminders),
+			habits: sanitizeHabits(o.habits),
 		},
 		o.font ?? undefined
 	);

@@ -24,6 +24,7 @@ import { linkPayload, qrBits, qrMatrix, wifiPayload, type WifiSecurity } from '.
 import { toAscii } from '../draw';
 import { messageList } from '../layouts/messages';
 import { reminderList } from '../layouts/reminders';
+import { habitGrid } from '../layouts/habits';
 
 interface Env {
 	d: Draw;
@@ -880,6 +881,8 @@ function drawWidget(env: Env, w: Widget) {
 			return lineWidget(env, w, o);
 		case 'reminders':
 			return reminderList(env.d, env.ctx, w, { bigToday: o.big === true, days: Number(o.days) || 7 });
+		case 'habits':
+			return habitGrid(env.d, env.ctx, w, { days: Number(o.days) || 0, streak: o.streak !== false, letters: o.letters === true });
 		case 'qr':
 			return qrWidget(env, w, o);
 		case 'messages':

@@ -5,6 +5,7 @@
 // its own), and returning a small, pre-formatted payload.
 import { viewForStyle, LIVE_STYLES, isRefreshSec, renderStyleOf } from '../../../../data/calendarStyles';
 import { sanitizeReminders, type Reminder } from '../../../../lib/eink/reminders';
+import { sanitizeHabits, type Habit } from '../../../../lib/eink/habits';
 import { designIdOf, getDesign } from '../../../../lib/designs';
 import { timelineSleep } from '../../../../lib/eink/layouts/timeline';
 import { getForecast, type Forecast } from '../../../../lib/weather';
@@ -330,6 +331,14 @@ export async function GET({ params, request, locals }) {
 		}
 	}
 
+	// School timetables and other calendar links or files (src/lib/feeds.ts), alongside Google's.
+	try {
+		const { allFeedEvents } = await import('../../../../lib/feeds');
+		for (const e of await allFeedEvents(db, deviceId, tzPick, rightNow.getTime(), fetchFrom.getTime())) rawEvents.push(e);
+	} catch (err) {
+		console.error('Extra calendars failed:', err);
+	}
+
 	// Settle on a valid timezone: Google's, else the saved one, else UTC.
 	const isValidTz = (tz: unknown): tz is string => {
 		if (typeof tz !== 'string' || !tz) return false;
@@ -407,6 +416,12 @@ export async function GET({ params, request, locals }) {
 	try {
 		const rq = await db.prepare('SELECT reminders FROM devices WHERE id = ?').bind(deviceId).first();
 		reminders = sanitizeReminders(rq?.reminders);
+	} catch {}
+	// Habits (schema-habits.sql).
+	let habits: Habit[] = [];
+	try {
+		const hq = await db.prepare('SELECT habits FROM devices WHERE id = ?').bind(deviceId).first();
+		habits = sanitizeHabits(hq?.habits);
 	} catch {}
 	let sign: unknown = null;
 	if (isSignStyle(style)) {
@@ -563,6 +578,7 @@ export async function GET({ params, request, locals }) {
 			sign,
 			messages: msgs.map((m) => ({ author: m.author, body: m.body, atLocal: m.createdAt + offsetSec })),
 			reminders,
+			habits,
 		}, fontChoice ?? undefined);
 		// How long to sleep: the layout's own answer, but wake sooner for a scheduled screen change,
 		// and (for a "Free or busy" widget) when a meeting starts or ends.
