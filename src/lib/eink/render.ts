@@ -53,6 +53,11 @@ export interface EinkOptions {
    * upscale of the two panel colours).
    */
   texture?: number;
+  /**
+   * device only: just the calendar, no peach backdrop or shadow, and the canvas
+   * cropped to the device (transparent corners). For putting it on your own background.
+   */
+  bare?: boolean;
 }
 
 /** Any array-like of 120000 numbers: Uint8Array, Uint8ClampedArray, number[]. */
@@ -285,7 +290,8 @@ function drawDevice(canvas: CanvasLike, px: Pixels, opts: EinkOptions, dark: boo
   const devR = 24 * f;
 
   // --- 1. peach backdrop + soft shadows (pixel maths, identical everywhere) -
-  putRGBA(ctx, backdrop(outW, outH, f, dx, dy, dw, dh, devR), outW, outH, 0, 0);
+  if (!opts.bare) putRGBA(ctx, backdrop(outW, outH, f, dx, dy, dw, dh, devR), outW, outH, 0, 0);
+  else ctx.clearRect(0, 0, outW, outH);
 
   // --- 2. bezel body -------------------------------------------------------
   const bezel = ctx.createLinearGradient(0, dy, 0, dy + dh);
@@ -342,6 +348,14 @@ function drawDevice(canvas: CanvasLike, px: Pixels, opts: EinkOptions, dark: boo
   roundRectPath(ctx, dx + 0.75 * f, dy + 0.75 * f, dw - 1.5 * f, dh - 1.5 * f, devR);
   ctx.stroke();
   ctx.restore();
+
+  // --- 5. bare: keep only the device itself --------------------------------
+  if (opts.bare) {
+    const img = ctx.getImageData(dx, dy, dw, dh);
+    canvas.width = dw;
+    canvas.height = dh;
+    ctx.putImageData(img, 0, 0);
+  }
 }
 
 // --- pixel-maths helpers for the mockup ------------------------------------

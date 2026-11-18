@@ -44,7 +44,7 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 			</div>
 			<div class="gp-sheet">
 				<div class="gcard" id="gcard">
-					<div class="gc-pic"><div class="bezel"><canvas id="g-canvas" width="800" height="600" aria-label="The calendar, showing a message for them"></canvas></div></div>
+					<div class="gc-pic"><canvas id="g-canvas" width="800" height="600" aria-label="The calendar, showing a message for them"></canvas></div>
 					<div class="gc-words">
 						<div class="gc-kicker">Something good is on its way</div>
 						<div class="gc-to" id="c-to"></div>
@@ -94,7 +94,7 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 			});
 			try {
 				const r = await renderPreview({ style: 'custom', custom: layout, dark: false, hasWeather: false, vbat: 4.1 });
-				if (n === drawing) paintScreen(canvas, r.px, { mode: 'screen', width: 800 });
+				if (n === drawing) paintScreen(canvas, r.px, { mode: 'device', width: 1400, bare: true });
 			} catch {}
 		}
 		function sync() {
@@ -162,8 +162,7 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 		print-color-adjust: exact;
 	}
 	.gc-pic { display: grid; place-items: center; }
-	.bezel { width: 100%; box-sizing: border-box; padding: 3.2mm 3.2mm 4.6mm; background: #151513; border-radius: 2.6mm; box-shadow: 0 2mm 4mm -2mm rgba(0, 0, 0, 0.45); }
-	.bezel canvas { width: 100%; height: auto; display: block; border-radius: 0.6mm; }
+	.gc-pic canvas { width: 100%; height: auto; display: block; filter: drop-shadow(0 1.6mm 2.2mm rgba(40, 25, 10, 0.32)); }
 	.gc-words { display: flex; flex-direction: column; min-width: 0; }
 	.gc-kicker { font-size: 2.6mm; letter-spacing: 0.16em; text-transform: uppercase; color: #6b655a; margin-bottom: 3mm; }
 	.gc-to { font-family: 'Instrument', serif; font-size: 10mm; line-height: 1; margin-bottom: 3mm; overflow-wrap: anywhere; }
