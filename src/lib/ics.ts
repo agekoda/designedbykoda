@@ -333,6 +333,13 @@ export function parseIcs(text: string, fallbackTz: string, fromMs: number, toMs:
 		const push = (localStart: number) => {
 			const ms = e.start.allDay ? localStart : localToMs(localStart, e.start.tz);
 			if (ms + Math.max(len, 1) < fromMs || ms > toMs) return;
+			// a timed event from midnight lasting all day (Compass does this) is really an all-day one
+			if (!e.start.allDay && localStart % 86400000 === 0 && len >= 23 * 3600000) {
+				const d0 = new Date(localStart).toISOString().slice(0, 10);
+				const d1 = new Date(localStart + Math.round(len / 86400000) * 86400000).toISOString().slice(0, 10);
+				out.push({ title: e.title, ms: Date.parse(d0 + 'T00:00:00Z'), allDay: true, dateOnly: d0, endDateOnly: d1 });
+				return;
+			}
 			if (e.start.allDay) {
 				const d0 = new Date(localStart).toISOString().slice(0, 10);
 				const d1 = new Date(localStart + Math.max(86400000, len)).toISOString().slice(0, 10);
