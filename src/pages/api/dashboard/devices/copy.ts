@@ -18,6 +18,7 @@ const GROUPS: string[][] = [
 	['language'],
 	['schedule', 'temp_unit', 'sign_cfg'],
 	['reminders'],
+	['habits'],
 ];
 const CALENDARS: string[][] = [['selected_calendar_ids'], ['weather_name', 'weather_lat', 'weather_lon']];
 

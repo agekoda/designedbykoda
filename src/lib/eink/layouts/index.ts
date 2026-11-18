@@ -25,6 +25,8 @@ import { custom } from './custom';
 import { planner } from './planner';
 import { messages } from './messages';
 import { reminders } from './reminders';
+import { habits } from './habits';
+import { notes } from './notes';
 import { renderCustom } from '../builder/render';
 import { sanitizeLayout, sanitizeSign, signLayout, type SignStyle } from '../builder/model';
 
@@ -55,6 +57,8 @@ export const LAYOUTS: Record<string, LayoutEntry> = {
 	nameplate: { render: sign('nameplate'), font: 'sans' },
 	messages: { render: messages, font: 'sans' },
 	reminders: { render: reminders, font: 'sans' },
+	habits: { render: habits, font: 'sans' },
+	notes: { render: notes, font: 'sans' },
 };
 
 // The font a layout uses when nothing else is chosen.

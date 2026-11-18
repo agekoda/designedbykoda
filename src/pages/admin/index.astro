@@ -205,6 +205,11 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 							</div>
 							<div class="mid">
 								<pre class="addr">{addressText(o) || '(no address)'}</pre>
+								{(o as any).gift_json && (() => {
+									let g: any = null;
+									try { g = JSON.parse((o as any).gift_json); } catch {}
+									return g && <p class="gift-line"><b>Gift</b>{g.to && ` for ${g.to}`}{g.from && `, from ${g.from}`}. No prices in the box.{g.msg && <><br />"{g.msg}"</>} <a href={'/gift?o=' + o.id} target="_blank" rel="noopener">Card</a></p>;
+								})()}
 								<div class="meta">
 									<span class={`pill st-${o.status}`}>{ADMIN_LABEL[o.status]}</span>
 									<span>Order {orderNumber(o.id)}</span>
@@ -432,6 +437,8 @@ const batchPct = Math.min(100, Math.round((live.length / BATCH) * 100));
 	.amt { text-align: right; }
 	.mid { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 12px 0; align-items: flex-start; }
 	.addr { margin: 0; padding: 0; border: 0; background: none; font: inherit; font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; }
+	.gift-line { margin: 0.5em 0 0; font-size: 0.88rem; line-height: 1.5; color: var(--muted); }
+	.gift-line b { color: var(--fg); }
 	.meta { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; opacity: 0.85; align-items: flex-end; }
 	.pill { padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; background: color-mix(in srgb, currentColor 14%, transparent); }
 	.st-ordered.pill { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }

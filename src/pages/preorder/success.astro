@@ -16,6 +16,7 @@ if (valid && db) {
 }
 Astro.response.headers.set('X-Robots-Tag', 'noindex');
 Astro.response.headers.set('Referrer-Policy', 'no-referrer');
+const gift = Astro.url.searchParams.get('gift') === '1';
 const signIn = '/api/auth/google/start?return=' + encodeURIComponent('/preorder/success?order=' + order);
 ---
 <Layout title="Preorder confirmed - designedbykoda" description="Your E-Ink Calendar preorder is confirmed.">
@@ -24,6 +25,12 @@ const signIn = '/api/auth/google/start?return=' + encodeURIComponent('/preorder/
 		<p>
 			Thanks for preordering the E-Ink Calendar. You'll get a receipt by email shortly, and I'll be in touch with updates as your order gets closer to shipping.
 		</p>
+		{valid && gift && (
+			<div class="track">
+				<p class="t">It's a gift, so there's a card to print and give them until it arrives. You can change the words before you print.</p>
+				<a class="button" href={'/gift?o=' + order}>Print the gift card</a>
+			</div>
+		)}
 		{valid && signedIn && (
 			<div class="track" id="track" data-order={order}>
 				<p class="t" id="track-text">Adding it to your dashboard…</p>

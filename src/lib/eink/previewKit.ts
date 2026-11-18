@@ -2,6 +2,7 @@
 // sample events, and paints the 1-bit screen onto a canvas.
 import { renderEink } from './render';
 import { sanitizeReminders } from './reminders';
+import { sanitizeHabits } from './habits';
 import { loadFontPack, renderDrawList, SCREEN_W, SCREEN_H, type Rendered } from './preview';
 import { renderLayout } from './layouts';
 import type { CalEvent, TaskItem } from './context';
@@ -103,6 +104,7 @@ export interface PreviewOptions {
 	sign?: unknown; // Meeting room / Guest welcome / Desk name plate words
 	messages?: { author: string; body: string; atLocal: number }[]; // message board, newest first
 	reminders?: unknown; // repeating reminders (bin day...)
+	habits?: unknown; // habits and the days they were done
 }
 
 export function drawListFor(o: PreviewOptions): string {
@@ -134,6 +136,7 @@ export function drawListFor(o: PreviewOptions): string {
 			sign: o.sign ?? null,
 			messages: o.messages ?? [],
 			reminders: sanitizeReminders(o.reminders),
+			habits: sanitizeHabits(o.habits),
 		},
 		o.font ?? undefined
 	);
@@ -171,6 +174,6 @@ export function paint(canvas: HTMLCanvasElement, px: Uint8Array, scale = 1, w = 
 // Full-screen previews (400x300 buffers) go through the shared e-paper renderer.
 // "screen" = just the panel, "device" = the panel inside the device mockup.
 // The draw-list renderer already bakes dark mode into the pixels, so dark is never passed on.
-export function paintScreen(canvas: HTMLCanvasElement, px: Uint8Array, opts: { mode?: 'screen' | 'device'; scale?: number; width?: number } = {}) {
-	renderEink(canvas as any, px, { mode: opts.mode ?? 'screen', scale: opts.scale ?? 1, width: opts.width, texture: 1 });
+export function paintScreen(canvas: HTMLCanvasElement, px: Uint8Array, opts: { mode?: 'screen' | 'device'; scale?: number; width?: number; bare?: boolean } = {}) {
+	renderEink(canvas as any, px, { mode: opts.mode ?? 'screen', scale: opts.scale ?? 1, width: opts.width, texture: 1, bare: opts.bare });
 }

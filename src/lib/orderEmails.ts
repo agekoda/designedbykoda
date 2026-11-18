@@ -19,6 +19,12 @@ const fromOrders = (env: any) => env.RECEIPT_EMAIL_FROM || 'orders@designedbykod
 const foot = (env: any) =>
 	`Questions? Reply to this email or write to ${footLink('mailto:' + supportEmail(env), supportEmail(env))}.<br>${footLink(ORIGIN + '/help', 'Help')} &nbsp;·&nbsp; ABN ${ABN}`;
 
+// Bought in November or before Christmas Day (Perth time)?
+const beforeXmas = (at: number) => {
+	const d = new Date((at + 8 * 3600) * 1000);
+	return d.getUTCMonth() === 10 || (d.getUTCMonth() === 11 && d.getUTCDate() < 25);
+};
+
 export interface OrderInfo {
 	id: string;
 	email: string;
@@ -29,17 +35,26 @@ export interface OrderInfo {
 	shippingAmt: number;
 	createdAt: number;
 	tracking?: string | null;
+	gift?: { to: string; from: string; msg: string } | null;
+	buyerName?: string; // who paid (the address name can be the person it's for, when it's a gift)
 }
 
 export function receiptEmail(env: any, o: OrderInfo) {
 	const num = orderNumber(o.id);
 	const date = new Date(o.createdAt * 1000).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Perth' });
 	const item = o.total - (o.shippingAmt ?? 0);
-	const first = (o.name || '').split(/\s+/)[0];
+	const first = ((o.gift ? o.buyerName : '') || o.name || '').split(/\s+/)[0];
 	const track = `${ORIGIN}/track?o=${encodeURIComponent(o.id)}`;
-	const lines = [
-		`${first ? `Thanks, ${first}. ` : 'Thanks! '}Your E-Ink Calendar is reserved and ships by ${SHIPS_BY}. I'll email you again when it's on its way.`,
-	];
+	const card = `${ORIGIN}/gift?o=${encodeURIComponent(o.id)}`;
+	const forWho = o.gift?.to ? ` for ${o.gift.to}` : '';
+	const lines = o.gift
+		? [
+				`${first ? `Thanks, ${first}. ` : 'Thanks! '}The E-Ink Calendar${forWho} is reserved and ships by ${SHIPS_BY}, with no prices in the box. I'll email you again when it's on its way.`,
+				`${beforeXmas(o.createdAt) ? 'It won\'t arrive before Christmas' : 'It arrives by the end of February'}, so there's a gift card you can print and give them in the meantime.`,
+			]
+		: [
+				`${first ? `Thanks, ${first}. ` : 'Thanks! '}Your E-Ink Calendar is reserved and ships by ${SHIPS_BY}. I'll email you again when it's on its way.`,
+			];
 	const rows = [
 		{ left: 'E-Ink Calendar (pre-order)', right: money(item, o.currency) },
 		{ left: 'Shipping', right: money(o.shippingAmt, o.currency) },
@@ -48,6 +63,7 @@ export function receiptEmail(env: any, o: OrderInfo) {
 	const blocks = [
 		{ label: 'Order', text: `${num} · paid ${date}` },
 		{ label: 'Ships to', text: addressLines(o.name, o.addr) },
+		...(o.gift ? [{ label: 'Gift', text: [o.gift.to && `For ${o.gift.to}`, o.gift.from && `From ${o.gift.from}`, o.gift.msg && `"${o.gift.msg}"`].filter(Boolean).join('\n') || 'Yes' }] : []),
 	];
 	const subject = `Your E-Ink Calendar pre-order (${num})`;
 	const html = emailHtml({
@@ -57,7 +73,7 @@ export function receiptEmail(env: any, o: OrderInfo) {
 		lines,
 		rows,
 		blocks,
-		button: { label: 'Track your order', url: track },
+		button: o.gift ? { label: 'Print the gift card', url: card } : { label: 'Track your order', url: track },
 		footer: foot(env),
 		preview: `Ships by ${SHIPS_BY}. Total paid ${money(o.total, o.currency)}.`,
 	});
@@ -74,6 +90,7 @@ export function receiptEmail(env: any, o: OrderInfo) {
 		'Ships to:',
 		addressLines(o.name, o.addr),
 		'',
+		...(o.gift ? [`Print the gift card: ${card}`] : []),
 		`Track your order: ${track}`,
 		'',
 		`Questions? Reply to this email or write to ${supportEmail(env)}.`,
@@ -88,7 +105,9 @@ export function shippedEmail(env: any, o: OrderInfo) {
 	const page = `${ORIGIN}/track?o=${encodeURIComponent(o.id)}`;
 	const first = (o.name || '').split(/\s+/)[0];
 	const lines = [
-		`${first ? `Good news, ${first}: your` : 'Your'} E-Ink Calendar has been posted.`,
+		o.gift
+			? `Good news: the E-Ink Calendar${o.gift.to ? ` for ${o.gift.to}` : ''} has been posted.`
+			: `${first ? `Good news, ${first}: your` : 'Your'} E-Ink Calendar has been posted.`,
 		url ? 'Use the tracking number to see where it is.' : 'You can follow it on your order page.',
 	];
 	const subject = `Your E-Ink Calendar is on its way (${num})`;
@@ -125,5 +144,9 @@ export function fromRow(r: any): OrderInfo {
 	try {
 		addr = r.address_json ? JSON.parse(r.address_json) : {};
 	} catch {}
-	return { id: r.id, email: r.email, name: r.name, addr, currency: r.currency, total: r.amount_total ?? 0, shippingAmt: r.shipping_amount ?? 0, createdAt: r.created_at, tracking: r.tracking };
+	let gift: OrderInfo['gift'] = null;
+	try {
+		gift = r.gift_json ? JSON.parse(r.gift_json) : null;
+	} catch {}
+	return { id: r.id, email: r.email, name: r.name, addr, currency: r.currency, total: r.amount_total ?? 0, shippingAmt: r.shipping_amount ?? 0, createdAt: r.created_at, tracking: r.tracking, gift };
 }

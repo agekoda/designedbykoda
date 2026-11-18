@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	appVersion  = "1.2.0"
+	appVersion  = "1.2.1"
 	appName     = "designedbykoda-admin"
 	defaultSite = "https://designedbykoda.com"
 	defaultPort = 47615

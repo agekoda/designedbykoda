@@ -64,8 +64,10 @@ export async function runDailySummary(env: any, now = Date.now()) {
 		...(curKeys.length > 1 || curKeys[0] !== 'AUD' ? [{ left: 'About, in AUD', right: money(Math.round(aud), 'AUD'), strong: true, rule: true }] : []),
 	];
 	const subject = `${n} pre-order${n === 1 ? '' : 's'} on ${day}`;
+	const gifts = orders.filter((o) => o.gift_json).length;
 	const lines = [
 		`${n} new pre-order${n === 1 ? '' : 's'} from ${countryList.length} countr${countryList.length === 1 ? 'y' : 'ies'}. ${allTime} in total so far.`,
+		...(gifts ? [`${gifts === n ? (n === 1 ? 'It is a gift' : 'All of them are gifts') : `${gifts} of them ${gifts === 1 ? 'is a gift' : 'are gifts'}`}: leave prices out of ${gifts === 1 ? 'that box' : 'those boxes'}.`] : []),
 	];
 	const blocks = [{ label: 'Countries', text: countryList.map(([c, k]) => `${countryName(c)}: ${k}`).join('\n') }];
 	const html = emailHtml({

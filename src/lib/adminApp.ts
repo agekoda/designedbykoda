@@ -93,6 +93,13 @@ export async function loadAppData(env: any) {
 			trackingUrl: trackingUrl(o.tracking),
 			customerNote: o.customer_note ?? null,
 			adminNote: o.admin_note ?? null,
+			gift: (() => {
+				try {
+					return o.gift_json ? JSON.parse(o.gift_json) : null;
+				} catch {
+					return null;
+				}
+			})(),
 			linked: !!o.user_id,
 			shippedEmailAt: o.shipped_email_at ?? null,
 		};

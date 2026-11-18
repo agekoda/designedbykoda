@@ -61,6 +61,8 @@ export interface LayoutCtx {
 	messages?: ScreenMsg[];
 	// Repeating reminders, like bin day (src/lib/eink/reminders.ts).
 	reminders?: import('./reminders').Reminder[] | null;
+	// Habits ticked off in Customize display (src/lib/eink/habits.ts).
+	habits?: import('./habits').Habit[] | null;
 }
 
 export interface ScreenMsg {

@@ -1,0 +1,190 @@
+---
+// A gift card to print, for orders bought as a gift (or any order: "Giving it as a gift?").
+// Opened with ?o=<checkout id>, the same private id as the tracking page. The words come from
+// checkout and can be changed here before printing; changes aren't saved.
+export const prerender = false;
+import Layout from '../layouts/Layout.astro';
+import { sanitizeGift } from '../lib/gift';
+
+const id = Astro.url.searchParams.get('o') ?? '';
+const valid = /^cs_(test|live)_[A-Za-z0-9]{10,200}$/.test(id);
+const db = Astro.locals.runtime?.env?.DB;
+let found = false;
+let gift = { to: '', from: '', msg: '' };
+if (valid && db) {
+	try {
+		const o: any = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first();
+		if (o) {
+			found = true;
+			gift = sanitizeGift(o.gift_json) ?? gift;
+		}
+	} catch {}
+}
+Astro.response.headers.set('X-Robots-Tag', 'noindex');
+Astro.response.headers.set('Referrer-Policy', 'no-referrer');
+---
+
+<Layout title="Gift card - designedbykoda" description="Print a gift card for an E-Ink Calendar." noindex>
+	{!found ? (
+		<div class="gp-missing">
+			<h1>Gift card</h1>
+			<p>Open this page from the link in your receipt email, or from your order's tracking page.</p>
+			<a class="gp-btn" href="/track">Find your order</a>
+		</div>
+	) : (
+		<div class="gp" data-to={gift.to} data-from={gift.from} data-msg={gift.msg}>
+			<div class="gp-side">
+				<h1>Your gift card</h1>
+				<p class="gp-lede">The calendar ships by the end of February, so give them this on the day. Change the words if you like, then print it and cut along the dotted line.</p>
+				<label class="gp-field"><span>For</span><input id="g-to" maxlength="40" placeholder="Sam" autocomplete="off" /></label>
+				<label class="gp-field"><span>From</span><input id="g-from" maxlength="40" placeholder="Alex" autocomplete="off" /></label>
+				<label class="gp-field"><span>Message</span><textarea id="g-msg" maxlength="300" rows="4" placeholder="Merry Christmas! Something good is on its way."></textarea></label>
+				<button type="button" class="gp-btn" id="g-print">Print the card</button>
+				<p class="gp-fine">Prints on A4 or Letter. Turn on "Background graphics" in the print settings for the cream colour, or leave it white.</p>
+			</div>
+			<div class="gp-sheet">
+				<div class="gcard" id="gcard">
+					<div class="gc-pic"><canvas id="g-canvas" width="800" height="600" aria-label="The calendar, showing a message for them"></canvas></div>
+					<div class="gc-words">
+						<div class="gc-kicker">Something good is on its way</div>
+						<div class="gc-to" id="c-to"></div>
+						<p class="gc-msg" id="c-msg"></p>
+						<div class="gc-from" id="c-from"></div>
+						<div class="gc-fine">An E-Ink Calendar, made by hand in Perth. It shows your day on paper that updates itself, and it arrives by the end of February 2027.</div>
+						<div class="gc-brand">designedbykoda</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	)}
+</Layout>
+
+<script>
+	import { renderPreview, paintScreen } from '../lib/eink/previewKit';
+	import { sanitizeLayout } from '../lib/eink/builder/model';
+
+	const root = document.querySelector<HTMLElement>('.gp');
+	if (root) {
+		const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+		const to = $<HTMLInputElement>('g-to');
+		const from = $<HTMLInputElement>('g-from');
+		const msg = $<HTMLTextAreaElement>('g-msg');
+		to.value = root.dataset.to ?? '';
+		from.value = root.dataset.from ?? '';
+		msg.value = root.dataset.msg ?? '';
+		const canvas = $<HTMLCanvasElement>('g-canvas');
+
+		// the calendar's own screen, saying who it's for
+		const W = (t: string, x: number, y: number, w: number, h: number, o: Record<string, string | boolean>) => ({ id: 'g' + x + y, t, x, y, w, h, o });
+		let drawing = 0;
+		async function drawScreen() {
+			const n = ++drawing;
+			const name = to.value.trim();
+			const layout = sanitizeLayout({
+				v: 1,
+				widgets: [
+					W('box', 0, 0, 400, 34, { fill: 'solid' }),
+					W('text', 12, 4, 376, 26, { text: 'A GIFT', light: true, bold: true, size: 's', valign: 'middle' }),
+					W('text', 40, 52, 320, 118, { text: name ? `For ${name}` : 'For you', bold: true, size: 'auto', align: 'center' }),
+					W('line', 150, 182, 100, 2, { thick: '2' }),
+					W('text', 16, 196, 368, 30, { text: 'Your day, on paper', size: 'm', align: 'center' }),
+					W('text', 16, 228, 368, 24, { text: 'that updates itself', size: 'm', align: 'center' }),
+					W('text', 16, 266, 368, 22, { text: 'Arriving by the end of February', size: 's', align: 'center' }),
+				],
+			});
+			try {
+				const r = await renderPreview({ style: 'custom', custom: layout, dark: false, hasWeather: false, vbat: 4.1 });
+				if (n === drawing) paintScreen(canvas, r.px, { mode: 'device', width: 1400, bare: true });
+			} catch {}
+		}
+		function sync() {
+			$('c-to').textContent = to.value.trim() ? `For ${to.value.trim()}` : 'For you';
+			$('c-msg').textContent = msg.value.trim();
+			$('c-from').textContent = from.value.trim() ? `From ${from.value.trim()}` : '';
+		}
+		let t: any;
+		for (const el of [to, from, msg])
+			el.addEventListener('input', () => {
+				sync();
+				if (el === to) {
+					clearTimeout(t);
+					t = setTimeout(drawScreen, 150);
+				}
+			});
+		$('g-print').addEventListener('click', () => window.print());
+		sync();
+		drawScreen();
+	}
+</script>
+
+<style>
+	@font-face { font-family: 'Instrument'; src: url('/fonts/instrument-serif.woff2') format('woff2'); font-display: swap; }
+	@font-face { font-family: 'Instrument'; src: url('/fonts/instrument-serif-italic.woff2') format('woff2'); font-style: italic; font-display: swap; }
+	.gp-missing { max-width: 520px; margin: 0 auto; padding: 5em 0; text-align: center; }
+	.gp-missing p { color: var(--muted); margin-bottom: 2em; }
+	.gp {
+		position: relative;
+		left: 50%;
+		width: min(1180px, 100vw - 3em);
+		transform: translateX(-50%);
+		display: grid;
+		grid-template-columns: 340px 1fr;
+		gap: 3em;
+		align-items: start;
+		padding: 2.5em 0 5em;
+	}
+	.gp-side h1 { font-family: 'Instrument', serif; font-weight: 400; font-size: 2.6em; line-height: 1.05; margin: 0 0 0.35em; }
+	.gp-lede { color: var(--muted); line-height: 1.55; margin: 0 0 1.6em; }
+	.gp-field { display: grid; gap: 0.35em; margin-bottom: 1em; }
+	.gp-field > span { font-size: 0.75em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+	.gp-field input, .gp-field textarea { width: 100%; box-sizing: border-box; padding: 0.7em 0.85em; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-raised); color: var(--fg); font: inherit; resize: vertical; }
+	.gp-field input:focus, .gp-field textarea:focus { outline: none; border-color: var(--accent); }
+	.gp-btn { display: inline-block; margin-top: 0.4em; padding: 0.8em 1.6em; border: none; border-radius: 999px; background: var(--fg); color: var(--bg); font: inherit; font-weight: 700; text-decoration: none; }
+	.gp-btn:hover { background: var(--accent); color: var(--bg); }
+	.gp-fine { color: var(--muted); font-size: 0.82em; line-height: 1.5; margin-top: 1.2em; }
+	.gp-sheet { display: grid; place-items: center; padding: 2.5em; background: var(--bg-raised); border-radius: 22px; }
+
+	/* the card itself: A6 landscape, 148 x 105 mm */
+	.gcard {
+		width: 148mm;
+		height: 105mm;
+		box-sizing: border-box;
+		display: grid;
+		grid-template-columns: 66mm 1fr;
+		gap: 6mm;
+		padding: 7mm;
+		background: #f6f1e7;
+		color: #1b1a17;
+		box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 18px 40px -18px rgba(40, 30, 10, 0.35);
+		outline: 1px dashed rgba(27, 26, 23, 0.28);
+		outline-offset: 4mm;
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+	}
+	.gc-pic { display: grid; place-items: center; }
+	.gc-pic canvas { width: 100%; height: auto; display: block; filter: drop-shadow(0 1.6mm 2.2mm rgba(40, 25, 10, 0.32)); }
+	.gc-words { display: flex; flex-direction: column; min-width: 0; }
+	.gc-kicker { font-size: 2.6mm; letter-spacing: 0.16em; text-transform: uppercase; color: #6b655a; margin-bottom: 3mm; }
+	.gc-to { font-family: 'Instrument', serif; font-size: 10mm; line-height: 1; margin-bottom: 3mm; overflow-wrap: anywhere; }
+	.gc-msg { font-family: 'Instrument', serif; font-style: italic; font-size: 5mm; line-height: 1.25; color: #3b372f; margin: 0 0 3mm; white-space: pre-line; overflow-wrap: anywhere; overflow: hidden; }
+	.gc-msg:empty { display: none; }
+	.gc-from { font-size: 3.4mm; font-weight: 700; margin-bottom: auto; }
+	.gc-fine { font-size: 2.5mm; line-height: 1.45; color: #6b655a; margin-top: 3mm; }
+	.gc-brand { font-size: 2.6mm; font-weight: 700; letter-spacing: 0.04em; margin-top: 2mm; }
+
+	@media (max-width: 900px) {
+		.gp { grid-template-columns: 1fr; }
+		.gp-sheet { padding: 1.2em; overflow-x: auto; place-items: start; }
+	}
+
+	@page { size: A4 portrait; margin: 14mm; }
+	@media print {
+		/* only the card: no header, footer, background or floating buttons */
+		:global(body *) { visibility: hidden !important; }
+		.gcard, .gcard * { visibility: visible !important; }
+		:global(.bg-fx) { display: none !important; }
+		:global(html), :global(body) { background: #fff !important; }
+		.gp-sheet { padding: 0; background: none; }
+		.gcard { position: absolute; left: 4mm; top: 4mm; box-shadow: none; }
+	}
+</style>

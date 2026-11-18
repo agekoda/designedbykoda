@@ -3,6 +3,7 @@
 // user, so you can only ever see or change your own devices.
 import { sanitizeSchedule, activeStyle } from '../../../lib/eink/schedule';
 import { sanitizeReminders } from '../../../lib/eink/reminders';
+import { sanitizeHabits } from '../../../lib/eink/habits';
 import { sanitizeCfg, utcOffset } from '../../../lib/messages';
 import { listDesigns } from '../../../lib/designs';
 import { isStyleId, DEFAULT_STYLE } from '../../../data/calendarStyles';
@@ -145,6 +146,11 @@ export async function GET({ request, locals }) {
 		const rr = await db.prepare('SELECT id, reminders FROM devices WHERE user_id = ?').bind(userId).all();
 		for (const e of rr.results ?? []) rems.set(e.id, sanitizeReminders(e.reminders));
 	} catch {}
+	const habs = new Map<string, unknown>();
+	try {
+		const hr = await db.prepare('SELECT id, habits FROM devices WHERE user_id = ?').bind(userId).all();
+		for (const e of hr.results ?? []) habs.set(e.id, sanitizeHabits(e.habits));
+	} catch {} // schema-habits.sql
 
 	// Your designs and when each calendar next wakes (schema-designs.sql / schema-screens.sql).
 	const designsOf = new Map<string, unknown>();
@@ -166,6 +172,7 @@ export async function GET({ request, locals }) {
 		style,
 		nextStyle,
 		reminders: rems.get(d.id) ?? [],
+		habits: habs.get(d.id) ?? [],
 		clock: clocks.get(d.id) ?? '24',
 		firmware: fws.get(d.id) ?? null,
 		update: (() => {

@@ -363,6 +363,19 @@ export const WIDGETS: Record<string, WidgetDef> = {
 			{ key: 'days', label: 'Looks ahead', kind: 'choice', choices: [['1', 'Today'], ['2', '2 days'], ['7', 'A week'], ['14', '2 weeks']], def: '7' },
 		],
 	},
+	habits: {
+		label: 'Habits',
+		group: 'Extras',
+		blurb: 'Streaks and a grid of the days you did them. Tick them off in Customize display',
+		w: 380,
+		h: 120,
+		min: { w: 100, h: 30 },
+		opts: [
+			{ key: 'days', label: 'Days shown', kind: 'choice', choices: [['0', 'As many as fit'], ['7', 'A week'], ['14', '2 weeks'], ['21', '3 weeks'], ['28', '4 weeks']], def: '0' },
+			{ key: 'streak', label: 'Streak', kind: 'toggle', def: true },
+			{ key: 'letters', label: 'Weekday letters', kind: 'toggle', def: false },
+		],
+	},
 	qr: {
 		label: 'QR code',
 		group: 'Extras',
@@ -566,6 +579,7 @@ export function layoutNeeds(layout: CustomLayout | null | undefined) {
 		// redraw when a meeting starts or ends, not just at midnight
 		live: types.has('room_status'),
 		reminders: types.has('reminders'),
+		habits: types.has('habits'),
 	};
 }
 

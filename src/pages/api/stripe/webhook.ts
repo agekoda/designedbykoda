@@ -58,10 +58,21 @@ export async function POST({ request, locals }) {
 	}
 
 	if (!isNew) return new Response('ok', { status: 200 });
+	// A gift (src/lib/gift.ts): saved on its own so a database without schema-gift.sql still takes the order.
+	const md = s.metadata ?? {};
+	const gift = md.gift === '1' ? { to: md.gift_to ?? '', from: md.gift_from ?? '', msg: md.gift_msg ?? '' } : null;
+	if (gift) {
+		try {
+			const { sanitizeGift } = await import('../../../lib/gift');
+			await db.prepare('UPDATE orders SET gift_json = ? WHERE id = ?').bind(JSON.stringify(sanitizeGift(gift)), s.id).run();
+		} catch (err) {
+			console.error('Saving gift details failed (run schema-gift.sql):', err);
+		}
+	}
 	// The buyer's receipt (Stripe's own receipt emails are turned off). You get one summary a day instead
 	// of an email per order: src/lib/dailySummary.ts.
 	const { sendReceipt } = await import('../../../lib/orderEmails');
-	await sendReceipt(env, { id: s.id, email, name, addr, currency, total, shippingAmt, createdAt: Math.floor(Date.now() / 1000) });
+	await sendReceipt(env, { id: s.id, email, name, addr, currency, total, shippingAmt, createdAt: Math.floor(Date.now() / 1000), gift, buyerName: cust.name || '' });
 	return new Response('ok', { status: 200 });
 }
 

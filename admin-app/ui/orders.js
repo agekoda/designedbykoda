@@ -63,7 +63,7 @@
 				<tbody>${rows.map((o) => html`<tr class="click" data-act="order-open" data-id="${o.id}">
 					<td class="check"><input type="checkbox" data-change="orders-pick" data-id="${o.id}" ${S.picked.has(o.id) ? raw('checked') : ''}></td>
 					<td><b class="mono">${o.number}</b><div class="sub" data-tip="${dateTime(o.createdAt)}">${ago(o.createdAt)}</div></td>
-					<td><div class="clip">${o.name || '–'}${o.adminNote ? html` <span class="tag" data-tip="Your note|${o.adminNote}">note</span>` : ''}</div><div class="sub clip">${o.email}</div></td>
+					<td><div class="clip">${o.name || '–'}${o.adminNote ? html` <span class="tag" data-tip="Your note|${o.adminNote}">note</span>` : ''}${o.gift ? html` <span class="tag" data-tip="Gift|${[o.gift.to && 'For ' + o.gift.to, o.gift.from && 'From ' + o.gift.from, o.gift.msg].filter(Boolean).join(' · ') || 'No prices in the box'}">gift</span>` : ''}</div><div class="sub clip">${o.email}</div></td>
 					<td><div class="clip">${[o.addr.city, o.addr.state].filter(Boolean).join(', ') || '–'}</div><div class="sub">${country(o.country)}</div></td>
 					<td class="right nowrap">${money(o.total, o.currency)}</td>
 					<td>${pill(o.status)}</td>
@@ -131,6 +131,11 @@
 					<div class="row wrap" style="margin-top:10px"><button class="btn small" data-act="copy" data-text="${addressText(o)}" data-what="Address copied">${icon('copy', 14)}Copy address</button>
 						<button class="btn small" data-act="copy" data-text="${o.email}" data-what="Email copied">${icon('copy', 14)}${o.email}</button>
 						${o.phone ? html`<button class="btn small" data-act="copy" data-text="${o.phone}" data-what="Phone copied">${icon('copy', 14)}${o.phone}</button>` : ''}</div></section>
+
+				${o.gift ? html`<section><h3>Gift</h3>
+					<div class="kv"><dt>For</dt><dd>${o.gift.to || html`<span class="muted">Not given</span>`}</dd><dt>From</dt><dd>${o.gift.from || html`<span class="muted">Not given</span>`}</dd>${o.gift.msg ? html`<dt>Message</dt><dd>${o.gift.msg}</dd>` : ''}</div>
+					<p class="muted" style="margin-top:10px">Leave anything with a price out of the box. The buyer can print a card from their receipt.</p>
+					<div class="row wrap" style="margin-top:10px"><button class="btn small" data-act="open" data-url="${App.local.site}/gift?o=${o.id}">${icon('out', 14)}Their gift card</button></div></section>` : ''}
 
 				<section><h3>Tracking and notes</h3>
 					<label class="field" style="margin-top:0"><span>Tracking number</span><input id="o-track" value="${o.tracking || ''}" data-input="order-dirty" placeholder="From the AusPost label" autocomplete="off" spellcheck="false">

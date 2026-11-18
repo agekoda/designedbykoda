@@ -84,6 +84,12 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						<button type="button" class="btn small ghost" id="rem-add">+ Add a reminder</button>
 						<p class="muted small hint">Shown on the Reminders screen, and in the Reminders widget in your own designs. They don't go in your Google Calendar.</p>
 					</div>
+					<div id="opt-hab" hidden>
+						<div class="label sub">Habits</div>
+						<div id="hab-list"></div>
+						<button type="button" class="btn small ghost" id="hab-add">+ Add a habit</button>
+						<p class="muted small hint">Tick off the days you did it, then save. Your calendar shows the new streak at midnight, or straight away if you press its button.</p>
+					</div>
 					<div id="opt-todo" hidden>
 						<p class="muted" id="todo-status"></p>
 						<a class="btn small" id="todo-connect" href="/api/auth/google/start?tasks=1">Connect Google Tasks</a>
@@ -280,6 +286,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { layoutNeeds } from '../../lib/eink/builder/model';
 	import { dropdown, type Dropdown } from '../../lib/dropdown';
 	import { shareDialog } from '../../lib/shareDialog';
+	import { MAX_HABITS, MAX_HABIT_NAME, sampleHabits, sanitizeHabits, streak as habitStreak, type Habit } from '../../lib/eink/habits';
 	import { MAX_REMINDERS, MAX_REMINDER_TEXT, repeatText, sampleReminders, sanitizeReminders, type Reminder } from '../../lib/eink/reminders';
 	import {
 		CORNER,
@@ -309,7 +316,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const layoutOf = (id: string) => (id === 'custom' ? customLayout : designOf(id)?.layout ?? null);
 	const renderId = (id: string) => (isDesign(id) ? 'custom' : id);
 	// which group each ready-made screen sits in, for the picker's filters
-	const GROUP: Record<string, string> = { agenda: 'cal', month: 'cal', week: 'cal', bigdate: 'cal', timeline: 'cal', nextup: 'cal', planner: 'cal', room: 'sign', guest: 'sign', nameplate: 'sign', messages: 'glance', reminders: 'glance', moon: 'glance', quote: 'glance', countdown: 'glance', todo: 'glance', frame: 'glance', custom: 'mine' };
+	const GROUP: Record<string, string> = { agenda: 'cal', month: 'cal', week: 'cal', bigdate: 'cal', timeline: 'cal', nextup: 'cal', planner: 'cal', room: 'sign', guest: 'sign', nameplate: 'sign', messages: 'glance', notes: 'glance', habits: 'glance', reminders: 'glance', moon: 'glance', quote: 'glance', countdown: 'glance', todo: 'glance', frame: 'glance', custom: 'mine' };
 	const families: { id: string; label: string }[] = JSON.parse(root.dataset.families!);
 	const dithers: { id: string; label: string; note: string }[] = JSON.parse(root.dataset.dithers!);
 	const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -335,6 +342,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const optMsgs = $('opt-msgs');
 	const optRem = $('opt-rem');
 	const remList = $('rem-list');
+	const optHab = $('opt-hab');
+	const habList = $('hab-list');
 	const signFields = $('sign-fields');
 	const signBuilder = $<HTMLAnchorElement>('sign-builder');
 	const cdTitle = $<HTMLInputElement>('cd-title');
@@ -398,6 +407,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		sch: Schedule;
 		sign: SignCfg;
 		reminders: Reminder[];
+		habits: Habit[];
 	}
 	// The picture editor works on one of two pictures: the Agenda's corner picture, or the Photo frame's full-screen one.
 	type PicKey = 'corner' | 'frame';
@@ -434,6 +444,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		sch: { ...EMPTY_SCHEDULE },
 		sign: JSON.parse(JSON.stringify(SIGN_DEFAULTS)),
 		reminders: [],
+		habits: [],
 	};
 	let base = JSON.stringify(st);
 	// A layout picked in the Schedule tab is previewed (and its Picture / Options tabs shown)
@@ -471,6 +482,17 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	};
 	const sampleDate = () => new Date(Date.now() + 25 * 86400000).toISOString().slice(0, 10);
 
+	// Messages on the calendar now (for the Message board and Notes previews), and examples for the cards.
+	let liveMsgs: { author: string; body: string; atLocal: number }[] = [];
+	function sampleMsgs() {
+		const now = Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60;
+		return [
+			{ author: 'Mum', body: 'Bins out tonight please!', atLocal: now - 1500 },
+			{ author: 'Dad', body: 'Good luck on your exam today', atLocal: now - 9000 },
+			{ author: 'Sam', body: 'Back at 6. Dinner is in the fridge', atLocal: now - 30000 },
+			{ author: 'Alex', body: 'Milk and bread', atLocal: now - 90000 },
+		];
+	}
 	// Everything beyond the plain calendar a layout needs, for the big preview and for the layout cards.
 	function extras(styleId: string, thumb: boolean) {
 		const s = styles.find((x) => x.id === styleId);
@@ -484,6 +506,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			tasksState: (thumb || tasksGranted ? 'ok' : 'needs_permission') as 'ok' | 'needs_permission',
 			sign: st.sign,
 			reminders: st.reminders.some((r) => r.text.trim()) ? st.reminders : thumb ? sampleReminders(Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60) : [],
+			messages: liveMsgs.length ? liveMsgs : thumb ? sampleMsgs() : [],
+			habits: st.habits.some((h) => h.name.trim()) ? st.habits : thumb ? sampleHabits(Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60) : [],
 		};
 	}
 
@@ -927,7 +951,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		paintEditor();
 
 		// Options tab: the Countdown's name and date, or connecting Google Tasks
-		const opt = fs() === 'countdown' ? 'countdown' : (fs() === 'todo' || fs() === 'planner') ? 'todo' : isSignStyle(fs()) ? 'sign' : fs() === 'messages' ? 'msgs' : null;
+		const opt = fs() === 'countdown' ? 'countdown' : (fs() === 'todo' || fs() === 'planner') ? 'todo' : isSignStyle(fs()) ? 'sign' : (fs() === 'messages' || fs() === 'notes') ? 'msgs' : null;
 		optCountdown.hidden = opt !== 'countdown';
 		optTodo.hidden = opt !== 'todo';
 		optSign.hidden = opt !== 'sign';
@@ -936,6 +960,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const remNow = fs() === 'reminders' || !!layoutOf(fs())?.widgets?.some((w: any) => w.t === 'reminders');
 		optRem.hidden = !remNow;
 		if (remNow && !remList.contains(document.activeElement)) drawReminders();
+		// habits: on the Habits screen, or a design with the Habits widget
+		const habNow = fs() === 'habits' || !!layoutOf(fs())?.widgets?.some((w: any) => w.t === 'habits');
+		optHab.hidden = !habNow;
+		if (habNow && !habList.contains(document.activeElement)) drawHabits();
 		($('msgs-open') as HTMLAnchorElement).href = '/dashboard/messages?device=' + encodeURIComponent(deviceId);
 		if (opt === 'sign') syncSignFields();
 		// your own design: a button to edit it
@@ -1049,6 +1077,70 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			if (!next) return; // at least one day
 			a.r.days = next;
 			remChanged(true);
+		}
+	});
+
+	// ---------------------------------------------------------------- habits (ticked off here, streaks on the screen)
+	const dayNum = (offsetDays = 0) => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000) + offsetDays;
+	const isoDay = (n: number) => new Date(n * 86400000).toISOString().slice(0, 10);
+	function drawHabits() {
+		const today = dayNum();
+		habList.innerHTML = st.habits
+			.map((h, i) => {
+				const done = new Set(h.done);
+				const ticks = [6, 5, 4, 3, 2, 1, 0]
+					.map((back) => {
+						const n = today - back;
+						const wd = new Date(n * 86400000).getUTCDay();
+						const on = done.has(isoDay(n));
+						const name = back === 0 ? 'Today' : back === 1 ? 'Yesterday' : DAY_NAME[wd];
+						return `<button type="button" class="day${on ? ' on' : ''}${back === 0 ? ' today' : ''}" data-n="${n}" aria-pressed="${on}" title="${name}">${back === 0 ? '✓' : DAY_LETTER[wd]}</button>`;
+					})
+					.join('');
+				const s = habitStreak(h, today);
+				return `<div class="slot hab" data-i="${i}">
+					<div class="sl-top"><input class="txt hab-name" type="text" maxlength="${MAX_HABIT_NAME}" value="${escHtml(h.name)}" placeholder="Read 20 pages" aria-label="Habit" autocomplete="off" /><button type="button" class="sl-del" aria-label="Remove">&times;</button></div>
+					<div class="hab-when"><div class="sl-days" role="group" aria-label="Done on these days (the last week)">${ticks}</div><span class="muted small hab-streak">${s === 0 ? 'No streak yet' : s === 1 ? '1 day in a row' : s + ' days in a row'}</span></div>
+				</div>`;
+			})
+			.join('');
+		($('hab-add') as HTMLButtonElement).hidden = st.habits.length >= MAX_HABITS;
+	}
+	const habAt = (el: Element) => {
+		const row = el.closest<HTMLElement>('.hab');
+		return row ? { i: parseInt(row.dataset.i!, 10), h: st.habits[parseInt(row.dataset.i!, 10)], row } : null;
+	};
+	const habChanged = (redrawRows: boolean) => {
+		if (redrawRows) drawHabits();
+		schedule(false);
+		changed();
+	};
+	$('hab-add').addEventListener('click', () => {
+		st.habits.push({ name: '', done: [] });
+		habChanged(true);
+		habList.querySelector<HTMLInputElement>('.hab:last-child .hab-name')?.focus();
+	});
+	habList.addEventListener('input', (e) => {
+		const el = e.target as HTMLInputElement;
+		const a = habAt(el);
+		if (!a || !el.classList.contains('hab-name')) return;
+		a.h.name = el.value;
+		habChanged(false);
+	});
+	habList.addEventListener('click', (e) => {
+		const t = e.target as HTMLElement;
+		const a = habAt(t);
+		if (!a) return;
+		if (t.closest('.sl-del')) {
+			st.habits.splice(a.i, 1);
+			habChanged(true);
+			return;
+		}
+		const day = t.closest<HTMLElement>('.day');
+		if (day) {
+			const iso = isoDay(parseInt(day.dataset.n!, 10));
+			a.h.done = a.h.done.includes(iso) ? a.h.done.filter((d) => d !== iso) : [iso, ...a.h.done].sort().reverse();
+			habChanged(true);
 		}
 	});
 
@@ -1368,6 +1460,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			if (!r.ok) return;
 			const j = await r.json();
 			const k = Array.isArray(j.messages) ? j.messages.length : 0;
+			const off = -new Date().getTimezoneOffset() * 60;
+			liveMsgs = (Array.isArray(j.messages) ? j.messages : []).map((m: any) => ({ author: String(m.author ?? ''), body: String(m.body ?? ''), atLocal: (m.createdAt ?? 0) + off }));
+			schedule();
 			msgSum = k ? `${k} on the calendar` : 'None yet';
 			syncSums();
 		} catch {}
@@ -1422,6 +1517,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		if (JSON.stringify(st.sch) !== JSON.stringify(baseState.sch)) body.schedule = st.sch;
 		if (JSON.stringify(st.sign) !== JSON.stringify(baseState.sign)) body.sign = st.sign;
 		if (JSON.stringify(st.reminders) !== JSON.stringify(baseState.reminders)) body.reminders = st.reminders.filter((r) => r.text.trim());
+		if (JSON.stringify(st.habits) !== JSON.stringify(baseState.habits)) body.habits = st.habits.filter((h) => h.name.trim());
 		if (st.clock !== baseState.clock) body.clock = st.clock;
 		if (st.unit !== baseState.unit) body.unit = st.unit; // only when changed, so a server without schema-screens.sql still saves the rest
 		if (anyCorner || st.cornerMode === 'image') {
@@ -1587,6 +1683,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				sch: info.schedule ?? { ...EMPTY_SCHEDULE },
 				sign: sanitizeSign(info.sign),
 				reminders: sanitizeReminders(info.reminders),
+				habits: sanitizeHabits(info.habits),
 			};
 			screensReady = info.screensReady !== false;
 			battAnchor = info.batteryAnchor ?? null;
@@ -1864,6 +1961,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust #opt-rem[hidden] { display: none; }
 	.cust #rem-list .rem { margin-bottom: 0.8em; }
 	.cust .rem .sl-top .txt { flex: 1; min-width: 0; }
+	.cust #opt-hab[hidden] { display: none; }
+	.cust #hab-list .hab { margin-bottom: 0.8em; }
+	.cust .hab .sl-top .txt { flex: 1; min-width: 0; }
+	.cust .hab-when { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8em; margin-top: 0.6em; }
+	.cust .hab .day.today { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--fg); }
 	.cust .rem-when { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6em; margin-top: 0.6em; }
 	.cust .rem-md, .cust .rem-start { display: inline-flex; align-items: center; gap: 0.5em; }
 	.cust .rem-start { margin-top: 0.6em; }
