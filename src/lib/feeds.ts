@@ -52,7 +52,7 @@ async function sha(s: string): Promise<string> {
 	return [...new Uint8Array(d).slice(0, 16)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 // Bump PARSER when ics.ts changes how events are read, so saved copies of links are read again at once.
-const PARSER = 3;
+const PARSER = 4;
 const keyFor = async (deviceId: string, f: Feed, tz: string) => (f.url ? 'u:' + (await sha(f.url + '|' + tz + '|' + PARSER)) : `f:${deviceId}:${f.id}`);
 
 // Events are stored small: [title, start ms, all-day 0/1, date, end ms, end date]

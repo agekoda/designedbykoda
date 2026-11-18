@@ -333,20 +333,19 @@ export function parseIcs(text: string, fallbackTz: string, fromMs: number, toMs:
 		const push = (localStart: number) => {
 			const ms = e.start.allDay ? localStart : localToMs(localStart, e.start.tz);
 			if (ms + Math.max(len, 1) < fromMs || ms > toMs) return;
-			// A timed event from midnight lasting a day or more (Compass sends "Year 11 Exams" like this,
-			// often as UTC times) is really an all-day one. Judged by the calendar's own clock.
+			// A timed event lasting a day or more (Compass sends "Year 11 Completed 2026" as 8:50am on
+			// 12 Nov to 3pm on 17 Dec) goes in the all-day row for each day it covers, like Google Calendar
+			// shows multi-day events, rather than covering the whole Timeline. Days are the calendar's own.
 			if (!e.start.allDay && len >= 23 * 3600000) {
 				const DAY = 86400000;
 				const wall = (t: number) => t + offsetSec(fallbackTz, t) * 1000;
-				const w0 = wall(ms);
-				if (((w0 % DAY) + DAY) % DAY < 60000) {
-					const w1 = wall(ms + len);
-					const endDay = Math.floor(w1 / DAY) + (((w1 % DAY) + DAY) % DAY < 60000 ? 0 : 1); // ends 23:59 = through that day
-					const d0 = new Date(Math.floor(w0 / DAY) * DAY).toISOString().slice(0, 10);
-					const d1 = new Date(Math.max(endDay, Math.floor(w0 / DAY) + 1) * DAY).toISOString().slice(0, 10);
-					out.push({ title: e.title, ms: Date.parse(d0 + 'T00:00:00Z'), allDay: true, dateOnly: d0, endDateOnly: d1 });
-					return;
-				}
+				const day0 = Math.floor(wall(ms) / DAY);
+				const w1 = wall(ms + len);
+				const day1 = Math.max(day0 + 1, Math.floor(w1 / DAY) + (((w1 % DAY) + DAY) % DAY < 60000 ? 0 : 1)); // the day after the last
+				const d0 = new Date(day0 * DAY).toISOString().slice(0, 10);
+				const d1 = new Date(day1 * DAY).toISOString().slice(0, 10);
+				out.push({ title: e.title, ms: day0 * DAY, allDay: true, dateOnly: d0, endDateOnly: d1 });
+				return;
 			}
 			if (e.start.allDay) {
 				const d0 = new Date(localStart).toISOString().slice(0, 10);
