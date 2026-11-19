@@ -31,6 +31,7 @@ import { tomorrow } from './tomorrow';
 import { timetable } from './timetable';
 import { away } from './away';
 import { renderCustom } from '../builder/render';
+import { forecast } from './forecast';
 import { sanitizeLayout, sanitizeSign, signLayout, type SignStyle } from '../builder/model';
 
 // Meeting room, Guest welcome and Desk name plate: a builder design filled in from a few words.
@@ -59,6 +60,7 @@ export const LAYOUTS: Record<string, LayoutEntry> = {
 	guest: { render: sign('guest'), font: 'sans' },
 	nameplate: { render: sign('nameplate'), font: 'sans' },
 	waiting: { render: sign('waiting'), font: 'sans' },
+	forecast: { render: forecast, font: 'sans' },
 	messages: { render: messages, font: 'sans' },
 	reminders: { render: reminders, font: 'sans' },
 	habits: { render: habits, font: 'sans' },
