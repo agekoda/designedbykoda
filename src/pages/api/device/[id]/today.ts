@@ -14,7 +14,7 @@ import { getForecast, type Forecast } from '../../../../lib/weather';
 import { renderLayout } from '../../../../lib/eink/layouts';
 import { b64ToBytes, decodePic, FRAME_BYTES } from '../../../../lib/eink/image';
 import { fetchTasks } from '../../../../lib/tasks';
-import { isSignStyle, layoutNeeds, LIVE_SIGNS, sanitizeLayout, type CustomLayout } from '../../../../lib/eink/builder/model';
+import { isSignStyle, layoutNeeds, LIVE_SIGNS, CAL_SIGNS, sanitizeSign, sanitizeLayout, type CustomLayout } from '../../../../lib/eink/builder/model';
 import { pickScreen, secondsToNextEventEdge } from '../../../../lib/screens';
 import { activeMessages, sanitizeCfg, secondsToNextCheck, secondsToNextExpiry } from '../../../../lib/messages';
 export const prerender = false;
@@ -243,10 +243,6 @@ export async function GET({ params, request, locals }) {
 			.run();
 		return null;
 	};
-	if (calendarIds.length) {
-		const fail = await googleToken();
-		if (fail) return fail;
-	}
 
 	console.log(
 		`Fetching for device ${deviceId}: calendars=${JSON.stringify(calendarIds)} savedTimezone=${user.timezone} from ${rightNow.toISOString()} onward`
@@ -324,6 +320,24 @@ export async function GET({ params, request, locals }) {
 	const rawEvents: { title: string; ms: number; allDay: boolean; dateOnly?: string; endMs?: number; endDateOnly?: string; name?: string; room?: string; moved?: boolean; bring?: string }[] = [];
 	let googleTz: string | null = null;
 
+	// Meeting room and Waiting room can have their own calendars (chosen with the sign in Settings),
+	// used instead of the usual ones, so a work calendar never mixes with home and back again.
+	let onlyFeeds: string[] | null = null;
+	if ((CAL_SIGNS as readonly string[]).includes(style)) {
+		try {
+			const r = await db.prepare('SELECT sign_cfg FROM devices WHERE id = ?').bind(deviceId).first();
+			const own = (sanitizeSign(r?.sign_cfg ?? null) as any)[style]?.cals as string[] | undefined;
+			if (own?.length) {
+				calendarIds = own.filter((c) => !c.startsWith('feed:'));
+				onlyFeeds = own.filter((c) => c.startsWith('feed:')).map((c) => c.slice(5));
+			}
+		} catch {}
+	}
+	if (calendarIds.length) {
+		const fail = await googleToken();
+		if (fail) return fail;
+	}
+
 	for (const calId of calendarIds) {
 		const eventsUrl = new URL(
 			`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`
@@ -375,7 +389,7 @@ export async function GET({ params, request, locals }) {
 	// School timetables and other calendar links or files (src/lib/feeds.ts), alongside Google's.
 	try {
 		const { allFeedEvents } = await import('../../../../lib/feeds');
-		for (const e of await allFeedEvents(db, deviceId, tzPick, rightNow.getTime(), fetchFrom.getTime())) rawEvents.push(e);
+		for (const e of await allFeedEvents(db, deviceId, tzPick, rightNow.getTime(), fetchFrom.getTime(), onlyFeeds)) rawEvents.push(e);
 	} catch (err) {
 		console.error('Extra calendars failed:', err);
 	}

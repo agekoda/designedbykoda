@@ -73,7 +73,12 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 					<div class="details" id="details">
 					<div id="opt-sign" hidden>
 						<div id="sign-fields"></div>
-						<p class="muted small sign-note" id="sign-note" hidden></p>
+						<div class="sign-cals" id="sign-cals" hidden>
+							<div class="label sub">Calendars for this sign</div>
+							<div class="sp-list" id="sign-cal-list"></div>
+							<select id="sign-cal-add" aria-label="Add a calendar"></select>
+							<p class="muted small sp-hint" id="sign-cal-hint"></p>
+						</div>
 						<a class="btn small ghost" id="sign-builder" href="#">Edit the layout in the builder</a>
 						<p class="muted small hint">Opens it in the layout builder as a new design of your own, where you can move things around and add widgets.</p>
 					</div>
@@ -1266,12 +1271,87 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				if (document.activeElement !== el && el.value !== (vals[el.dataset.k!] ?? '')) el.value = vals[el.dataset.k!] ?? '';
 			});
 		}
-		const note = $('sign-note');
-		note.hidden = id !== 'waiting';
-		if (id === 'waiting') note.innerHTML = 'Names come from today\u2019s appointments in <a href="#calendars" data-go="calendars">your calendars</a>, like a booking system\u2019s calendar link. Only the first name and the first letter of the surname show (Sam K.). You can change that in the builder.';
+		drawSignCals(id);
 		signBuilder.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId) + '&seed=1';
 		signBuilder.dataset.builder = '1';
 	}
+	// Meeting room and Waiting room: which of your calendars this sign reads. Picked here, they're used
+	// instead of the ones in Calendars and timetables while this sign is on the screen, so work and
+	// home never mix, and switching to Agenda goes straight back to your usual ones.
+	let calChoices: { id: string; label: string; kind: string }[] | null = null;
+	let calLoading: Promise<void> | null = null;
+	let calDd: Dropdown | null = null;
+	function loadCalChoices() {
+		calLoading ??= (async () => {
+			const out: { id: string; label: string; kind: string }[] = [];
+			try {
+				const r = await fetch('/api/dashboard/calendars');
+				const j = r.ok ? await r.json() : null;
+				for (const c of j?.calendars ?? []) out.push({ id: c.id, label: c.summary, kind: 'Google Calendar' });
+			} catch {}
+			try {
+				const r = await fetch('/api/dashboard/feeds?deviceId=' + encodeURIComponent(deviceId));
+				const j = r.ok ? await r.json() : null;
+				for (const f of j?.feeds ?? []) out.push({ id: 'feed:' + f.id, label: f.name, kind: f.kind === 'file' ? 'File' : 'Calendar link' });
+			} catch {}
+			calChoices = out;
+		})();
+		return calLoading;
+	}
+	function drawSignCals(id: string) {
+		const box = $('sign-cals');
+		box.hidden = id !== 'room' && id !== 'waiting';
+		if (box.hidden) return;
+		const cfg = st.sign[id] as { cals?: string[] };
+		const chosen = cfg.cals ?? [];
+		const list = $('sign-cal-list');
+		const add = $('sign-cal-add') as HTMLSelectElement;
+		const hint = $('sign-cal-hint');
+		if (!calChoices) {
+			list.innerHTML = '<p class="muted small">Loading your calendars\u2026</p>';
+			loadCalChoices().then(() => fs() === id && drawSignCals(id));
+			return;
+		}
+		const byId = new Map(calChoices.map((c) => [c.id, c]));
+		list.innerHTML = chosen
+			.map((c) => {
+				const x = byId.get(c);
+				return `<div class="sp-row sp-item"><span class="sp-t"><b>${escHtml(x?.label ?? 'A calendar that\u2019s been removed')}</b><span class="sp-sub">${escHtml(x?.kind ?? 'Remove it, or add it again in Calendars and timetables')}</span></span><button type="button" class="sp-x" data-rm="${escHtml(c)}" aria-label="Remove">&times;</button></div>`;
+			})
+			.join('');
+		const left = calChoices.filter((c) => !chosen.includes(c.id));
+		add.innerHTML = `<option value="">+ Add a calendar</option>` + left.map((c) => `<option value="${escHtml(c.id)}">${escHtml(c.label)} (${escHtml(c.kind)})</option>`).join('');
+		add.value = '';
+		if (!calDd) {
+			calDd = dropdown(add);
+			add.addEventListener('change', () => {
+				const sid = fs();
+				if (!add.value || (sid !== 'room' && sid !== 'waiting')) return;
+				const c = st.sign[sid] as { cals?: string[] };
+				c.cals = [...(c.cals ?? []), add.value];
+				drawSignCals(sid);
+				schedule(false);
+				changed();
+			});
+			list.addEventListener('click', (e) => {
+				const b = (e.target as HTMLElement).closest<HTMLElement>('[data-rm]');
+				const sid = fs();
+				if (!b || (sid !== 'room' && sid !== 'waiting')) return;
+				const c = st.sign[sid] as { cals?: string[] };
+				c.cals = (c.cals ?? []).filter((x) => x !== b.dataset.rm);
+				drawSignCals(sid);
+				schedule(false);
+				changed();
+			});
+		} else calDd.sync();
+		const what = id === 'waiting' ? 'appointments' : 'bookings';
+		hint.innerHTML = !calChoices.length
+			? 'Add a Google calendar or a calendar link in <a href="#calendars" data-go="calendars">Calendars and timetables</a> first.'
+			: chosen.length
+				? `Only these are shown for ${what}. Your other screens still use the calendars in <a href="#calendars" data-go="calendars">Calendars and timetables</a>.`
+				: `None chosen, so it uses the calendars in <a href="#calendars" data-go="calendars">Calendars and timetables</a>. Choose one here (like the clinic\u2019s booking calendar) to keep this sign to just that.`;
+	}
+
 	signFields.addEventListener('input', (e) => {
 		const el = e.target as HTMLInputElement | HTMLTextAreaElement;
 		const id = fs();
@@ -1949,7 +2029,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .cat.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 	.cust .picker-scroll { flex: 1; overflow-y: auto; padding: 1.2em 1.4em 2em; }
 	.cust .lay[hidden], .cust #mine-head[hidden], .cust #design-cards[hidden] { display: none; }
-	.cust .sign-note { margin: 0.4em 0 1.1em; }
+	.cust .sign-cals { margin: 0.6em 0 1.4em; }
+	.cust .sign-cals .sp-list:not(:empty) { margin-bottom: 0.7em; }
 	.cust .gname { font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 1.8em 0 0.8em; }
 	.cust .lay { position: relative; display: block; }
 	.cust .lay-edit { position: absolute; top: 0.9em; right: 0.9em; background: var(--fg); color: var(--bg); font-size: 0.75em; font-weight: 700; padding: 0.25em 0.75em; border-radius: 999px; text-decoration: none; opacity: 0; transition: opacity 0.2s; }
@@ -2040,7 +2121,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.sp-add { margin-top: 0.9em; }
 	.sp-adds { display: flex; gap: 0.6em; flex-wrap: wrap; margin-top: 0.9em; }
 	.sp-adds [hidden] { display: none; }
-	.sp-hint { margin: 1.1em 0 0; } /* the gap under every list or button in Settings: keep them all the same */
+	.cust .sp-hint, .sp-hint { margin: 1.1em 0 0; } /* the gap under every list or button in Settings: keep them all the same */
 	.sp-empty { padding: 1.2em; border: 1px dashed var(--border); border-radius: 14px; display: grid; gap: 0.4em; justify-items: start; }
 	.sp-empty p { margin: 0 0 0.5em; }
 	.sp-save { margin-top: 1.1em; }

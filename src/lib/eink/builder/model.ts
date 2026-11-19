@@ -197,7 +197,7 @@ export const WIDGETS: Record<string, WidgetDef> = {
 		h: 200,
 		min: { w: 140, h: 70 },
 		opts: [
-			{ key: 'names', label: 'Names', kind: 'choice', choices: [['short', 'First name and initial (Sam K.)'], ['first', 'First name only'], ['full', 'Whole title']], def: 'short' },
+			{ key: 'names', label: 'Names', kind: 'choice', choices: [['short', 'Sam K.'], ['first', 'First name'], ['full', 'Whole title']], def: 'short' },
 			{ key: 'count', label: 'Show who\'s next', kind: 'choice', choices: [['0', 'Nobody'], ['1', '1 person'], ['2', '2 people'], ['3', '3 people'], ['4', '4 people']], def: '3' },
 			{ key: 'times', label: 'Show their times', kind: 'toggle', def: true },
 			{ key: 'now', label: 'Heading', kind: 'text', def: 'Now seeing', max: 24, rows: 1 },
@@ -754,13 +754,13 @@ export const LIVE_SIGNS = ['room', 'nameplate', 'waiting'];
 export const isSignStyle = (s: unknown): s is SignStyle => SIGN_STYLES.includes(s as SignStyle);
 
 export interface SignCfg {
-	room: { name: string };
+	room: { name: string; cals: string[] };
 	guest: { title: string; ssid: string; pass: string; rules: string; checkout: string; contact: string };
 	nameplate: { name: string; role: string };
-	waiting: { title: string; note: string };
+	waiting: { title: string; note: string; cals: string[] };
 }
 export const SIGN_DEFAULTS: SignCfg = {
-	room: { name: 'Boardroom' },
+	room: { name: 'Boardroom', cals: [] },
 	guest: {
 		title: 'Welcome, Sam!',
 		ssid: 'Guest Wi-Fi',
@@ -770,13 +770,22 @@ export const SIGN_DEFAULTS: SignCfg = {
 		contact: 'Questions? Text Koda on 0400 000 000',
 	},
 	nameplate: { name: 'Alex Koda', role: 'Hardware Engineer' },
-	waiting: { title: 'Riverside Physio', note: 'Please let reception know you\'re here' },
+	waiting: { title: 'Riverside Physio', note: 'Please let reception know you\'re here', cals: [] },
 };
 // How long each box may be, and which ones are kept exactly as typed (Wi-Fi details).
 const SIGN_LIMITS: Record<string, { max: number; raw?: boolean; multiline?: boolean }> = {
 	name: { max: 40 }, title: { max: 40 }, role: { max: 40 }, checkout: { max: 30 }, contact: { max: 60 }, note: { max: 60 },
 	ssid: { max: 32, raw: true }, pass: { max: 63, raw: true }, rules: { max: 300, multiline: true },
 };
+
+// The calendars a Meeting room or Waiting room reads, instead of the ones picked in Calendars and
+// timetables: Google calendar ids, and "feed:<id>" for timetables and other calendar links or files.
+// Empty means "the usual ones". So a sign carried between home and work keeps its own calendar.
+export const CAL_SIGNS = ['room', 'waiting'] as const;
+export function signCals(v: unknown): string[] {
+	if (!Array.isArray(v)) return [];
+	return [...new Set(v.filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= 300))].slice(0, 10);
+}
 
 export function sanitizeSign(input: unknown): SignCfg {
 	let raw: any = input;
@@ -793,6 +802,10 @@ export function sanitizeSign(input: unknown): SignCfg {
 		if (!src || typeof src !== 'object') continue;
 		for (const key of Object.keys(out[sign]) as (keyof SignCfg[typeof sign])[]) {
 			const v = src[key];
+			if (key === 'cals') {
+				(out[sign] as any).cals = signCals(v);
+				continue;
+			}
 			if (typeof v !== 'string') continue;
 			const lim = SIGN_LIMITS[key as string];
 			(out[sign] as any)[key] = cleanOpt({ key: String(key), label: '', kind: 'text', def: '', max: lim.max, raw: lim.raw, multiline: lim.multiline }, v);

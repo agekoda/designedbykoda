@@ -6,7 +6,7 @@ import { deg, windText } from '../units';
 import { minutesShort, timeText } from '../clock';
 import { Draw, PAPER, INK, type Align, type Color } from '../draw';
 import { fontId, type Family, type Role } from '../fonts';
-import { measure, wrapText } from '../measure';
+import { advanceOf, measure, wrapText } from '../measure';
 import { VMETRICS } from '../vmetrics';
 import { CORNER, fitBits } from '../image';
 import { batteryIcon } from '../batteryIcon';
@@ -114,6 +114,40 @@ function textWidget(env: Env, w: Widget, o: Opts, text: string) {
 	const { inner, color } = chrome(env, w, o);
 	const fit = fitText(env, text, inner.w, inner.h, facesFor(o.size), o.bold === true);
 	drawLines(env, inner, fit.lines, fit.face, o.align, o.valign ?? 'middle', color);
+}
+
+// Where each line of a Text box sits on the screen, so the builder can type straight onto the
+// canvas in the real pixel font: it draws its own cursor from this, and turns clicks into positions.
+// Same steps as textWidget (padding, fitting, wrapping, alignment). Lines know where they start in
+// the text, so the cursor can be placed by character.
+export interface CaretLine { start: number; end: number; x: number; base: number; adv: number[] }
+export function textLayout(family: Family, w: Widget, text: string): { lines: CaretLine[]; asc: number; desc: number } {
+	const o = withDefaults(w);
+	const env = { d: new Draw(family, false), ctx: null as any, fam: family } as Env;
+	const pad = o.invert === true || o.border === true ? 5 : 0;
+	const inner: Box = { x: w.x + pad, y: w.y + pad, w: Math.max(1, w.w - 2 * pad), h: Math.max(1, w.h - 2 * pad) };
+	const fit = fitText(env, text, inner.w, inner.h, facesFor(o.size), o.bold === true);
+	const face = fit.face;
+	const v = vm(env, face);
+	const shown = fit.lines.length ? fit.lines : [''];
+	const bh = blockH(env, face, shown.length);
+	const top = o.valign === 'top' ? inner.y : o.valign === 'bottom' ? inner.y + inner.h - bh : inner.y + (inner.h - bh) / 2;
+	const lines: CaretLine[] = [];
+	let pos = 0;
+	shown.forEach((ln, i) => {
+		// find this line in the text, past the spaces and line breaks wrapping took out
+		let start = ln ? text.indexOf(ln, pos) : pos;
+		if (start < 0) start = pos;
+		const end = start + ln.length;
+		pos = end;
+		const adv = Array.from(ln).map((c) => advanceOf(family, face.role, c, face.scale));
+		const width = adv.reduce((a, b) => a + b, 0);
+		const x = o.align === 'center' ? inner.x + (inner.w - width) / 2 : o.align === 'right' ? inner.x + inner.w - width : inner.x;
+		lines.push({ start, end, x, base: top + v.asc + i * v.lh, adv });
+	});
+	// whatever the last line didn't take (trailing spaces, a new empty line) belongs at its end
+	if (lines.length) lines[lines.length - 1].end = Math.max(lines[lines.length - 1].end, text.length);
+	return { lines, asc: v.asc, desc: v.desc };
 }
 
 // ---- events ----

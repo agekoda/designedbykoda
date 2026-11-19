@@ -140,8 +140,9 @@ export async function feedEvents(db: any, deviceId: string, f: Feed, tz: string,
 
 // Everything from all of a calendar's feeds, from `fromMs` on, in the shape today.ts collects
 // Google's events in.
-export async function allFeedEvents(db: any, deviceId: string, tz: string, nowMs: number, fromMs: number): Promise<NamedEvent[]> {
-	const feeds = await listFeeds(db, deviceId);
+export async function allFeedEvents(db: any, deviceId: string, tz: string, nowMs: number, fromMs: number, only?: string[] | null): Promise<NamedEvent[]> {
+	// `only`: just these feeds (a sign with its own calendars); otherwise all of them
+	const feeds = (await listFeeds(db, deviceId)).filter((f) => !only || only.includes(f.id));
 	if (!feeds.length) return [];
 	const lists = await Promise.all(feeds.map((f) => feedEvents(db, deviceId, f, tz, nowMs).catch(() => ({ events: [] as IcsEvent[] }))));
 	// class names, rooms and room changes (src/lib/classes.ts), worked out over everything we have
