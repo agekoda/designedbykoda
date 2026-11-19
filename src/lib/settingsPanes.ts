@@ -98,24 +98,25 @@ export function mountCalendars(box: HTMLElement, d: any, all: any[] | null, toas
 		box.innerHTML = '<p class="muted small">Couldn’t load your Google calendars right now. Try again in a moment.</p>';
 		return;
 	}
+	// none ticked is allowed: saved as ["-"], so only timetables and other calendar links show
 	const sel: string[] = d.calendarIds?.length ? d.calendarIds : all.filter((c) => c.primary).map((c) => c.id);
 	box.innerHTML = `<div class="sp-list">${all
 		.map((c) => `<label class="sp-row sp-check"><input type="checkbox" value="${esc(c.id)}" ${sel.includes(c.id) ? 'checked' : ''} /><span class="sp-box" aria-hidden="true"></span><span class="sp-t sp-inline"><span>${esc(c.summary)}</span>${c.primary ? '<span class="sp-tag">Primary</span>' : ''}</span></label>`)
-		.join('')}</div>`;
+		.join('')}</div><p class="muted small sp-hint" data-none>${sel.includes('-') ? 'No Google calendars on this calendar. Tick one to add it.' : 'Untick them all to show only your timetables and other calendars below.'}</p>`;
+	const noneHint = box.querySelector('[data-none]') as HTMLElement;
 	let timer: any;
 	box.addEventListener('change', (e) => {
 		const cb = e.target as HTMLInputElement;
-		const ids = Array.from(box.querySelectorAll<HTMLInputElement>('input:checked')).map((x) => x.value);
-		if (!ids.length) {
-			cb.checked = true;
-			return toast('Keep at least one calendar selected.', true);
-		}
+		if (!cb.matches('input[type=checkbox]')) return;
+		const picked = Array.from(box.querySelectorAll<HTMLInputElement>('input:checked')).map((x) => x.value);
+		const ids = picked.length ? picked : ['-'];
+		noneHint.textContent = picked.length ? 'Untick them all to show only your timetables and other calendars below.' : 'No Google calendars on this calendar. Tick one to add it.';
 		clearTimeout(timer);
 		timer = setTimeout(async () => {
 			const r = await post('/api/dashboard/devices', { deviceId: d.id, calendarIds: ids });
 			if (r.ok) {
 				d.calendarIds = ids;
-				toast('Saved');
+				toast(picked.length ? 'Saved' : 'Saved. Only your timetables and other calendars will show.');
 			} else toast(r.error || 'Could not save.', true);
 		}, 500);
 	});

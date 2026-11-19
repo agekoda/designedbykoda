@@ -18,6 +18,7 @@ import { isSignStyle, layoutNeeds, sanitizeLayout, type CustomLayout } from '../
 import { pickScreen, secondsToNextEventEdge } from '../../../../lib/screens';
 import { activeMessages, sanitizeCfg, secondsToNextCheck, secondsToNextExpiry } from '../../../../lib/messages';
 export const prerender = false;
+import { NO_GOOGLE } from '../../../../lib/googleCals';
 
 function getCookielessAuthSecret(request: Request): string | null {
 	const header = request.headers.get('Authorization') || '';
@@ -173,42 +174,6 @@ export async function GET({ params, request, locals }) {
 	}
 
 	const now = Math.floor(Date.now() / 1000);
-	let accessToken: string;
-
-	// Reuse the cached access token if it's still good for at least another
-	// minute; otherwise refresh it and cache the new one on this device row.
-	if (device.cached_access_token && device.cached_token_expiry > now + 60) {
-		accessToken = device.cached_access_token;
-	} else {
-		const refreshToken = await decryptToken(user.encrypted_refresh_token, encryptionKey);
-		const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-			body: new URLSearchParams({
-				refresh_token: refreshToken,
-				client_id: clientId,
-				client_secret: clientSecret,
-				grant_type: 'refresh_token',
-			}),
-		});
-		if (!tokenRes.ok) {
-			const errText = await tokenRes.text();
-			// A revoked/expired refresh token surfaces here — worth its own
-			// distinct error so the firmware (and later, the dashboard) can
-			// tell "reconnect your Google account" apart from a generic failure.
-			if (errText.includes('invalid_grant')) {
-				return json({ error: 'reauth_required' }, 403);
-			}
-			return json({ error: `Token refresh failed: ${errText}` }, 502);
-		}
-		const tokenData = await tokenRes.json();
-		accessToken = tokenData.access_token;
-		const newExpiry = now + (tokenData.expires_in || 3600);
-		await db
-			.prepare('UPDATE devices SET cached_access_token = ?, cached_token_expiry = ? WHERE id = ?')
-			.bind(accessToken, newExpiry, deviceId)
-			.run();
-	}
 
 	// The timezone is whatever Google Calendar itself says the account is in
 	// (the `timeZone` field on every events response), so the device always
@@ -237,6 +202,51 @@ export async function GET({ params, request, locals }) {
 		if (Array.isArray(own) && own.length) calendarIds = own;
 	} catch {}
 	if (calendarIds.length === 0) calendarIds = ['primary'];
+	// "-" on its own means no Google calendars at all: only timetables and other calendar links.
+	calendarIds = calendarIds.filter((id) => id !== NO_GOOGLE);
+
+	// A Google access token, fetched only when something needs Google (its calendars, or Tasks for
+	// the to-do list). Reuse the cached one if it's still good for at least another minute;
+	// otherwise refresh it and cache the new one on this device row.
+	let accessToken = '';
+	const googleToken = async (): Promise<Response | null> => {
+		if (accessToken) return null;
+		if (device.cached_access_token && device.cached_token_expiry > now + 60) {
+			accessToken = device.cached_access_token;
+			return null;
+		}
+		const refreshToken = await decryptToken(user.encrypted_refresh_token, encryptionKey);
+		const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: new URLSearchParams({
+				refresh_token: refreshToken,
+				client_id: clientId,
+				client_secret: clientSecret,
+				grant_type: 'refresh_token',
+			}),
+		});
+		if (!tokenRes.ok) {
+			const errText = await tokenRes.text();
+			// A revoked/expired refresh token surfaces here — worth its own
+			// distinct error so the firmware (and later, the dashboard) can
+			// tell "reconnect your Google account" apart from a generic failure.
+			if (errText.includes('invalid_grant')) return json({ error: 'reauth_required' }, 403);
+			return json({ error: `Token refresh failed: ${errText}` }, 502);
+		}
+		const tokenData = await tokenRes.json();
+		accessToken = tokenData.access_token;
+		const newExpiry = now + (tokenData.expires_in || 3600);
+		await db
+			.prepare('UPDATE devices SET cached_access_token = ?, cached_token_expiry = ? WHERE id = ?')
+			.bind(accessToken, newExpiry, deviceId)
+			.run();
+		return null;
+	};
+	if (calendarIds.length) {
+		const fail = await googleToken();
+		if (fail) return fail;
+	}
 
 	console.log(
 		`Fetching for device ${deviceId}: calendars=${JSON.stringify(calendarIds)} savedTimezone=${user.timezone} from ${rightNow.toISOString()} onward`
@@ -466,9 +476,12 @@ export async function GET({ params, request, locals }) {
 	let tasks: { title: string; done: boolean; due?: string }[] | null = null;
 	let tasksState: 'ok' | 'needs_permission' | 'error' = 'ok';
 	if ((style === 'todo' || needs.tasks) && proto === '2') {
-		const r = await fetchTasks(accessToken, rightNow.getTime());
-		tasks = r.tasks;
-		tasksState = r.state;
+		if (await googleToken()) tasksState = 'error';
+		else {
+			const r = await fetchTasks(accessToken, rightNow.getTime());
+			tasks = r.tasks;
+			tasksState = r.state;
+		}
 	}
 
 	// Dark mode (white on black), from schema-darkmode.sql. Its own query so a
