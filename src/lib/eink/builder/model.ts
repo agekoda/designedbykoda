@@ -189,6 +189,23 @@ export const WIDGETS: Record<string, WidgetDef> = {
 		],
 		def: { align: 'center' },
 	},
+	queue: {
+		label: 'Now seeing',
+		group: 'Calendar',
+		blurb: 'Who\'s being seen now and who\'s next, from today\'s appointments. For a waiting room. Updates itself when an appointment starts or ends',
+		w: 380,
+		h: 200,
+		min: { w: 140, h: 70 },
+		opts: [
+			{ key: 'names', label: 'Names', kind: 'choice', choices: [['short', 'First name and initial (Sam K.)'], ['first', 'First name only'], ['full', 'Whole title']], def: 'short' },
+			{ key: 'count', label: 'Show who\'s next', kind: 'choice', choices: [['0', 'Nobody'], ['1', '1 person'], ['2', '2 people'], ['3', '3 people'], ['4', '4 people']], def: '3' },
+			{ key: 'times', label: 'Show their times', kind: 'toggle', def: true },
+			{ key: 'now', label: 'Heading', kind: 'text', def: 'Now seeing', max: 24, rows: 1 },
+			{ key: 'empty', label: 'When nobody\'s left today', kind: 'text', def: 'No more appointments today', max: 40, rows: 1 },
+			ALIGN,
+		],
+		def: { align: 'center' },
+	},
 	event_count: {
 		label: 'Event count',
 		group: 'Calendar',
@@ -577,7 +594,7 @@ export function layoutNeeds(layout: CustomLayout | null | undefined) {
 		countdown: types.has('countdown'),
 		picture: types.has('picture'),
 		// redraw when a meeting starts or ends, not just at midnight
-		live: types.has('room_status'),
+		live: types.has('room_status') || types.has('queue'),
 		reminders: types.has('reminders'),
 		habits: types.has('habits'),
 	};
@@ -720,6 +737,7 @@ export const TEMPLATES: Template[] = [
 	{ id: 'room', label: 'Meeting room', note: 'Room name, free or in use, and today\'s bookings', build: () => signLayout('room', SIGN_DEFAULTS) },
 	{ id: 'guest', label: 'Guest welcome', note: 'Wi-Fi QR code, house rules and check-out time', build: () => signLayout('guest', SIGN_DEFAULTS) },
 	{ id: 'nameplate', label: 'Desk name plate', note: 'Your name, your role, and whether you\'re free', build: () => signLayout('nameplate', SIGN_DEFAULTS) },
+	{ id: 'waiting', label: 'Waiting room', note: 'Who\'s being seen now, and who\'s next', build: () => signLayout('waiting', SIGN_DEFAULTS) },
 ];
 
 export function templateById(id: string): Template {
@@ -729,14 +747,17 @@ export function templateById(id: string): Template {
 // ---- signs: Meeting room, Guest welcome and Desk name plate ----
 // These are ready-made layouts (pick one, fill in a few boxes on Customize display) and also
 // builder templates. Both are built here from the same few words, so they always match.
-export type SignStyle = 'room' | 'guest' | 'nameplate';
-export const SIGN_STYLES: SignStyle[] = ['room', 'guest', 'nameplate'];
+export type SignStyle = 'room' | 'guest' | 'nameplate' | 'waiting';
+export const SIGN_STYLES: SignStyle[] = ['room', 'guest', 'nameplate', 'waiting'];
+// signs that redraw when an appointment or meeting starts or ends
+export const LIVE_SIGNS = ['room', 'nameplate', 'waiting'];
 export const isSignStyle = (s: unknown): s is SignStyle => SIGN_STYLES.includes(s as SignStyle);
 
 export interface SignCfg {
 	room: { name: string };
 	guest: { title: string; ssid: string; pass: string; rules: string; checkout: string; contact: string };
 	nameplate: { name: string; role: string };
+	waiting: { title: string; note: string };
 }
 export const SIGN_DEFAULTS: SignCfg = {
 	room: { name: 'Boardroom' },
@@ -749,10 +770,11 @@ export const SIGN_DEFAULTS: SignCfg = {
 		contact: 'Questions? Text Koda on 0400 000 000',
 	},
 	nameplate: { name: 'Alex Koda', role: 'Hardware Engineer' },
+	waiting: { title: 'Riverside Physio', note: 'Please let reception know you\'re here' },
 };
 // How long each box may be, and which ones are kept exactly as typed (Wi-Fi details).
 const SIGN_LIMITS: Record<string, { max: number; raw?: boolean; multiline?: boolean }> = {
-	name: { max: 40 }, title: { max: 40 }, role: { max: 40 }, checkout: { max: 30 }, contact: { max: 60 },
+	name: { max: 40 }, title: { max: 40 }, role: { max: 40 }, checkout: { max: 30 }, contact: { max: 60 }, note: { max: 60 },
 	ssid: { max: 32, raw: true }, pass: { max: 63, raw: true }, rules: { max: 300, multiline: true },
 };
 
@@ -806,6 +828,19 @@ export function signLayout(sign: SignStyle, cfg: SignCfg): CustomLayout {
 				W('list', 176, 88, 214, 134, { items: c.rules, bullet: 'dot', size: 'auto' }),
 				W('text', 176, 230, 214, 40, { text: c.checkout, invert: true, bold: true, size: 'auto', align: 'center' }),
 				W('text', 10, 280, 380, 18, { text: c.contact, size: 's', align: 'center' }),
+			],
+		};
+	}
+	if (sign === 'waiting') {
+		const c = cfg.waiting;
+		return {
+			v: 1,
+			widgets: [
+				W('box', 0, 0, 400, 44, { fill: 'solid' }),
+				W('text', 12, 4, 260, 36, { text: c.title, light: true, bold: true, size: 'auto', valign: 'middle' }),
+				W('updated', 272, 12, 118, 20, { light: true, align: 'right', size: 's' }),
+				W('queue', 10, 54, 380, 206, { names: 'short', count: '3', times: true, now: 'Now seeing', empty: 'No more appointments today', align: 'center' }),
+				W('text', 10, 270, 380, 24, { text: c.note, size: 's', align: 'center', valign: 'middle' }),
 			],
 		};
 	}

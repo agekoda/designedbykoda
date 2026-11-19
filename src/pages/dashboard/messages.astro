@@ -111,7 +111,7 @@ try {
 	import { renderPreview, paintScreen } from '../../lib/eink/previewKit';
 	import { qrMatrix, qrBits } from '../../lib/eink/qr';
 	import { estimate, lifeText } from '../../lib/eink/batteryLife';
-	import { layoutNeeds } from '../../lib/eink/builder/model';
+	import { layoutNeeds, LIVE_SIGNS } from '../../lib/eink/builder/model';
 	import { CALENDAR_STYLES } from '../../data/calendarStyles';
 	import { DAY_FROM, DAY_TO, secondsToNextCheck } from '../../lib/messages';
 	import { dropdown } from '../../lib/dropdown';
@@ -330,7 +330,7 @@ try {
 	checkEl.innerHTML = checks.map((c) => `<label><input type="radio" name="check" value="${c.sec}" /><span>${c.label}</span></label>`).join('');
 	function syncSettings() {
 		checkEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = +i.value === cfg.check));
-		const live = dev ? (dev.style === 'custom' && layoutNeeds(dev.custom).live) || dev.style === 'room' || dev.style === 'nameplate' : false;
+		const live = dev ? (dev.style === 'custom' && layoutNeeds(dev.custom).live) || LIVE_SIGNS.includes(dev.style) : false;
 		const life = dev ? lifeText(estimate({ style: dev.style, refreshSec: dev.refreshIntervalSec, schedule: dev.schedule, live, msgCheck: cfg.check })) : '';
 		$('check-hint').textContent = (cfg.check ? `Only between ${DAY_FROM}am and ${DAY_TO - 12}pm, so it sleeps overnight. ` : 'It still picks up messages at midnight and whenever it wakes for anything else. ') + (life ? `With this, a full charge lasts ${life}.` : '');
 		$('when').textContent = whenText();

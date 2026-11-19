@@ -25,6 +25,7 @@ import { toAscii } from '../draw';
 import { messageList } from '../layouts/messages';
 import { reminderList } from '../layouts/reminders';
 import { habitGrid } from '../layouts/habits';
+import { personName, type NameStyle } from '../waiting';
 
 interface Env {
 	d: Draw;
@@ -818,6 +819,47 @@ function roomStatusWidget(env: Env, w: Widget, o: Opts) {
 	}
 }
 
+// Waiting room: the appointment happening now, big, then who's next today. Names are cut down to
+// "Sam K." by default (src/lib/eink/waiting.ts) so a full name never shows to the room.
+function queueWidget(env: Env, w: Widget, o: Opts) {
+	const { d, ctx } = env;
+	const style = (['short', 'first', 'full'].includes(String(o.names)) ? o.names : 'short') as NameStyle;
+	const who = (e: CalEvent) => personName(e.title, style) || e.title;
+	const today = dayIdx(ctx.nowLocal);
+	const now = currentEvent(ctx);
+	const later = ctx.events.filter((e) => !e.allDay && e.startLocal > ctx.nowLocal + 60 && dayIdx(e.startLocal) === today && e !== now);
+	const a: Align = o.align === 'center' ? 'center' : o.align === 'right' ? 'right' : 'left';
+	const xOf = (box: Box) => (a === 'center' ? box.x + box.w / 2 : a === 'right' ? box.x + box.w : box.x);
+	const inner: Box = { x: w.x, y: w.y, w: w.w, h: w.h };
+	if (!now && !later.length) {
+		const fit = fitText(env, String(o.empty ?? '') || 'No more appointments today', inner.w, Math.min(inner.h, 90), ['l', 'm', 's'], true);
+		drawLines(env, inner, fit.lines, fit.face, a, 'middle', INK);
+		return;
+	}
+	// the big name: whoever is in now, or else whoever is first
+	const big = now ?? later[0];
+	const rest = now ? later : later.slice(1);
+	const count = Math.max(0, Math.min(4, parseInt(String(o.count ?? '3'), 10) || 0));
+	const shown = rest.slice(0, count);
+	const sv = vm(env, FACES.s);
+	const head = now ? String(o.now ?? '') || 'Now seeing' : `Next${o.times !== false ? ', at ' + hm(big.startLocal) : ''}`;
+	const headH = sv.lh + 2;
+	const listH = shown.length ? shown.length * (sv.lh + 2) + sv.lh + 12 : 0;
+	d.text(xOf(inner), inner.y + sv.asc - sv.desc + 2, 'sb', head, { align: a, maxW: inner.w });
+	const bigBox: Box = { x: inner.x, y: inner.y + headH, w: inner.w, h: Math.max(20, inner.h - headH - listH) };
+	const fit = fitText(env, who(big), bigBox.w, bigBox.h, ORDER, true);
+	drawLines(env, bigBox, fit.lines.slice(0, 2), fit.face, a, 'middle', INK);
+	if (!shown.length) return;
+	let y = bigBox.y + bigBox.h + 2;
+	d.hline(Math.round(inner.x + (a === 'center' ? inner.w * 0.2 : 0)), Math.round(y), Math.round(a === 'center' ? inner.w * 0.6 : inner.w), INK);
+	y += sv.asc - sv.desc + 13;
+	d.text(xOf(inner), y, 'sb', 'Next', { align: a, maxW: inner.w });
+	for (const e of shown) {
+		y += sv.lh + 2;
+		d.text(xOf(inner), y, 's', o.times !== false ? `${hm(e.startLocal)}  ${who(e)}` : who(e), { align: a, maxW: inner.w });
+	}
+}
+
 // ---- one widget ----
 function drawWidget(env: Env, w: Widget) {
 	const o = withDefaults(w);
@@ -891,6 +933,8 @@ function drawWidget(env: Env, w: Widget) {
 			return listWidget(env, w, o);
 		case 'room_status':
 			return roomStatusWidget(env, w, o);
+		case 'queue':
+			return queueWidget(env, w, o);
 		case 'updated':
 			return textWidget(env, w, o, `${String(o.prefix ?? '').trim()} ${hm(env.ctx.nowLocal)}`.trim());
 	}

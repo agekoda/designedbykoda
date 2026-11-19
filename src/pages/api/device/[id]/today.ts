@@ -14,7 +14,7 @@ import { getForecast, type Forecast } from '../../../../lib/weather';
 import { renderLayout } from '../../../../lib/eink/layouts';
 import { b64ToBytes, decodePic, FRAME_BYTES } from '../../../../lib/eink/image';
 import { fetchTasks } from '../../../../lib/tasks';
-import { isSignStyle, layoutNeeds, sanitizeLayout, type CustomLayout } from '../../../../lib/eink/builder/model';
+import { isSignStyle, layoutNeeds, LIVE_SIGNS, sanitizeLayout, type CustomLayout } from '../../../../lib/eink/builder/model';
 import { pickScreen, secondsToNextEventEdge } from '../../../../lib/screens';
 import { activeMessages, sanitizeCfg, secondsToNextCheck, secondsToNextExpiry } from '../../../../lib/messages';
 export const prerender = false;
@@ -450,7 +450,7 @@ export async function GET({ params, request, locals }) {
 	if (designId && proto === '2') customLayout = (await getDesign(db, deviceId, designId))?.layout ?? null;
 	const needs = style === 'planner' ? { tasks: true, countdown: false, picture: false, live: false } : layoutNeeds(customLayout);
 	// Meeting room and Desk name plate show free / busy, so they wake when meetings start and end.
-	if (style === 'room' || style === 'nameplate') needs.live = true;
+	if (LIVE_SIGNS.includes(style)) needs.live = true;
 	// The words on a sign (schema-screens.sql).
 	// Repeating reminders (schema-reminders.sql).
 	let reminders: Reminder[] = [];

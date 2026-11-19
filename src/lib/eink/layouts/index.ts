@@ -58,6 +58,7 @@ export const LAYOUTS: Record<string, LayoutEntry> = {
 	room: { render: sign('room'), font: 'sans' },
 	guest: { render: sign('guest'), font: 'sans' },
 	nameplate: { render: sign('nameplate'), font: 'sans' },
+	waiting: { render: sign('waiting'), font: 'sans' },
 	messages: { render: messages, font: 'sans' },
 	reminders: { render: reminders, font: 'sans' },
 	habits: { render: habits, font: 'sans' },
