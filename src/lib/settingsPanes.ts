@@ -208,8 +208,8 @@ export function mountFeeds(box: HTMLElement, d: any, toast: Toast, hooks: { onAd
 			</div>
 			<label class="fd-field"><span>Name</span><input class="x-dlg-field" data-name maxlength="30" placeholder="Compass" autocomplete="off" /></label>
 			<label class="fd-field" data-linkrow><span>Calendar link</span><input class="x-dlg-field" data-url placeholder="https://…" autocomplete="off" spellcheck="false" /></label>
-			<label class="fd-field" data-filerow hidden><span>Timetable file</span><input type="file" data-file accept=".ics,text/calendar" /></label>
-			<p class="fd-fine">The link is private to you. It's only used to read your timetable for this calendar.</p>`;
+			<div class="fd-field" data-filerow hidden><span>Timetable file</span><label class="fd-file"><input type="file" data-file accept=".ics,text/calendar" /><span class="fd-file-btn">Choose a file</span><span class="fd-file-name" data-fname>No file chosen</span></label></div>
+			<p class="fd-fine">This stays private to you. It's only used to read your timetable for this calendar.</p>`;
 		let kind = 'compass';
 		const $b = <T extends HTMLElement>(s: string) => body.querySelector(s) as T;
 		const setKind = (k: string) => {
@@ -221,6 +221,11 @@ export function mountFeeds(box: HTMLElement, d: any, toast: Toast, hooks: { onAd
 			$b<HTMLInputElement>('[data-name]').placeholder = k === 'compass' ? 'Compass' : k === 'seqta' ? 'SEQTA timetable' : 'Calendar';
 		};
 		body.querySelectorAll<HTMLElement>('.fd-tab').forEach((t) => t.addEventListener('click', () => setKind(t.dataset.k!)));
+		// the real file input is hidden behind a button in the site's style; show the chosen file's name
+		$b<HTMLInputElement>('[data-file]').addEventListener('change', (e) => {
+			const f = (e.target as HTMLInputElement).files?.[0];
+			$b<HTMLElement>('[data-fname]').textContent = f ? f.name : 'No file chosen';
+		});
 		setKind('compass');
 		if (!(await ask('Shows your classes and school events on this calendar, with your Google ones.', { title: 'Add a timetable or calendar', ok: 'Add it', body }))) return;
 		const name = $b<HTMLInputElement>('[data-name]').value.trim() || $b<HTMLInputElement>('[data-name]').placeholder;
