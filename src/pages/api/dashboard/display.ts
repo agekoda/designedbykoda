@@ -1,6 +1,7 @@
 // The customise-display page's API: read and save how one device's screen looks
 // (layout, font, dark mode, and the Agenda's picture). Everything is checked
 // against the logged-in user, so you can only touch your own devices.
+import { sanitizeDeco } from '../../../lib/eink/festive';
 import { isStyleId, isRefreshSec, DEFAULT_STYLE } from '../../../data/calendarStyles';
 import { sanitizeReminders } from '../../../lib/eink/reminders';
 import { sanitizeHabits } from '../../../lib/eink/habits';
@@ -112,6 +113,7 @@ export async function GET({ request, locals }) {
 	let countdown: { title: string; date: string } | null = null;
 	let frameSrc: string | null = null;
 	let frameCfg: unknown = null;
+	let frameDeco = sanitizeDeco(null);
 	let tasksGranted = false;
 	try {
 		const w = await db.prepare('SELECT weather_lat, weather_lon FROM devices WHERE id = ?').bind(deviceId).first();
@@ -126,6 +128,10 @@ export async function GET({ request, locals }) {
 		frameSrc = x?.frame_src || null;
 		frameCfg = x?.frame_cfg ? JSON.parse(x.frame_cfg) : null;
 	} catch {}
+	try {
+		const x = await db.prepare('SELECT frame_deco FROM devices WHERE id = ?').bind(deviceId).first();
+		frameDeco = sanitizeDeco(x?.frame_deco);
+	} catch {} // before the column exists (added the first time it's saved)
 	try {
 		const u = await db.prepare('SELECT tasks_granted FROM users WHERE id = ?').bind(userId).first();
 		tasksGranted = u?.tasks_granted === 1;
@@ -169,6 +175,7 @@ export async function GET({ request, locals }) {
 			countdown,
 			frameSrc,
 			frameCfg,
+			frameDeco,
 			tasksGranted,
 			batteryMv: extra.battery_mv ?? null,
 			batteryAt: extra.battery_at ?? null,
@@ -314,6 +321,21 @@ export async function POST({ request, locals }) {
 			await db.prepare('UPDATE devices SET schedule = ? WHERE id = ? AND user_id = ?').bind(JSON.stringify(sanitizeSchedule(body.schedule, isStyleId)), deviceId, o.userId).run();
 		} catch {
 			return json({ error: 'Schedules are not enabled on the server yet (run schema-screens.sql).' }, 500);
+		}
+	}
+	if (body.frameDeco !== undefined) {
+		// the festive border round the Photo frame: its column is added the first time it's saved
+		const v = JSON.stringify(sanitizeDeco(body.frameDeco));
+		const save = () => db.prepare('UPDATE devices SET frame_deco = ? WHERE id = ? AND user_id = ?').bind(v, deviceId, o.userId).run();
+		try {
+			await save();
+		} catch {
+			try {
+				await db.prepare('ALTER TABLE devices ADD COLUMN frame_deco TEXT').run();
+				await save();
+			} catch {
+				return json({ error: 'Could not save the festive border.' }, 500);
+			}
 		}
 	}
 	await markSaved(db, deviceId);

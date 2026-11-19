@@ -39,14 +39,23 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 				<label class="gp-field"><span>For</span><input id="g-to" maxlength="40" placeholder="Sam" autocomplete="off" /></label>
 				<label class="gp-field"><span>From</span><input id="g-from" maxlength="40" placeholder="Alex" autocomplete="off" /></label>
 				<label class="gp-field"><span>Message</span><textarea id="g-msg" maxlength="300" rows="4" placeholder="Merry Christmas! Something good is on its way."></textarea></label>
+				<div class="gp-field"><span>Style</span>
+					<div class="gp-seg" role="radiogroup" aria-label="Card style">
+						<label><input type="radio" name="g-style" value="festive" /><span>Festive</span></label>
+						<label><input type="radio" name="g-style" value="plain" /><span>Plain</span></label>
+					</div>
+				</div>
 				<button type="button" class="gp-btn" id="g-print">Print the card</button>
 				<p class="gp-fine">Prints on A4 or Letter. Turn on "Background graphics" in the print settings for the cream colour, or leave it white.</p>
 			</div>
 			<div class="gp-sheet">
 				<div class="gcard" id="gcard">
+					<svg class="gc-deco gc-deco-a" viewBox="0 0 40 40" aria-hidden="true"><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"><path d="M20 4v32M6.1 12l27.8 16M6.1 28l27.8-16"/><path d="M16 7l4 4 4-4M16 33l4-4 4 4M8 17l5-1-1-5M32 23l-5 1 1 5M8 23l5 1-1 5M32 17l-5-1 1-5"/></g></svg>
+					<svg class="gc-deco gc-deco-b" viewBox="0 0 40 40" aria-hidden="true"><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"><path d="M20 4v32M6.1 12l27.8 16M6.1 28l27.8-16"/><path d="M16 7l4 4 4-4M16 33l4-4 4 4M8 17l5-1-1-5M32 23l-5 1 1 5M8 23l5 1-1 5M32 17l-5-1 1-5"/></g></svg>
+					<svg class="gc-holly" viewBox="0 0 64 40" aria-hidden="true"><path class="lf" d="M31 22c-4-9-13-14-26-13 2 3 0 5 3 7-2 2 1 4-1 6 3 1 3 4 6 4 1 3 5 2 7 4 3-3 8-4 11-8z"/><path class="lf" d="M33 22c4-9 13-14 26-13-2 3 0 5-3 7 2 2-1 4 1 6-3 1-3 4-6 4-1 3-5 2-7 4-3-3-8-4-11-8z"/><circle class="br" cx="27.5" cy="24" r="4.2"/><circle class="br" cx="36.5" cy="24" r="4.2"/><circle class="br" cx="32" cy="17" r="4.2"/></svg>
 					<div class="gc-pic"><canvas id="g-canvas" width="800" height="600" aria-label="The calendar, showing a message for them"></canvas></div>
 					<div class="gc-words">
-						<div class="gc-kicker">Something good is on its way</div>
+						<div class="gc-kicker" id="c-kicker">Something good is on its way</div>
 						<div class="gc-to" id="c-to"></div>
 						<p class="gc-msg" id="c-msg"></p>
 						<div class="gc-from" id="c-from"></div>
@@ -62,6 +71,9 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 <script>
 	import { renderPreview, paintScreen } from '../lib/eink/previewKit';
 	import { sanitizeLayout } from '../lib/eink/builder/model';
+	import { drawListFor, loadFonts } from '../lib/eink/previewKit';
+	import { renderDrawList } from '../lib/eink/preview';
+	import { addFestive } from '../lib/eink/festive';
 
 	const root = document.querySelector<HTMLElement>('.gp');
 	if (root) {
@@ -77,27 +89,60 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 		// the calendar's own screen, saying who it's for
 		const W = (t: string, x: number, y: number, w: number, h: number, o: Record<string, string | boolean>) => ({ id: 'g' + x + y, t, x, y, w, h, o });
 		let drawing = 0;
+		// Festive or plain. Festive is the default until Christmas Day.
+		const xmasNow = (() => {
+			const n = new Date();
+			return n.getMonth() === 10 || (n.getMonth() === 11 && n.getDate() <= 25);
+		})();
+		let festive = xmasNow;
+		const styleEls = document.querySelectorAll<HTMLInputElement>('input[name="g-style"]');
+		styleEls.forEach((r) => {
+			r.checked = r.value === (festive ? 'festive' : 'plain');
+			r.addEventListener('change', () => {
+				festive = r.value === 'festive' && r.checked ? true : r.value === 'plain' && r.checked ? false : festive;
+				sync();
+				drawScreen();
+			});
+		});
 		async function drawScreen() {
 			const n = ++drawing;
 			const name = to.value.trim();
-			const layout = sanitizeLayout({
-				v: 1,
-				widgets: [
-					W('box', 0, 0, 400, 34, { fill: 'solid' }),
-					W('text', 12, 4, 376, 26, { text: 'A GIFT', light: true, bold: true, size: 's', valign: 'middle' }),
-					W('text', 40, 52, 320, 118, { text: name ? `For ${name}` : 'For you', bold: true, size: 'auto', align: 'center' }),
-					W('line', 150, 182, 100, 2, { thick: '2' }),
-					W('text', 16, 196, 368, 30, { text: 'Your day, on paper', size: 'm', align: 'center' }),
-					W('text', 16, 228, 368, 24, { text: 'that updates itself', size: 'm', align: 'center' }),
-					W('text', 16, 266, 368, 22, { text: 'Arriving by the end of February', size: 's', align: 'center' }),
-				],
-			});
+			const layout = sanitizeLayout(
+				festive
+					? {
+							v: 1,
+							// inside the festive border: nothing within 20 dots of the edge
+							widgets: [
+								W('text', 34, 34, 332, 30, { text: 'Merry Christmas', size: 'm', align: 'center', valign: 'middle' }),
+								W('text', 40, 66, 320, 104, { text: name ? `For ${name}` : 'For you', bold: true, size: 'auto', align: 'center' }),
+								W('line', 150, 182, 100, 2, { thick: '2' }),
+								W('text', 30, 196, 340, 30, { text: 'Your day, on paper', size: 'm', align: 'center' }),
+								W('text', 30, 228, 340, 24, { text: 'that updates itself', size: 'm', align: 'center' }),
+								W('text', 30, 256, 340, 20, { text: 'Arriving by the end of February', size: 's', align: 'center' }),
+							],
+						}
+					: {
+							v: 1,
+							widgets: [
+								W('box', 0, 0, 400, 34, { fill: 'solid' }),
+								W('text', 12, 4, 376, 26, { text: 'A GIFT', light: true, bold: true, size: 's', valign: 'middle' }),
+								W('text', 40, 52, 320, 118, { text: name ? `For ${name}` : 'For you', bold: true, size: 'auto', align: 'center' }),
+								W('line', 150, 182, 100, 2, { thick: '2' }),
+								W('text', 16, 196, 368, 30, { text: 'Your day, on paper', size: 'm', align: 'center' }),
+								W('text', 16, 228, 368, 24, { text: 'that updates itself', size: 'm', align: 'center' }),
+								W('text', 16, 266, 368, 22, { text: 'Arriving by the end of February', size: 's', align: 'center' }),
+							],
+						},
+			);
 			try {
-				const r = await renderPreview({ style: 'custom', custom: layout, dark: false, hasWeather: false, vbat: 4.1 });
+				const opts = { style: 'custom', custom: layout, dark: false, hasWeather: false, vbat: 4.1 } as const;
+				const r = festive ? renderDrawList(addFestive(drawListFor(opts as any), 'sans', ''), await loadFonts()) : await renderPreview(opts as any);
 				if (n === drawing) paintScreen(canvas, r.px, { mode: 'device', width: 1400, bare: true });
 			} catch {}
 		}
 		function sync() {
+			$('gcard').classList.toggle('festive', festive);
+			$('c-kicker').textContent = festive ? 'Merry Christmas' : 'Something good is on its way';
 			$('c-to').textContent = to.value.trim() ? `For ${to.value.trim()}` : 'For you';
 			$('c-msg').textContent = msg.value.trim();
 			$('c-from').textContent = from.value.trim() ? `From ${from.value.trim()}` : '';
@@ -139,6 +184,12 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 	.gp-field > span { font-size: 0.75em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 	.gp-field input, .gp-field textarea { width: 100%; box-sizing: border-box; padding: 0.7em 0.85em; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-raised); color: var(--fg); font: inherit; resize: vertical; }
 	.gp-field input:focus, .gp-field textarea:focus { outline: none; border-color: var(--accent); }
+	.gp-seg { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-raised); width: max-content; }
+	.gp-seg label { cursor: pointer; }
+	.gp-seg input { position: absolute; opacity: 0; pointer-events: none; }
+	.gp-seg span { display: block; padding: 0.45em 1.1em; border-radius: 999px; font-weight: 700; font-size: 0.92em; color: var(--muted); }
+	.gp-seg input:checked + span { background: var(--fg); color: var(--bg); }
+	.gp-seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.gp-btn { display: inline-block; margin-top: 0.4em; padding: 0.8em 1.6em; border: none; border-radius: 999px; background: var(--fg); color: var(--bg); font: inherit; font-weight: 700; text-decoration: none; }
 	.gp-btn:hover { background: var(--accent); color: var(--bg); }
 	.gp-fine { color: var(--muted); font-size: 0.82em; line-height: 1.5; margin-top: 1.2em; }
@@ -162,6 +213,18 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 		print-color-adjust: exact;
 	}
 	.gc-pic { display: grid; place-items: center; }
+	/* festive: a red kicker, holly by the words, snowflakes in two corners and a fine red line inside the edge */
+	.gcard { position: relative; overflow: hidden; }
+	.gc-deco, .gc-holly { display: none; position: absolute; pointer-events: none; }
+	.gcard.festive .gc-deco, .gcard.festive .gc-holly { display: block; }
+	.gcard.festive { box-shadow: inset 0 0 0 2.2mm #f6f1e7, inset 0 0 0 2.5mm #9b2226, 0 1px 0 rgba(0, 0, 0, 0.04), 0 18px 40px -18px rgba(40, 30, 10, 0.35); }
+	.gc-deco { width: 9mm; height: 9mm; color: #9b2226; opacity: 0.55; }
+	.gc-deco-a { right: 6mm; top: 6mm; }
+	.gc-deco-b { left: 72mm; bottom: 5.5mm; width: 6mm; height: 6mm; opacity: 0.4; }
+	.gc-holly { right: 17mm; top: 5.5mm; width: 13mm; height: 8mm; }
+	.gc-holly .lf { fill: #2f5d3a; }
+	.gc-holly .br { fill: #b3262d; }
+	.gcard.festive .gc-kicker { color: #9b2226; font-weight: 700; }
 	.gc-pic canvas { width: 100%; height: auto; display: block; filter: drop-shadow(0 1.6mm 2.2mm rgba(40, 25, 10, 0.32)); }
 	.gc-words { display: flex; flex-direction: column; min-width: 0; }
 	.gc-kicker { font-size: 2.6mm; letter-spacing: 0.16em; text-transform: uppercase; color: #6b655a; margin-bottom: 3mm; }

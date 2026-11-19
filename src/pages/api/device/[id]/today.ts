@@ -19,6 +19,9 @@ import { pickScreen, secondsToNextEventEdge } from '../../../../lib/screens';
 import { activeMessages, sanitizeCfg, secondsToNextCheck, secondsToNextExpiry } from '../../../../lib/messages';
 export const prerender = false;
 import { NO_GOOGLE } from '../../../../lib/googleCals';
+import { sanitizeDeco, type FrameDeco } from '../../../../lib/eink/festive';
+import { getStatus, activeStatus } from '../../../../lib/deskStatus';
+import { fetchBirthdays, mergeBirthdays, type Birthday } from '../../../../lib/birthdays';
 
 function getCookielessAuthSecret(request: Request): string | null {
 	const header = request.headers.get('Authorization') || '';
@@ -462,7 +465,7 @@ export async function GET({ params, request, locals }) {
 	// One of Your designs (schema-designs.sql): "design:<id>".
 	const designId = designIdOf(style);
 	if (designId && proto === '2') customLayout = (await getDesign(db, deviceId, designId))?.layout ?? null;
-	const needs = style === 'planner' ? { tasks: true, countdown: false, picture: false, live: false } : layoutNeeds(customLayout);
+	const needs = style === 'planner' ? { ...layoutNeeds(null), tasks: true } : layoutNeeds(customLayout);
 	// Meeting room and Desk name plate show free / busy, so they wake when meetings start and end.
 	if (LIVE_SIGNS.includes(style)) needs.live = true;
 	// The words on a sign (schema-screens.sql).
@@ -496,6 +499,13 @@ export async function GET({ params, request, locals }) {
 			tasks = r.tasks;
 			tasksState = r.state;
 		}
+	}
+
+	// Birthdays widget: Google contacts' birthdays, plus any "… birthday" on the calendars read
+	let birthdays: Birthday[] = [];
+	if (needs.birthdays && proto === '2') {
+		const g = (await googleToken()) ? [] : await fetchBirthdays(accessToken, rightNow.getTime(), 62);
+		birthdays = mergeBirthdays(g, allEvents);
 	}
 
 	// Dark mode (white on black), from schema-darkmode.sql. Its own query so a
@@ -603,6 +613,10 @@ export async function GET({ params, request, locals }) {
 		// Countdown name + date, and the Photo frame picture (schema-layouts.sql). Only read for those layouts.
 		let countdown: { title: string; date: string } | null = null;
 		let frameImage: Uint8Array | null = null;
+		let frameDeco: FrameDeco | null = null;
+		// a status set from a phone for the desk name plate (src/lib/deskStatus.ts)
+		const desk = needs.live || isSignStyle(style) ? await getStatus(db, deviceId) : null;
+		const deskNow = activeStatus(desk, now);
 		try {
 			if (style === 'countdown' || needs.countdown) {
 				const c = await db.prepare('SELECT countdown_title, countdown_date FROM devices WHERE id = ?').bind(deviceId).first();
@@ -611,6 +625,10 @@ export async function GET({ params, request, locals }) {
 				const f = await db.prepare('SELECT frame_bits FROM devices WHERE id = ?').bind(deviceId).first();
 				const bytes = f?.frame_bits ? b64ToBytes(f.frame_bits) : null;
 				if (bytes && bytes.length === FRAME_BYTES) frameImage = bytes;
+				try {
+					const fd = await db.prepare('SELECT frame_deco FROM devices WHERE id = ?').bind(deviceId).first();
+					frameDeco = sanitizeDeco(fd?.frame_deco);
+				} catch {} // no festive border saved yet
 			}
 		} catch {}
 		const nowLocal = Math.floor(effNowMs / 1000) + offsetSec;
@@ -632,6 +650,8 @@ export async function GET({ params, request, locals }) {
 			utcOffsetSec: offsetSec,
 			countdown,
 			frameImage,
+			frameDeco,
+			deskStatus: deskNow ? { text: deskNow.text, untilLocal: deskNow.until === null ? null : deskNow.until + offsetSec } : null,
 			tasks,
 			tasksState,
 			custom: customLayout,
@@ -639,6 +659,7 @@ export async function GET({ params, request, locals }) {
 			messages: msgs.map((m) => ({ author: m.author, body: m.body, atLocal: m.createdAt + offsetSec })),
 			reminders,
 			habits,
+			birthdays,
 		}, fontChoice ?? undefined);
 		// How long to sleep: the layout's own answer, but wake sooner for a scheduled screen change,
 		// and (for a "Free or busy" widget) when a meeting starts or ends.
@@ -652,6 +673,12 @@ export async function GET({ params, request, locals }) {
 		// wake to look for new messages, and to take one off the screen when it runs out
 		const check = secondsToNextCheck(msgCfg.check, nowLocal);
 		if (check !== null) sleepSec = Math.min(sleepSec, Math.max(60, check));
+		// with a desk status link: look for a new status every so often in the day, and wake when one runs out
+		if (desk) {
+			const c = secondsToNextCheck(desk.check, nowLocal);
+			if (c !== null) sleepSec = Math.min(sleepSec, Math.max(60, c));
+			if (deskNow?.until) sleepSec = Math.min(sleepSec, Math.max(60, deskNow.until - now + 5));
+		}
 		const expiry = secondsToNextExpiry(msgs, now);
 		if (expiry !== null) sleepSec = Math.min(sleepSec, Math.max(60, expiry + 5));
 		// School day switches to tomorrow at 6 pm
