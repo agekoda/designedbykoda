@@ -504,7 +504,7 @@ export async function GET({ params, request, locals }) {
 	// Birthdays widget: Google contacts' birthdays, plus any "… birthday" on the calendars read
 	let birthdays: Birthday[] = [];
 	if (needs.birthdays && proto === '2') {
-		const g = (await googleToken()) ? [] : await fetchBirthdays(accessToken, rightNow.getTime(), 62);
+		const g = (await googleToken()) ? [] : await fetchBirthdays(accessToken, calendarIds, rightNow.getTime(), 62, offsetSec);
 		birthdays = mergeBirthdays(g, allEvents);
 	}
 
