@@ -4,6 +4,7 @@
 import { isStyleId, isRefreshSec, DEFAULT_STYLE } from '../../../data/calendarStyles';
 import { sanitizeReminders } from '../../../lib/eink/reminders';
 import { sanitizeHabits } from '../../../lib/eink/habits';
+import { settledAnchor } from '../../../lib/eink/batteryLife';
 import { isFamily } from '../../../lib/eink/fonts';
 import { b64ToBytes, decodePic, FRAME_BYTES, cleanSettings } from '../../../lib/eink/image';
 import { cleanText } from '../../../lib/eink/draw';
@@ -95,7 +96,7 @@ export async function GET({ request, locals }) {
 		const sq = await db.prepare('SELECT schedule, battery_anchor_mv, battery_anchor_at, sign_cfg FROM devices WHERE id = ?').bind(deviceId).first();
 		sign = sanitizeSign(sq?.sign_cfg);
 		schedule = sanitizeSchedule(sq?.schedule, isStyleId);
-		if (sq?.battery_anchor_mv && sq?.battery_anchor_at) batteryAnchor = { mv: sq.battery_anchor_mv, at: sq.battery_anchor_at };
+		if (sq?.battery_anchor_mv && sq?.battery_anchor_at) batteryAnchor = await settledAnchor(db, deviceId, sq.battery_anchor_at);
 	} catch {
 		screensReady = false;
 	}
