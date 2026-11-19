@@ -99,7 +99,7 @@ if (userId && hasDevice && !addingDevice) {
 						<section class="step" data-step="calendars">
 							<div class="step-kicker">Step 3</div>
 							<div class="step-title">Pick your calendars</div>
-							<p class="step-text">Choose which ones your calendar should show.</p>
+							<p class="step-text">Choose which ones your calendar should show. Only using a school timetable, Outlook or another calendar link? Untick them all and add it in Settings once you’re set up.</p>
 							<div id="calendar-list" class="cal-list">
 								<p class="loading-text">Loading your calendars…</p>
 							</div>
@@ -298,7 +298,8 @@ if (userId && hasDevice && !addingDevice) {
 			});
 
 		saveCals.addEventListener('click', async () => {
-			const ids = Array.from(list.querySelectorAll<HTMLInputElement>('input:checked')).map((el) => el.value);
+			const picked = Array.from(list.querySelectorAll<HTMLInputElement>('input:checked')).map((el) => el.value);
+			const ids = picked.length ? picked : ['-']; // none: only timetables and other calendar links
 			saveCals.disabled = true;
 			setMsg(calMsg, '');
 			const r = await post('/api/dashboard/devices', { deviceId, calendarIds: ids });
