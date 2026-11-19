@@ -19,18 +19,18 @@ export const DEFAULT_STYLE = 'agenda';
 
 export const CALENDAR_STYLES: CalendarStyle[] = [
 	{ id: 'agenda', label: 'Agenda', note: 'Today, a mini month and your next events', image: '/images/polls/eink-styles/agenda.png', imageDark: '/images/polls/eink-styles/agenda-dark.png', view: 3, corner: true },
-	{ id: 'moon', label: 'Moon & Sun', note: "Tonight's moon, plus sunrise and sunset", image: '/images/polls/eink-styles/moon.png', imageDark: '/images/polls/eink-styles/moon-dark.png', view: 9, setup: false },
+	{ id: 'tomorrow', label: 'School day', note: "Today's classes, then tomorrow's from 6 pm, with rooms, what to bring and what's due", image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 23, setup: false },
 	{ id: 'timeline', label: 'Timeline', note: 'Your day as hour blocks, with a moving "now" bar', image: '/images/polls/eink-styles/timeline.png', imageDark: '/images/polls/eink-styles/timeline-dark.png', view: 8 },
 	{ id: 'quote', label: 'Quote', note: 'A new quote every day', image: '/images/polls/eink-styles/quote.png', imageDark: '/images/polls/eink-styles/quote-dark.png', view: 10, setup: false },
 	{ id: 'nextup', label: 'Next up', note: 'Your very next event, big and clear', image: '/images/polls/eink-styles/nextup.png', imageDark: '/images/polls/eink-styles/nextup-dark.png', view: 7 },
 	{ id: 'todo', label: 'To-do', note: 'Your Google Tasks, with tick boxes', image: '/images/polls/eink-styles/todo.png', imageDark: '/images/polls/eink-styles/todo-dark.png', view: 13, setup: false },
-	{ id: 'planner', label: 'Planner', note: 'This week, your events and your to-do list', image: '/images/polls/eink-styles/planner.png', imageDark: '/images/polls/eink-styles/planner-dark.png', view: 15, setup: false },
+	{ id: 'moon', label: 'Moon & Sun', note: "Tonight's moon, plus sunrise and sunset", image: '/images/polls/eink-styles/moon.png', imageDark: '/images/polls/eink-styles/moon-dark.png', view: 9, setup: false },
 	{ id: 'countdown', label: 'Countdown', note: 'Days until something you are looking forward to', image: '/images/polls/eink-styles/countdown.png', imageDark: '/images/polls/eink-styles/countdown-dark.png', view: 11, setup: false },
 	{ id: 'messages', label: 'Message board', note: 'Messages sent from the dashboard or a shared link', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 19, setup: false },
 	{ id: 'reminders', label: 'Reminders', note: 'Bin day and other things that repeat', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 20, setup: false },
 	{ id: 'habits', label: 'Habits', note: 'Streaks for the things you do every day', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 21, setup: false },
 	{ id: 'notes', label: 'Notes', note: 'Notes from the family, pinned up like paper', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 22, setup: false },
-	{ id: 'tomorrow', label: 'School day', note: "Today's classes, then tomorrow's from 6 pm, with rooms, what to bring and what's due", image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 23, setup: false },
+	{ id: 'planner', label: 'Planner', note: 'This week, your events and your to-do list', image: '/images/polls/eink-styles/planner.png', imageDark: '/images/polls/eink-styles/planner-dark.png', view: 15, setup: false },
 	{ id: 'timetable', label: 'School week', note: 'Monday to Friday like a printed timetable, today in black', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 24, setup: false },
 	{ id: 'frame', label: 'Photo frame', note: 'Your own picture, edge to edge', image: '/images/polls/eink-styles/frame.png', imageDark: '/images/polls/eink-styles/frame-dark.png', view: 12, frame: true, setup: false },
 	{ id: 'room', label: 'Meeting room', note: 'Free or in use, and today\'s bookings', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 16, sign: true, setup: false },
@@ -51,7 +51,7 @@ export const REFRESH_CHOICES = [
 	{ sec: 3600, label: 'Hourly' },
 ];
 export const isRefreshSec = (v: unknown): v is number => REFRESH_CHOICES.some((c) => c.sec === v);
-export const LIVE_STYLES = ['timeline'];
+export const LIVE_STYLES = ['timeline', 'timetable'];
 
 export function viewForStyle(id: unknown): number {
 	if (isDesignStyle(id)) return 14;

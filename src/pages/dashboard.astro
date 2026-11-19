@@ -256,7 +256,6 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 					<div class="label">Timetables and other calendars</div>
 					<div class="feed-list" data-feeds></div>
 					<button type="button" class="link feed-add" data-feed-add>+ Add a school timetable or calendar</button>
-					<button type="button" class="link feed-add" data-classes hidden>Name your classes</button>
 				</div>
 			</div>
 			<div class="dev-body">
@@ -429,7 +428,7 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 		};
 		let drawFeeds = () => {
 			feedBox.innerHTML = feeds
-				.map((f) => `<div class="feed" data-id="${esc(f.id)}"><span class="feed-ico" aria-hidden="true">${f.kind === 'file' ? '▤' : '↻'}</span><span class="feed-t"><span class="feed-name">${esc(f.name)}</span><span class="feed-sub">${f.kind === 'file' ? 'File' : esc(f.host || 'Link')} · ${feedLine(f)}</span></span><button type="button" class="feed-edit" data-names>Name classes</button><button type="button" class="feed-del" data-del aria-label="Remove ${esc(f.name)}">&times;</button></div>`)
+				.map((f) => `<div class="feed" data-id="${esc(f.id)}"><span class="feed-ico" aria-hidden="true">${f.kind === 'file' ? '▤' : '↻'}</span><span class="feed-t"><span class="feed-name">${esc(f.name)}</span><span class="feed-sub">${f.kind === 'file' ? 'File' : esc(f.host || 'Link')} · ${feedLine(f)}</span><button type="button" class="feed-edit feed-under" data-names>Name classes</button></span><button type="button" class="feed-del" data-del aria-label="Remove ${esc(f.name)}">&times;</button></div>`)
 				.join('');
 			feedAdd.hidden = feeds.length >= feedMax;
 		};
@@ -522,14 +521,6 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 		}
 
 		// class names for school timetables (src/lib/classes.ts)
-		const clsBtn = el.querySelector('[data-classes]') as HTMLButtonElement;
-		const showClsBtn = () => (clsBtn.hidden = !feeds.length);
-		const _drawFeeds = drawFeeds;
-		drawFeeds = () => {
-			_drawFeeds();
-			showClsBtn();
-		};
-		clsBtn.addEventListener('click', () => openClasses(false));
 		// after adding a timetable (justAdded) it opens by itself, with Skip; it stays quiet when there are no classes
 		async function openClasses(justAdded: boolean) {
 			if (!justAdded) flash(note, 'Loading your classes…');
@@ -1000,6 +991,7 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 	.dash .daycfg .feed-list:not(:empty) { margin-bottom: 0.2em; }
 	.dash .feed-edit { background: none; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font: inherit; font-size: 0.78em; font-weight: 600; padding: 0.3em 0.8em; white-space: nowrap; }
 	.dash .feed-edit:hover { color: var(--fg); border-color: var(--muted); }
+	.dash .feed-edit.feed-under { justify-self: start; margin-top: 0.45em; }
 	.dc-dlg { margin: -0.4em 0 0.4em; }
 	.dc-dlg .dc-f { display: grid; gap: 0.35em; margin-bottom: 0.9em; }
 	.dc-dlg .dc-f > span { font-size: 0.75em; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }

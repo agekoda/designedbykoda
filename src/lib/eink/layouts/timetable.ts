@@ -162,7 +162,7 @@ export function timetable(ctx: LayoutCtx): string {
 	// now line on today
 	const nowS = ((ctx.nowLocal % 86400) + 86400) % 86400;
 	const ti = days.indexOf(today);
-	if (ti >= 0 && nowS > lo && nowS < hi) {
+	if (ti >= 0 && nowS > lo && nowS < hi && (ctx.refreshSec ?? 86400) < 86400) {
 		const y = Math.round(yOf(nowS));
 		const x = Math.round(GX + ti * colW);
 		d.fill(x - 2, y - 1, colW + 2, 3, INK);
