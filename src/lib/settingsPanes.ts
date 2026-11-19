@@ -100,7 +100,7 @@ export function mountCalendars(box: HTMLElement, d: any, all: any[] | null, toas
 	}
 	const sel: string[] = d.calendarIds?.length ? d.calendarIds : all.filter((c) => c.primary).map((c) => c.id);
 	box.innerHTML = `<div class="sp-list">${all
-		.map((c) => `<label class="sp-row sp-check"><input type="checkbox" value="${esc(c.id)}" ${sel.includes(c.id) ? 'checked' : ''} /><span class="sp-box" aria-hidden="true"></span><span class="sp-t">${esc(c.summary)}${c.primary ? ' <span class="sp-tag">Primary</span>' : ''}</span></label>`)
+		.map((c) => `<label class="sp-row sp-check"><input type="checkbox" value="${esc(c.id)}" ${sel.includes(c.id) ? 'checked' : ''} /><span class="sp-box" aria-hidden="true"></span><span class="sp-t sp-inline"><span>${esc(c.summary)}</span>${c.primary ? '<span class="sp-tag">Primary</span>' : ''}</span></label>`)
 		.join('')}</div>`;
 	let timer: any;
 	box.addEventListener('change', (e) => {

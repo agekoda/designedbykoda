@@ -101,6 +101,15 @@ function wrapLines(fam: LayoutCtx['family'], role: 's' | 'sb', text: string, max
 	return lines;
 }
 
+// Draws `text` wrapped onto up to `maxLines` lines from baseline y; returns the baseline after it.
+function para(d: Draw, fam: LayoutCtx['family'], x: number, y: number, role: 's' | 'sb', text: string, maxW: number, maxLines = 2, lh = 17): number {
+	for (const ln of wrapLines(fam, role, text, maxW, maxLines)) {
+		d.text(x, y, role, ln, { maxW });
+		y += lh;
+	}
+	return y;
+}
+
 const pad2 = (n: number) => String(n).padStart(2, '0');
 function hhmm(h: number): string {
 	return minutesText(h * 60);
@@ -232,7 +241,14 @@ export function timeline(ctx: LayoutCtx): string {
 	} else if (!live) {
 		d.text(px, 62, 's', 'TODAY');
 		d.text(px, 94, 'mb', `${timed.length} ${timed.length === 1 ? 'event' : 'events'}`, { maxW: colW });
-		d.text(px, 116, 's', rangeText(timed[0].s * 60, Math.max(...timed.map((t) => t.e)) * 60), { maxW: colW });
+		const a = timed[0].s, b = Math.max(...timed.map((t) => t.e));
+		const r = rangeText(a * 60, b * 60);
+		// "9:30 am - 4:15 pm" doesn't fit with a 12-hour clock: two lines
+		if (measure(fam, 's', r).w <= colW) d.text(px, 116, 's', r, { maxW: colW });
+		else {
+			d.text(px, 116, 's', `${hhmm(a)} -`, { maxW: colW });
+			d.text(px, 133, 's', hhmm(b), { maxW: colW });
+		}
 	} else {
 		const cur = timed.find((t) => t.s <= nowH && nowH < t.e);
 		const nxt = timed.find((t) => t.s > nowH);
@@ -243,8 +259,8 @@ export function timeline(ctx: LayoutCtx): string {
 				d.text(px, y, 'sb', ln, { maxW: colW });
 				y += 18;
 			}
-			d.text(px, y + 4, 's', firstThatFits(fam, 's', [`until ${hhmm(cur.e)}`, `to ${hhmm(cur.e)}`], colW));
-			if (nxt) d.text(px, y + 40, 's', firstThatFits(fam, 's', [`Next ${hhmm(nxt.s)}`, hhmm(nxt.s)], colW));
+			y = para(d, fam, px, y + 4, 's', `until ${hhmm(cur.e)}`, colW);
+			if (nxt && y + 18 < 236) para(d, fam, px, y + 14, 's', `Next ${hhmm(nxt.s)}`, colW);
 		} else if (nxt) {
 			d.text(px, 62, 's', 'NEXT');
 			d.text(px, 94, 'mb', hhmm(nxt.s), { maxW: colW });
@@ -253,7 +269,7 @@ export function timeline(ctx: LayoutCtx): string {
 				d.text(px, y, 's', ln, { maxW: colW });
 				y += 18;
 			}
-			d.text(px, y + 4, 's', barOn ? untilText(Math.round((nxt.s - nowH) * 60)) : `at ${hhmm(nxt.s)}`, { maxW: colW });
+			para(d, fam, px, y + 4, 's', barOn ? untilText(Math.round((nxt.s - nowH) * 60)) : `at ${hhmm(nxt.s)}`, colW);
 		} else {
 			d.text(px, 62, 's', 'TODAY');
 			d.text(px, 94, 'mb', 'All done', { maxW: colW });

@@ -689,6 +689,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	// ---------------------------------------------------------------- drawing the previews
 	let pending = false;
 	let thumbsDirty = true;
+	let stylesDirty = true;
+	let fontsDirty = true;
+	let thumbGen = 0;
+	const paneHidden = (id: string) => !!document.querySelector<HTMLElement>(`.pane[data-pane="${id}"]`)?.hidden;
 	function schedule(thumbs = true) {
 		if (thumbs) thumbsDirty = true;
 		if (pending) return;
@@ -713,13 +717,26 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			paintScreen(screen, r.px, { mode: 'device', scale: k });
 			screen.style.width = availCss + 'px';
 			if (thumbsDirty) {
+				stylesDirty = fontsDirty = true;
 				thumbsDirty = false;
+			}
+			// Only the cards on show are drawn, a few at a time so the page stays smooth; the rest
+			// wait until their section is opened.
+			if (stylesDirty && !paneHidden('screen')) {
+				stylesDirty = false;
+				const gen = ++thumbGen;
+				let n = 0;
 				for (const s of styles) {
 					const cv = picker.querySelector<HTMLCanvasElement>(`canvas[data-sid="${s.id}"]`);
 					if (!cv) continue;
 					const t = await renderPreview({ ...common, style: renderId(s.id), ...extras(s.id, true) });
+					if (gen !== thumbGen) break; // something changed again: a newer pass is on its way
 					paintScreen(cv, t.px, { mode: 'screen', scale: 1 });
+					if (++n % 3 === 0) await new Promise((r) => setTimeout(r, 0));
 				}
+			}
+			if (fontsDirty && !paneHidden('look')) {
+				fontsDirty = false;
 				const fonts = await loadFonts();
 				for (const f of families) {
 					const cv = fontsEl.querySelector<HTMLCanvasElement>(`canvas[data-fid="${f.id}"]`);
@@ -1158,9 +1175,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 					})
 					.join('');
 				const s = habitStreak(h, today);
-				return `<div class="slot hab" data-i="${i}">
-					<div class="sl-top"><input class="txt hab-name" type="text" maxlength="${MAX_HABIT_NAME}" value="${escHtml(h.name)}" placeholder="Read 20 pages" aria-label="Habit" autocomplete="off" /><button type="button" class="sl-del" aria-label="Remove">&times;</button></div>
-					<div class="hab-when"><div class="sl-days" role="group" aria-label="Done on these days (the last week)">${ticks}</div><span class="muted small hab-streak">${s === 0 ? 'No streak yet' : s === 1 ? '1 day in a row' : s + ' days in a row'}</span></div>
+				return `<div class="hab hab2" data-i="${i}">
+					<div class="hab2-l"><input class="hab-name hab2-name" type="text" maxlength="${MAX_HABIT_NAME}" value="${escHtml(h.name)}" placeholder="Name it, e.g. Read 20 pages" aria-label="Habit" autocomplete="off" />
+					<div class="hab2-days" role="group" aria-label="Done on these days (the last week)">${ticks}</div></div>
+					<div class="hab2-r"><b>${s}</b><span>${s === 1 ? 'day in a row' : 'days in a row'}</span></div>
+					<button type="button" class="sl-del hab2-del" aria-label="Remove this habit">&times;</button>
 				</div>`;
 			})
 			.join('');
@@ -1701,10 +1720,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		document.querySelectorAll<HTMLElement>('.pane').forEach((p) => (p.hidden = p.dataset.pane !== id));
 		document.querySelectorAll<HTMLElement>('#snav [data-pane]').forEach((b) => b.classList.toggle('on', b.dataset.pane === id));
 		if (push && location.hash !== '#' + id) history.replaceState(null, '', '#' + id);
-		if (id === 'screen') {
-			thumbsDirty = true;
-			schedule();
-		}
+		if (id === 'screen' || id === 'look') schedule();
 		if (id === 'classes' && sideDevice) mountClasses($('sp-classes'), sideDevice, toast);
 		if (innerWidth < 900) $('panes').scrollIntoView({ block: 'start', behavior: 'smooth' });
 	}
@@ -2165,11 +2181,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 
 	html.has-custom-cursor .cust, html.has-custom-cursor .cust * { cursor: none !important; }
 
-	@media (max-width: 1200px) {
-		.cust .stage { grid-template-columns: 250px minmax(0, 1fr); }
-		.cust .left { grid-column: 1 / -1; order: 0; position: static; max-width: 640px; }
-	}
-	@media (max-width: 960px) {
+	@media (max-width: 720px) {
 		.cust .stage { grid-template-columns: 1fr; }
 		.cust .left { position: static; order: -1; }
 		.cust .snav { position: static; display: flex; overflow-x: auto; gap: 0.3em; padding: 0.5em; border-radius: 14px; }
@@ -2246,4 +2258,54 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust #opt-msgs .btn { margin-top: 0.8em; }
 	.cust .design-acts { display: flex; gap: 0.5em; flex-wrap: wrap; }
 	.cust #design-share[hidden] { display: none; }
+
+	/* ---- full width: menu at the left edge, preview at the right, the section in between ---- */
+	.cust { width: calc(100vw - 2.4em); }
+	.cust .stage { grid-template-columns: clamp(180px, 17vw, 300px) minmax(0, 1fr) clamp(240px, 32vw, 720px); gap: clamp(0.7em, 1.6vw, 1.6em); }
+	.cust .snav button { white-space: normal; line-height: 1.25; }
+	.cust .left { grid-column: auto; max-width: none; }
+	@media (max-width: 720px) {
+		.cust { width: calc(100vw - 1.6em); }
+		.cust .stage { grid-template-columns: 1fr; }
+		.cust .snav, .cust .left, .cust .panes { grid-column: 1; grid-row: auto; }
+		.cust .snav button { white-space: nowrap; }
+	}
+	.cust .fonts { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+	.cust .fnt-name { overflow-wrap: anywhere; }
+	/* Choose a screen: as many cards to a row as fit, the chosen one marked */
+	.cust .picker-inline .layouts { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.7em; }
+	.cust .picker-inline .lay-card { position: relative; }
+	.cust .picker-inline input:checked + .lay-card::before { content: '✓ Chosen'; position: absolute; top: 0.9em; left: 0.9em; z-index: 1; padding: 0.2em 0.6em; border-radius: 999px; background: var(--accent); color: var(--bg); font-size: 0.7em; font-weight: 800; }
+	.cust .picker-inline .lay-note { font-size: 0.72em; }
+	/* Google calendars: the Primary pill sits after the name */
+	.sp-inline { display: flex; align-items: center; gap: 0.6em; flex-wrap: wrap; }
+	.sp-inline .sp-tag { margin-left: 0; }
+	#sp-weather .sp-hint { margin-top: 1.1em; }
+	/* habits, like a tracker: name, the last week as circles, the streak */
+	.cust .pane[data-pane='habits'] > .box { background: none; border: 0; padding: 0; }
+	.cust #hab-list { display: grid; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 1em; }
+	.cust #hab-list:empty { display: none; }
+	.cust .hab2 { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1em; align-items: center; padding: 1em 2.6em 1em 1.1em; border-bottom: 1px solid var(--border); background: var(--bg); }
+	.cust #hab-list .hab2 { margin: 0; border-radius: 0; border-left: 0; border-right: 0; border-top: 0; }
+	.cust .hab2:last-child { border-bottom: 0; }
+	.cust .hab2-name { width: 100%; border: 0; background: none; padding: 0.1em 0; color: var(--fg); font: inherit; font-weight: 800; font-size: 1em; border-bottom: 1px dashed transparent; }
+	.cust .hab2-name:hover { border-bottom-color: var(--border); }
+	.cust .hab2-name:focus { outline: none; border-bottom-color: var(--accent); }
+	.cust .hab2-days { display: flex; gap: 6px; margin-top: 0.6em; flex-wrap: wrap; }
+	.cust .hab2 .day { width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 1px solid var(--border); background: none; color: var(--muted); font: inherit; font-size: 0.72em; font-weight: 800; }
+	.cust .hab2 .day.on { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+	.cust .hab2 .day.today { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--muted); }
+	.cust .hab2 .day.today.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--fg); }
+	.cust .hab2-r { text-align: right; display: grid; }
+	.cust .hab2-r b { font-size: 1.5em; line-height: 1.1; color: var(--fg); }
+	.cust .hab2-r span { font-size: 0.78em; color: var(--muted); white-space: nowrap; }
+	.cust .hab2-del { position: absolute; top: 0.5em; right: 0.6em; background: none; border: 0; color: var(--muted-dim); font-size: 1.2em; line-height: 1; padding: 0.1em 0.2em; }
+	.cust .hab2-del:hover { color: var(--fg); }
+	/* when the middle column gets narrow (zoomed in), the streak drops under the circles */
+	.cust .panes { container-type: inline-size; }
+	@container (max-width: 380px) {
+		.cust .hab2 { grid-template-columns: minmax(0, 1fr); gap: 0.5em; }
+		.cust .hab2-r { text-align: left; grid-auto-flow: column; justify-content: start; align-items: baseline; gap: 0.4em; }
+		.cust .hab2 .day { width: 26px; height: 26px; }
+	}
 </style>

@@ -9,6 +9,7 @@ import { batteryIcon } from '../batteryIcon';
 import { dateShort, dayIdx, tmFromDayIdx, tmOf, type LayoutCtx } from '../context';
 import { upcoming } from '../reminders';
 import { tr } from '../i18n';
+import { centred } from './centred';
 
 function vm(fam: Family, role: Role, scale = 1) {
 	const v = VMETRICS[fontId(fam, role)] ?? VMETRICS[fontId('sans', role)];
@@ -93,8 +94,8 @@ export function reminders(ctx: LayoutCtx): string {
 	batteryIcon(d, ctx, 200, 4, 'center', PAPER);
 	if (!ctx.reminders?.some((r) => r.text)) {
 		d.text(200, 140, 'mb', 'Add your reminders', { align: 'center' });
-		d.text(200, 168, 's', 'Bin day, recycling, rent: things that repeat.', { align: 'center' });
-		d.text(200, 186, 's', 'Open Customize display on your dashboard.', { align: 'center' });
+		const y = centred(d, ctx.family, 168, 's', 'Bin day, recycling, rent: things that repeat.');
+		centred(d, ctx.family, y, 's', 'Add them in Settings on your dashboard.');
 		return d.toString();
 	}
 	reminderList(d, ctx, { x: 12, y: 42, w: 376, h: 250 }, { bigToday: true });

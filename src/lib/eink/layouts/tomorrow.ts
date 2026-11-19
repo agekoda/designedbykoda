@@ -5,7 +5,7 @@ import { Draw, INK, PAPER } from '../draw';
 import { fontId, type Family, type Role } from '../fonts';
 import { VMETRICS } from '../vmetrics';
 import { batteryIcon } from '../batteryIcon';
-import { measure } from '../measure';
+import { measure, wrapText } from '../measure';
 import { dateShort, dayAbbr, dayIdx, round0, timeTextOf, tmFromDayIdx, type LayoutCtx } from '../context';
 import { deg } from '../units';
 import { weatherBits, wxKind } from '../weatherIcon';
@@ -93,8 +93,13 @@ export function tomorrow(ctx: LayoutCtx): string {
 		for (const b of bring.slice(0, 4)) {
 			if (ry + bv.lh > 200) break;
 			d.fillRound(X, ry + 3, 5, 5, 1);
-			d.text(X + 10, ry + bv.asc, 'sb', b, { maxW: W - 10 });
-			ry += bv.lh + 1;
+			// two lines when it needs them ("Safety / boots")
+			const lines = wrapText(fam, 'sb', b, W - 10).slice(0, ry + 2 * bv.lh > 200 ? 1 : 2);
+			for (const ln of lines) {
+				d.text(X + 10, ry + bv.asc, 'sb', ln, { maxW: W - 10 });
+				ry += bv.lh;
+			}
+			ry += 1;
 		}
 		ry += 6;
 	}
@@ -103,8 +108,11 @@ export function tomorrow(ctx: LayoutCtx): string {
 		head('DUE SOON');
 		for (const e of due) {
 			if (ry + bv.lh + sv.lh > 298) break;
-			d.text(X, ry + bv.asc, 'sb', e.name ?? e.title, { maxW: W });
-			ry += bv.lh;
+			const lines = wrapText(fam, 'sb', e.name ?? e.title, W).slice(0, ry + 2 * bv.lh + sv.lh > 298 ? 1 : 2);
+			for (const ln of lines) {
+				d.text(X, ry + bv.asc, 'sb', ln, { maxW: W });
+				ry += bv.lh;
+			}
 			d.text(X, ry + sv.asc - 2, 's', whenShort(dayIdx(e.startLocal), today, dayAbbr), { maxW: W });
 			ry += sv.lh + 2;
 		}

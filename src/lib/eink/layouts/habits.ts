@@ -4,14 +4,18 @@
 import { Draw, INK, PAPER, type Color } from '../draw';
 import { fontId, type Family, type Role } from '../fonts';
 import { VMETRICS } from '../vmetrics';
+import { tr } from '../i18n';
+import { wrapText } from '../measure';
 import { batteryIcon } from '../batteryIcon';
 import { dateShort, dayIdx, dayLetter, tmFromDayIdx, tmOf, type LayoutCtx } from '../context';
 import { doneSet, streak } from '../habits';
+import { centred } from './centred';
 
 function vm(fam: Family, role: Role) {
 	const v = VMETRICS[fontId(fam, role)] ?? VMETRICS[fontId('sans', role)];
 	return { asc: v[0], desc: v[3], lh: v[4] };
 }
+
 
 type Box = { x: number; y: number; w: number; h: number };
 const GAP = 3;
@@ -24,7 +28,7 @@ export function habitGrid(d: Draw, ctx: LayoutCtx, box: Box, o: { days?: number;
 	const list = (ctx.habits ?? []).filter((h) => h.name);
 	const sv = vm(fam, 's');
 	if (!list.length) {
-		d.text(box.x + box.w / 2, box.y + box.h / 2, 's', 'No habits yet', { align: 'center', color, maxW: box.w });
+		d.text(box.x + box.w / 2, box.y + box.h / 2, 's', 'No habits yet', { align: 'center', color, maxW: box.w - 4 });
 		return;
 	}
 	const today = dayIdx(ctx.nowLocal);
@@ -96,9 +100,9 @@ export function habits(ctx: LayoutCtx): string {
 	d.text(392, 21, 's', dateShort(tmOf(ctx.nowLocal)), { align: 'right', color: PAPER });
 	batteryIcon(d, ctx, 200, 4, 'center', PAPER);
 	if (!ctx.habits?.some((h) => h.name)) {
-		d.text(200, 140, 'mb', 'Add your habits', { align: 'center' });
-		d.text(200, 168, 's', 'Reading, the gym, water: things to do every day.', { align: 'center' });
-		d.text(200, 186, 's', 'Open Customize display on your dashboard.', { align: 'center' });
+		let y = centred(d, ctx.family, 132, 'mb', 'Add your habits', 360, 26);
+		y = centred(d, ctx.family, y + 6, 's', 'Reading, the gym, water: things to do every day.');
+		centred(d, ctx.family, y, 's', 'Add them in Settings on your dashboard.');
 		return d.toString();
 	}
 	habitGrid(d, ctx, { x: 12, y: 44, w: 376, h: 248 }, { days: 21, letters: true });

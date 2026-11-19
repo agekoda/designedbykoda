@@ -4,6 +4,7 @@ import { measure } from '../measure';
 import { dayIdx, dayShort, DAY_NAMES, MONTH_NAMES, monthShort, tmOf, type LayoutCtx } from '../context';
 import { batteryIcon } from '../batteryIcon';
 import { dateShort, dateLong } from '../context';
+import { centred } from './centred';
 
 export function parseDay(s: string): number | null {
 	const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
@@ -26,8 +27,7 @@ export function countdown(ctx: LayoutCtx): string {
 	const target = c ? parseDay(c.date) : null;
 	if (!c || !c.title.trim() || target === null) {
 		d.text(200, 130, 'mb', 'Set up your countdown', { align: 'center' });
-		d.text(200, 158, 's', 'Open your dashboard, choose Customize,', { align: 'center' });
-		d.text(200, 176, 's', 'then give it a name and a date.', { align: 'center' });
+		centred(d, ctx.family, 158, 's', 'Open Settings on your dashboard, then give it a name and a date.');
 		return d.toString();
 	}
 

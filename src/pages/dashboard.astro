@@ -197,8 +197,11 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 
 				<p class="note" data-note aria-live="polite"></p>
 				<div class="dev-foot">
-					${d.update ? `<a class="link copy-link" href="/dashboard/settings?device=${encodeURIComponent(d.id)}#device">${d.update.asked ? 'Update waiting: press the button' : `Update to ${esc(d.update.version)}`}</a>` : ''}
+					${paired ? `<span class="muted small paired">Paired ${paired}</span>` : ''}
+					${d.firmware ? `<span class="muted small paired">Firmware ${esc(d.firmware)}</span>` : ''}
+					${d.update ? `<button type="button" class="link copy-link" data-update>${d.update.asked ? 'Update waiting: press the button' : `Update to ${esc(d.update.version)}`}</button>` : ''}
 					<button type="button" class="link copy-link" data-copy hidden>Copy settings to…</button>
+					<span data-foot><button type="button" class="link danger-link" data-unpair>Unpair this device</button></span>
 				</div>
 			</div>`;
 
@@ -294,12 +297,12 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 		const drawSummary = (feedNames: string[]) => {
 			const cals = (allCalendars ?? []).filter((c) => (d.calendarIds.length ? d.calendarIds.includes(c.id) : c.primary)).map((c) => c.summary);
 			const src = [...cals, ...feedNames];
-			const parts = [src.length ? src.join(' + ') : 'No calendars chosen'];
+			const parts = [src.length ? `<b>Calendars:</b> ${src.map(esc).join(', ')}` : '<b>Calendars:</b> none chosen'];
 			const dc = d.dayCfg;
 			const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 			if (dc?.away && dc.away.until > today) parts.push('Away until ' + new Date(dc.away.until + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }));
 			else if (dc?.quiet?.on) parts.push('Quiet hours on');
-			sumEl.textContent = parts.join(' · ');
+			sumEl.innerHTML = parts.join(' · ');
 		};
 		let feedNames: string[] = [];
 		(el as any)._draw = () => drawSummary(feedNames);
@@ -331,6 +334,42 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 			setTimeout(() => location.reload(), 900);
 		});
 
+		// over-the-air update: confirm, then the next button press installs it
+		el.querySelector('[data-update]')?.addEventListener('click', async () => {
+			const u = d.update!;
+			const body = document.createElement('div');
+			body.className = 'update-note';
+			body.innerHTML =
+				(u.notes ? `<p><strong>What's new:</strong> ${esc(u.notes)}</p>` : '') +
+				`<p class="muted small">It needs at least a quarter of its battery. If anything goes wrong, it goes back to ${esc(d.firmware || 'the old version')} by itself.</p>`;
+			const ok = await ask('After you click Update now, press the button on the calendar. It shows a progress bar, then restarts by itself. This takes about a minute.', { title: `Update to ${u.version}`, ok: 'Update now', body });
+			if (!ok) return;
+			const res = await post('/api/dashboard/devices/update-now', { id: d.id });
+			if (!res.ok) return flash(note, res.error || 'Could not start the update.', true);
+			flash(note, 'Now press the button on the calendar.');
+			const b = el.querySelector('[data-update]') as HTMLButtonElement | null;
+			if (b) b.textContent = 'Update waiting: press the button';
+			u.asked = true;
+		});
+
+		// unpair: two taps
+		const foot = el.querySelector('[data-foot]') as HTMLElement;
+		const askUnpair = () => {
+			foot.innerHTML = `<span class="confirm-text">Unpair this calendar? It goes back to showing a pairing code.</span><button type="button" class="btn small danger-btn" data-yes>Yes, unpair</button><button type="button" class="btn small ghost" data-no>Cancel</button>`;
+			foot.querySelector('[data-no]')!.addEventListener('click', () => {
+				foot.innerHTML = '<button type="button" class="link danger-link" data-unpair>Unpair this device</button>';
+				foot.querySelector('[data-unpair]')!.addEventListener('click', askUnpair);
+			});
+			foot.querySelector('[data-yes]')!.addEventListener('click', async (e) => {
+				(e.target as HTMLButtonElement).disabled = true;
+				const res = await post('/api/dashboard/devices/unpair', { deviceId: d.id });
+				if (res.ok) {
+					el.className = 'dev gone';
+					el.innerHTML = '<div class="gone-text"><div class="dev-name-static">Unpaired</div><p class="muted">Next time it refreshes (press its button to do it now) it will show a new pairing code. Use <a href="/setup?new=1">Add a device</a> to pair it again.</p></div>';
+				} else flash(note, res.error || 'Could not unpair.', true);
+			});
+		};
+		foot.querySelector('[data-unpair]')!.addEventListener('click', askUnpair);
 		return el;
 	}
 
@@ -600,6 +639,7 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 	.dash .cal-opt { display: flex; align-items: center; gap: 0.8em; padding: 0.65em 0.9em; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--fg); font-size: 0.95em; transition: border-color 0.2s, background 0.2s; }
 	.dash .cal-opt:hover { border-color: var(--muted); }
 	.dash .summary { display: block; margin: 0.7em 0 0; font-size: 0.88em; color: var(--muted); text-decoration: none; line-height: 1.45; }
+	.dash .summary b { color: var(--fg); font-weight: 700; }
 	.dash .summary:hover { color: var(--fg); }
 	.dash .summary:empty { display: none; }
 	.dash .feed-list { display: grid; gap: 0.5em; }

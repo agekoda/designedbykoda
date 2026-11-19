@@ -5,9 +5,11 @@ import { Draw, INK, PAPER, type Color } from '../draw';
 import { fontId, type Family, type Role } from '../fonts';
 import { measure, wrapText } from '../measure';
 import { VMETRICS } from '../vmetrics';
+import { tr } from '../i18n';
 import { batteryIcon } from '../batteryIcon';
 import { dateShort, tmOf, type LayoutCtx, type ScreenMsg } from '../context';
 import { msgWhen } from './messages';
+import { centred } from './centred';
 
 function vm(fam: Family, role: Role, scale = 1) {
 	const v = VMETRICS[fontId(fam, role)] ?? VMETRICS[fontId('sans', role)];
@@ -26,6 +28,7 @@ function fit(fam: Family, text: string, w: number, h: number) {
 	const lines = wrapText(fam, 's', text, w).slice(0, Math.max(1, Math.floor((h - v.asc - v.desc) / v.lh) + 1));
 	return { role: 's' as Role, scale: 1, lines, v };
 }
+
 
 type Box = { x: number; y: number; w: number; h: number };
 
@@ -70,9 +73,8 @@ export function notes(ctx: LayoutCtx): string {
 	batteryIcon(d, ctx, 200, 4, 'center', PAPER);
 	const msgs = (ctx.messages ?? []).slice(0, 4);
 	if (!msgs.length) {
-		d.text(200, 140, 'mb', 'No notes yet', { align: 'center' });
-		d.text(200, 168, 's', 'Send one from your dashboard,', { align: 'center' });
-		d.text(200, 186, 's', "or share your calendar's message link.", { align: 'center' });
+		const y = centred(d, ctx.family, 132, 'mb', 'No notes yet', 360, 26);
+		centred(d, ctx.family, y + 6, 's', "Send one from your dashboard, or share your calendar's message link.");
 		return d.toString();
 	}
 	const X = 10, Y = 44, W = 380, H = 248, G = 12;

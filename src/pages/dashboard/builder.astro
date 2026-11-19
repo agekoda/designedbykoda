@@ -348,7 +348,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	// ---------------------------------------------------------------- dragging and resizing
-	type Drag = { id: string; handle: string | null; sx: number; sy: number; orig: Widget; moved: boolean };
+	type Drag = { again?: boolean; id: string; handle: string | null; sx: number; sy: number; orig: Widget; moved: boolean };
 	let drag: Drag | null = null;
 	const scaleK = () => stage.getBoundingClientRect().width / SCREEN.w;
 
@@ -361,9 +361,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		}
 		const w = find(wb.dataset.id!);
 		if (!w) return;
+		if (wb.querySelector('.inline-edit')) return; // typing in it
+		const wasSelected = sel === w.id;
 		select(w.id);
 		wb.focus({ preventScroll: true });
-		drag = { id: w.id, handle: (t.closest('[data-h]') as HTMLElement | null)?.dataset.h ?? null, sx: e.clientX, sy: e.clientY, orig: { ...w, o: { ...w.o } }, moved: false };
+		drag = { again: wasSelected, id: w.id, handle: (t.closest('[data-h]') as HTMLElement | null)?.dataset.h ?? null, sx: e.clientX, sy: e.clientY, orig: { ...w, o: { ...w.o } }, moved: false };
 		overlay.setPointerCapture(e.pointerId);
 		e.preventDefault();
 	});
@@ -444,12 +446,72 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const endDrag = () => {
 		if (!drag) return;
 		const moved = drag.moved;
+		const again = drag.again && !drag.handle;
+		const id = drag.id;
 		drag = null;
+		// a second, slow click on a selected text box: type straight into it
+		if (!moved && again) setTimeout(() => inlineEdit(id), 0);
 		showGuides(null, null);
 		if (moved) commit();
 	};
 	overlay.addEventListener('pointerup', endDrag);
 	overlay.addEventListener('pointercancel', endDrag);
+
+	// ---------------------------------------------------------------- typing straight into a text box
+	// Click a selected box with words in it (or double-click any) and type; Enter or clicking away
+	// finishes, Escape puts the words back. Shift+Enter for a new line.
+	// the words you see on the box: a text option that is showing and isn't raw data (QR links, Wi-Fi)
+	const textOpt = (w: Widget) =>
+		WIDGETS[w.t].opts.find((o) => o.kind === 'text' && !o.raw && (!o.show || Object.entries(o.show).every(([k, v]) => w.o[k] === v)));
+	function inlineEdit(id: string) {
+		const w = find(id);
+		const el = els.get(id);
+		const od = w && textOpt(w);
+		if (!w || !el || !od || el.querySelector('.inline-edit')) return;
+		const before = String(w.o[od.key] ?? '');
+		const ta = document.createElement('textarea');
+		ta.className = 'inline-edit';
+		ta.value = before;
+		ta.maxLength = od.max ?? 200;
+		ta.spellcheck = false;
+		ta.style.fontSize = Math.max(12, Math.min(28, w.h * scaleK() * 0.32)) + 'px';
+		el.appendChild(ta);
+		ta.focus();
+		ta.select();
+		let finished = false;
+		const done = (keep: boolean) => {
+			if (finished) return; // removing the box blurs it, which calls this again
+			finished = true;
+			if (!keep) {
+				w.o[od.key] = before;
+				redraw();
+			}
+			ta.remove();
+			commit();
+			buildInspector();
+			el.focus({ preventScroll: true });
+		};
+		ta.addEventListener('input', () => {
+			w.o[od.key] = ta.value;
+			redraw();
+		});
+		ta.addEventListener('keydown', (e) => {
+			e.stopPropagation(); // not the builder's shortcuts (Delete, arrows)
+			if (e.key === 'Enter' && !e.shiftKey) {
+				e.preventDefault();
+				done(true);
+			} else if (e.key === 'Escape') {
+				e.preventDefault();
+				done(false);
+			}
+		});
+		ta.addEventListener('blur', () => done(true));
+		ta.addEventListener('pointerdown', (e) => e.stopPropagation());
+	}
+	overlay.addEventListener('dblclick', (e) => {
+		const wb = (e.target as HTMLElement).closest('.wb') as HTMLElement | null;
+		if (wb) inlineEdit(wb.dataset.id!);
+	});
 
 	// ---------------------------------------------------------------- keyboard
 	function nudge(dx: number, dy: number) {
@@ -1654,6 +1716,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .stage.drop { box-shadow: 0 0 0 3px var(--accent); }
 	.bld .stage > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 	.bld .overlay { position: absolute; inset: 0; }
+	.bld .wb .inline-edit { position: absolute; inset: -2px; width: calc(100% + 4px); height: calc(100% + 4px); box-sizing: border-box; margin: 0; padding: 0.2em 0.35em; resize: none; border: 2px solid var(--accent); border-radius: 4px; background: rgba(236, 233, 224, 0.96); color: #111; font: inherit; font-weight: 700; line-height: 1.2; outline: none; cursor: text; z-index: 5; }
 	.bld .wb { position: absolute; box-sizing: border-box; border: 1px dashed rgba(var(--accent-rgb), 0.55); cursor: move; outline: none; touch-action: none; }
 	.bld .stage.no-outlines .wb:not(.on) { border-color: transparent; }
 	.bld .wb:hover, .bld .wb.hl { border-style: solid; border-color: var(--accent); background: rgba(var(--accent-rgb), 0.08); }
