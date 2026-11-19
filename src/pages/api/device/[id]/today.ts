@@ -276,7 +276,7 @@ export async function GET({ params, request, locals }) {
 	// counts as already tomorrow. Everything else asks "from right now onwards".
 	let effNowMs = rightNow.getTime();
 	let fetchFrom = rightNow;
-	if (style === 'timeline') {
+	if (style === 'timeline' || style === 'tomorrow') {
 		let tzGuess = 'UTC';
 		try {
 			if (user.timezone) {
@@ -614,6 +614,11 @@ export async function GET({ params, request, locals }) {
 		if (check !== null) sleepSec = Math.min(sleepSec, Math.max(60, check));
 		const expiry = secondsToNextExpiry(msgs, now);
 		if (expiry !== null) sleepSec = Math.min(sleepSec, Math.max(60, expiry + 5));
+		// School day switches to tomorrow at 6 pm
+		if (style === 'tomorrow') {
+			const into = ((nowLocal % 86400) + 86400) % 86400;
+			if (into < 18 * 3600) sleepSec = Math.min(sleepSec, 18 * 3600 - into + 30);
+		}
 		if (away) sleepSec = Math.min(2 * 86400, secondsUntilBack(dayCfg, nowLocal));
 		else sleepSec = quietSleep(dayCfg, nowLocal, sleepSec);
 		await screens.save(db, sleepSec);

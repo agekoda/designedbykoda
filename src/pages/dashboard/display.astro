@@ -1831,6 +1831,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .lay-card canvas { aspect-ratio: 4 / 3; }
 	.cust .fnt-card canvas { aspect-ratio: 10 / 3; }
 	.cust .lay-name, .cust .fnt-name { font-size: 0.85em; font-weight: 700; color: var(--fg); text-align: center; }
+	.cust .lay-card { container-type: inline-size; }
+	.cust .picker .lay-name { font-size: min(1.12em, 10.5cqi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.cust .lay-note { font-size: 0.74em; color: var(--muted); text-align: center; line-height: 1.3; margin-top: -0.3em; padding: 0 0.2em 0.2em; }
 	.cust label:hover > .lay-card, .cust label:hover > .fnt-card { border-color: var(--muted); }
 	.cust input:checked + .lay-card, .cust input:checked + .fnt-card { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
