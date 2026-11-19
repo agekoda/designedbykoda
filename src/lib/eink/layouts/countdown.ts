@@ -5,6 +5,7 @@ import { dayIdx, dayShort, DAY_NAMES, MONTH_NAMES, monthShort, tmOf, type Layout
 import { batteryIcon } from '../batteryIcon';
 import { dateShort, dateLong } from '../context';
 import { centred } from './centred';
+import { tr } from '../i18n';
 
 export function parseDay(s: string): number | null {
 	const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
@@ -39,15 +40,20 @@ export function countdown(ctx: LayoutCtx): string {
 
 	if (days > 0) {
 		const n = String(days);
-		const w = measure(fam, 'bb', n, 4).w;
-		const sc = w <= 330 ? 4 : 3;
+		const sc = [4, 3, 2, 1].find((k) => measure(fam, 'bb', n, k).w <= (k === 4 ? 330 : 372)) ?? 1;
 		d.text(200, 228, 'bb', n, { align: 'center', scale: sc });
 		d.text(200, 256, 'mb', days === 1 ? 'day to go' : 'days to go', { align: 'center' });
 	} else if (days === 0) {
-		d.text(200, 200, 'bb', 'Today!', { align: 'center', scale: 3 });
+		// In the title's font, scaled up, as big as fits on one line. The extra-large number font
+		// comes out much bigger on the calendar than in the preview, so "Today!" in it wrapped into
+		// "Toda" / "y!" and ran off the bottom.
+		const word = tr('Today!');
+		const sc = [4, 3, 2, 1].find((k) => measure(fam, 'mb', word, k).w <= 360) ?? 1;
+		d.text(200, 186 + sc * 6, 'mb', word, { align: 'center', scale: sc, maxW: 380 });
 	} else {
 		const n = String(-days);
-		d.text(200, 200, 'bb', n, { align: 'center', scale: 3 });
+		const sc = [3, 2, 1].find((k) => measure(fam, 'bb', n, k).w <= 372) ?? 1;
+		d.text(200, 200, 'bb', n, { align: 'center', scale: sc, maxW: 380 });
 		d.text(200, 238, 'mb', days === -1 ? 'day ago' : 'days ago', { align: 'center' });
 	}
 
