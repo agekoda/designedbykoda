@@ -150,7 +150,8 @@ export function drawListFor(o: PreviewOptions): string {
 	// The live Timeline preview pretends it is 9:00 am, so the moving bar is always on show.
 	if ((timeline || o.style === 'timetable') && (o.refreshSec ?? 86400) < 86400) nowLocal = Math.floor(nowLocal / 86400) * 86400 + 9 * 3600;
 	// The Waiting room preview pretends it is 9:55 am, so someone is being seen and others are waiting.
-	const waiting = o.style === 'waiting';
+	// (and so does any design with a Now seeing widget, which shows example names, not "Team standup")
+	const waiting = o.style === 'waiting' || (o.style === 'custom' && !!o.custom?.widgets?.some((w) => w.t === 'queue'));
 	if (waiting) nowLocal = Math.floor(nowLocal / 86400) * 86400 + 9 * 3600 + 55 * 60;
 	return renderLayout(
 		o.style,

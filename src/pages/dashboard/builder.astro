@@ -102,6 +102,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { sampleReminders } from '../../lib/eink/reminders';
 	import { sampleHabits } from '../../lib/eink/habits';
 	import { renderDrawList } from '../../lib/eink/preview';
+	import { textLayout } from '../../lib/eink/builder/render';
+	import { advanceOf } from '../../lib/eink/measure';
+	import { isFamily, type Family } from '../../lib/eink/fonts';
 	import { bytesToB64, decodePic, encodePic, DEFAULT_IMAGE_SETTINGS, DITHERS, ditherGray, packBits, type ImageSettings } from '../../lib/eink/image';
 	import { dropdown, type Dropdown } from '../../lib/dropdown';
 	import { ask, closeDialog } from '../../lib/dialog';
@@ -463,21 +466,64 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	// the words you see on the box: a text option that is showing and isn't raw data (QR links, Wi-Fi)
 	const textOpt = (w: Widget) =>
 		WIDGETS[w.t].opts.find((o) => o.kind === 'text' && !o.raw && (!o.show || Object.entries(o.show).every(([k, v]) => w.o[k] === v)));
+	// Typing straight into a box. For a Text box the words are typed onto the canvas itself, in the
+	// screen's pixel font at its real size: a see-through textarea takes the keys, the preview redraws
+	// as you type, and a cursor is drawn where the next letter goes (textLayout in render.ts says where
+	// that is). Other widgets with words (Free or busy...) get a plain box to type in.
 	function inlineEdit(id: string) {
 		const w = find(id);
 		const el = els.get(id);
 		const od = w && textOpt(w);
 		if (!w || !el || !od || el.querySelector('.inline-edit')) return;
 		const before = String(w.o[od.key] ?? '');
+		const onCanvas = w.t === 'text' && od.key === 'text';
+		const fam = (isFamily(font) ? font : 'sans') as Family;
 		const ta = document.createElement('textarea');
-		ta.className = 'inline-edit';
+		ta.className = 'inline-edit' + (onCanvas ? ' ghost' : '');
 		ta.value = before;
 		ta.maxLength = od.max ?? 200;
 		ta.spellcheck = false;
-		ta.style.fontSize = Math.max(12, Math.min(28, w.h * scaleK() * 0.32)) + 'px';
+		if (!onCanvas) ta.style.fontSize = Math.max(12, Math.min(28, w.h * scaleK() * 0.32)) + 'px';
 		el.appendChild(ta);
+		const caret = document.createElement('div');
+		caret.className = 'inline-caret';
+		if (onCanvas) el.appendChild(caret);
+		el.classList.add('typing');
 		ta.focus();
-		ta.select();
+		if (onCanvas) ta.setSelectionRange(before.length, before.length);
+		else ta.select();
+		// the cursor, in screen pixels inside the box
+		const placeCaret = () => {
+			if (!onCanvas) return;
+			const k = scaleK();
+			const lay = textLayout(fam, w, ta.value);
+			const i = ta.selectionDirection === 'backward' ? ta.selectionStart : ta.selectionEnd;
+			let ln = lay.lines[lay.lines.length - 1];
+			for (const l of lay.lines) if (i <= l.end) { ln = l; break; }
+			let x = ln.x;
+			const upto = Math.max(0, i - ln.start);
+			for (let c = 0; c < upto; c++) x += c < ln.adv.length ? ln.adv[c] : advanceOf(fam, 's', ta.value[ln.start + c] === '\n' ? '' : ' ');
+			caret.style.left = (x - w.x) * k + 'px';
+			caret.style.top = (ln.base - lay.asc - w.y) * k + 'px';
+			caret.style.height = Math.max(8, (lay.asc + lay.desc) * k) + 'px';
+			caret.classList.remove('blink');
+			void caret.offsetWidth; // restart the blink, so it's solid while typing
+			caret.classList.add('blink');
+		};
+		// a click inside the box puts the cursor where you clicked
+		const indexAt = (px: number, py: number) => {
+			const lay = textLayout(fam, w, ta.value);
+			let ln = lay.lines[0];
+			for (const l of lay.lines) if (py >= l.base - lay.asc - 2) ln = l;
+			let x = ln.x;
+			let i = ln.start;
+			for (const a of ln.adv) {
+				if (px < x + a / 2) break;
+				x += a;
+				i++;
+			}
+			return Math.min(i, ln.end);
+		};
 		let finished = false;
 		const done = (keep: boolean) => {
 			if (finished) return; // removing the box blurs it, which calls this again
@@ -486,14 +532,22 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				w.o[od.key] = before;
 				redraw();
 			}
+			document.removeEventListener('selectionchange', onSel);
 			ta.remove();
+			caret.remove();
+			el.classList.remove('typing');
 			commit();
 			buildInspector();
 			el.focus({ preventScroll: true });
 		};
+		const onSel = () => {
+			if (document.activeElement === ta) placeCaret();
+		};
+		document.addEventListener('selectionchange', onSel);
 		ta.addEventListener('input', () => {
 			w.o[od.key] = ta.value;
 			redraw();
+			placeCaret();
 		});
 		ta.addEventListener('keydown', (e) => {
 			e.stopPropagation(); // not the builder's shortcuts (Delete, arrows)
@@ -506,7 +560,17 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			}
 		});
 		ta.addEventListener('blur', () => done(true));
-		ta.addEventListener('pointerdown', (e) => e.stopPropagation());
+		ta.addEventListener('pointerdown', (e) => {
+			e.stopPropagation();
+			if (!onCanvas) return;
+			e.preventDefault();
+			const r = el.getBoundingClientRect();
+			const k = scaleK();
+			const i = indexAt(w.x + (e.clientX - r.left) / k, w.y + (e.clientY - r.top) / k);
+			ta.setSelectionRange(i, i);
+			placeCaret();
+		});
+		placeCaret();
 	}
 	overlay.addEventListener('dblclick', (e) => {
 		const wb = (e.target as HTMLElement).closest('.wb') as HTMLElement | null;
@@ -1716,6 +1780,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .stage.drop { box-shadow: 0 0 0 3px var(--accent); }
 	.bld .stage > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 	.bld .overlay { position: absolute; inset: 0; }
+	.bld .wb .inline-edit.ghost { background: transparent; border-color: var(--accent); color: transparent; caret-color: transparent; padding: 0; overflow: hidden; }
+	.bld .wb .inline-caret { position: absolute; width: 2px; background: #fff; mix-blend-mode: difference; pointer-events: none; z-index: 6; }
+	.bld .wb .inline-caret.blink { animation: caret-blink 1.05s steps(1) infinite; }
+	@keyframes caret-blink { 50% { opacity: 0; } }
+	.bld .wb.typing { cursor: text; }
 	.bld .wb .inline-edit { position: absolute; inset: -2px; width: calc(100% + 4px); height: calc(100% + 4px); box-sizing: border-box; margin: 0; padding: 0.2em 0.35em; resize: none; border: 2px solid var(--accent); border-radius: 4px; background: rgba(236, 233, 224, 0.96); color: #111; font: inherit; font-weight: 700; line-height: 1.2; outline: none; cursor: text; z-index: 5; }
 	.bld .wb { position: absolute; box-sizing: border-box; border: 1px dashed rgba(var(--accent-rgb), 0.55); cursor: move; outline: none; touch-action: none; }
 	.bld .stage.no-outlines .wb:not(.on) { border-color: transparent; }
@@ -1771,8 +1840,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .al svg { width: 24px; height: 24px; }
 	.bld .al:hover, .bld .al:focus-visible { border-color: var(--accent); color: var(--fg); outline: none; }
 	.bld .row { display: flex; flex-wrap: wrap; gap: 0.4em; margin-top: 0.5em; }
-	.bld .seg { display: flex; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
-	.bld .seg button { flex: 1; background: none; border: 0; border-radius: 999px; padding: 0.35em 0.4em; font: inherit; font-size: 0.95em; color: var(--muted); }
+	/* a long label wraps inside a rounded box instead of being squashed into a circle */
+	.bld .seg { display: flex; background: var(--bg); border: 1px solid var(--border); border-radius: 18px; padding: 3px; gap: 2px; }
+	.bld .seg button { flex: 1 1 auto; min-width: 0; background: none; border: 0; border-radius: 15px; padding: 0.4em 0.6em; font: inherit; font-size: 0.95em; line-height: 1.25; color: var(--muted); }
 	.bld .seg button.on { background: var(--fg); color: var(--bg); }
 	.bld .layers { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 	.bld .layers button { width: 100%; text-align: left; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.35em 0.6em; font: inherit; font-size: 0.85em; color: var(--fg); }
