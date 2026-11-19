@@ -6,6 +6,8 @@
 import { viewForStyle, LIVE_STYLES, isRefreshSec, renderStyleOf } from '../../../../data/calendarStyles';
 import { sanitizeReminders, type Reminder } from '../../../../lib/eink/reminders';
 import { sanitizeHabits, type Habit } from '../../../../lib/eink/habits';
+import { isAway, quietSleep, sanitizeDayCfg, secondsUntilBack } from '../../../../lib/eink/dayCfg';
+import { dueSoon } from '../../../../lib/eink/school';
 import { designIdOf, getDesign } from '../../../../lib/designs';
 import { timelineSleep } from '../../../../lib/eink/layouts/timeline';
 import { getForecast, type Forecast } from '../../../../lib/weather';
@@ -249,6 +251,14 @@ export async function GET({ params, request, locals }) {
 	} catch {}
 	const screens = await pickScreen(db, deviceId, style, Math.floor(rightNow.getTime() / 1000) + getUtcOffsetSeconds(tzPick, rightNow), now, reqUrl.searchParams.get('w'));
 	style = screens.style;
+	// Away mode and quiet hours (schema-school.sql). Away takes over the whole screen.
+	let dayCfg = sanitizeDayCfg(null);
+	try {
+		const dq = await db.prepare('SELECT day_cfg FROM devices WHERE id = ?').bind(deviceId).first();
+		dayCfg = sanitizeDayCfg(dq?.day_cfg);
+	} catch {}
+	const away = isAway(dayCfg, Math.floor(rightNow.getTime() / 1000) + getUtcOffsetSeconds(tzPick, rightNow));
+	if (away) style = 'away';
 
 	// The message board (schema-messages.sql): messages showing now, and how often to check for new ones.
 	let msgCfg = sanitizeCfg(null);
@@ -279,8 +289,16 @@ export async function GET({ params, request, locals }) {
 		if (intoDay > 86400 - 600) effNowMs += 600 * 1000;
 		fetchFrom = getTodayRangeUTC(tzGuess, new Date(effNowMs)).start;
 	}
+	// School week: from Monday (the whole week shows, past days too).
+	if (style === 'timetable') {
+		const off = getUtcOffsetSeconds(tzPick, rightNow);
+		const localDay = Math.floor((rightNow.getTime() / 1000 + off) / 86400);
+		const wd = new Date(localDay * 86400000).getUTCDay();
+		const monday = wd === 6 ? localDay + 2 : wd === 0 ? localDay + 1 : localDay - (wd - 1);
+		fetchFrom = new Date((monday * 86400 - off) * 1000);
+	}
 
-	const rawEvents: { title: string; ms: number; allDay: boolean; dateOnly?: string; endMs?: number; endDateOnly?: string }[] = [];
+	const rawEvents: { title: string; ms: number; allDay: boolean; dateOnly?: string; endMs?: number; endDateOnly?: string; name?: string; room?: string; moved?: boolean; bring?: string }[] = [];
 	let googleTz: string | null = null;
 
 	for (const calId of calendarIds) {
@@ -291,7 +309,7 @@ export async function GET({ params, request, locals }) {
 		// No timeMax — maxResults + orderBy=startTime is what actually
 		// gives us "the next N upcoming events", regardless of how many
 		// days out they fall.
-		eventsUrl.searchParams.set('maxResults', '15');
+		eventsUrl.searchParams.set('maxResults', style === 'timetable' || style === 'tomorrow' ? '40' : '15');
 		eventsUrl.searchParams.set('singleEvents', 'true');
 		eventsUrl.searchParams.set('orderBy', 'startTime');
 
@@ -372,7 +390,7 @@ export async function GET({ params, request, locals }) {
 		} else if (e.endMs && e.endMs > e.ms) {
 			endLocal = Math.floor(e.endMs / 1000) + getUtcOffsetSeconds(timezone, new Date(e.endMs));
 		}
-		return { title: e.title, startUnix, startLocal, allDay: e.allDay, endLocal };
+		return { title: e.title, startUnix, startLocal, allDay: e.allDay, endLocal, name: e.name, room: e.room, moved: e.moved, bring: e.bring };
 	});
 
 	allEvents.sort((a, b) => a.startUnix - b.startUnix);
@@ -380,7 +398,7 @@ export async function GET({ params, request, locals }) {
 	// was capped individually — trim to the final cap here, after sorting,
 	// so we keep the chronologically-soonest ones across all calendars
 	// rather than e.g. all of one calendar's 15 and none of another's.
-	const trimmedEvents = allEvents.slice(0, 15);
+	const trimmedEvents = allEvents.slice(0, style === 'timetable' ? 150 : style === 'tomorrow' ? 60 : 15);
 	console.log(`Total events after merging all calendars: ${allEvents.length}, sending ${trimmedEvents.length}`);
 
 
@@ -558,7 +576,9 @@ export async function GET({ params, request, locals }) {
 		const nowLocal = Math.floor(effNowMs / 1000) + offsetSec;
 		const screen = renderLayout(renderStyleOf(style), {
 			nowLocal,
-			events: trimmedEvents.map((e) => ({ title: e.title, startLocal: e.startLocal, allDay: e.allDay, endLocal: e.endLocal })),
+			events: trimmedEvents.map((e) => ({ title: e.title, startLocal: e.startLocal, allDay: e.allDay, endLocal: e.endLocal, name: e.name, room: e.room, moved: e.moved, bring: e.bring })),
+			due: dueSoon(allEvents.map((e) => ({ title: e.title, startLocal: e.startLocal, allDay: e.allDay, endLocal: e.endLocal, name: e.name })), nowLocal),
+			away: away ? dayCfg.away : null,
 			weather,
 			vbat,
 			dark,
@@ -594,6 +614,8 @@ export async function GET({ params, request, locals }) {
 		if (check !== null) sleepSec = Math.min(sleepSec, Math.max(60, check));
 		const expiry = secondsToNextExpiry(msgs, now);
 		if (expiry !== null) sleepSec = Math.min(sleepSec, Math.max(60, expiry + 5));
+		if (away) sleepSec = Math.min(2 * 86400, secondsUntilBack(dayCfg, nowLocal));
+		else sleepSec = quietSleep(dayCfg, nowLocal, sleepSec);
 		await screens.save(db, sleepSec);
 		// X-Unchanged: 1 when this is exactly what the screen already shows, so firmware that
 		// knows the header can skip redrawing (no flash when a message check finds nothing new).

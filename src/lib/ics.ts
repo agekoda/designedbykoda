@@ -11,6 +11,7 @@ export interface IcsEvent {
 	dateOnly?: string; // all-day: YYYY-MM-DD
 	endMs?: number;
 	endDateOnly?: string; // all-day: the day after the last day
+	location?: string; // LOCATION, e.g. a classroom ("HEC4")
 }
 
 // ---- time zones ----
@@ -143,6 +144,7 @@ function parseDuration(s: string): number | null {
 interface RawEvent {
 	uid: string;
 	title: string;
+	location: string;
 	start: When;
 	end: When | null;
 	durMs: number | null;
@@ -245,7 +247,7 @@ export function parseIcs(text: string, fallbackTz: string, fromMs: number, toMs:
 		if (!line) continue;
 		const up = line.toUpperCase();
 		if (up === 'BEGIN:VEVENT') {
-			cur = { uid: '', title: '', start: null as any, end: null, durMs: null, rrule: null, exdates: [], recurrenceId: null, cancelled: false };
+			cur = { uid: '', title: '', location: '', start: null as any, end: null, durMs: null, rrule: null, exdates: [], recurrenceId: null, cancelled: false };
 			depth = 0;
 			continue;
 		}
@@ -272,6 +274,9 @@ export function parseIcs(text: string, fallbackTz: string, fromMs: number, toMs:
 				break;
 			case 'SUMMARY':
 				cur.title = unescape(p.value).slice(0, 120);
+				break;
+			case 'LOCATION':
+				cur.location = unescape(p.value).slice(0, 40);
 				break;
 			case 'DTSTART': {
 				const w = parseWhen(p, fallbackTz);
@@ -344,14 +349,14 @@ export function parseIcs(text: string, fallbackTz: string, fromMs: number, toMs:
 				const day1 = Math.max(day0 + 1, Math.floor(w1 / DAY) + (((w1 % DAY) + DAY) % DAY < 60000 ? 0 : 1)); // the day after the last
 				const d0 = new Date(day0 * DAY).toISOString().slice(0, 10);
 				const d1 = new Date(day1 * DAY).toISOString().slice(0, 10);
-				out.push({ title: e.title, ms: day0 * DAY, allDay: true, dateOnly: d0, endDateOnly: d1 });
+				out.push({ title: e.title, ms: day0 * DAY, allDay: true, dateOnly: d0, endDateOnly: d1, ...(e.location ? { location: e.location } : {}) });
 				return;
 			}
 			if (e.start.allDay) {
 				const d0 = new Date(localStart).toISOString().slice(0, 10);
 				const d1 = new Date(localStart + Math.max(86400000, len)).toISOString().slice(0, 10);
-				out.push({ title: e.title, ms, allDay: true, dateOnly: d0, endDateOnly: d1 });
-			} else out.push({ title: e.title, ms, allDay: false, endMs: len > 0 ? ms + len : undefined });
+				out.push({ title: e.title, ms, allDay: true, dateOnly: d0, endDateOnly: d1, ...(e.location ? { location: e.location } : {}) });
+			} else out.push({ title: e.title, ms, allDay: false, endMs: len > 0 ? ms + len : undefined, ...(e.location ? { location: e.location } : {}) });
 		};
 		if (e.rrule && e.recurrenceId === null) {
 			const skip = moved.get(e.uid);

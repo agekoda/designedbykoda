@@ -5,6 +5,7 @@
 //   ics_cache:    the events read from each, so a link is fetched at most every few hours rather
 //                 than on every wake. An uploaded file is read once, when it is uploaded.
 import { cleanFeedUrl, looksLikeIcs, parseIcs, type IcsEvent } from './ics';
+import { applyClasses, loadClasses, type NamedEvent } from './classes';
 
 export const MAX_FEEDS = 4;
 export const MAX_FEED_NAME = 30;
@@ -41,7 +42,11 @@ export async function ensureTables(db: any) {
 export async function listFeeds(db: any, deviceId: string): Promise<Feed[]> {
 	try {
 		const r = await db.prepare('SELECT id, name, url, created_at FROM device_feeds WHERE device_id = ? ORDER BY created_at').bind(deviceId).all();
-		return (r.results ?? []).map((x: any) => ({ id: x.id, name: x.name || 'Calendar', url: x.url ?? null, createdAt: x.created_at ?? 0 }));
+		// An early version saved uploaded files with the name in the url column: those are files.
+		return (r.results ?? []).map((x: any) => {
+			const bad = x.url && !/^https?:\/\//i.test(x.url);
+			return { id: x.id, name: (bad ? x.url : x.name) || 'Calendar', url: bad ? null : x.url ?? null, createdAt: x.created_at ?? 0 };
+		});
 	} catch {
 		return []; // no feeds have ever been added
 	}
@@ -52,13 +57,13 @@ async function sha(s: string): Promise<string> {
 	return [...new Uint8Array(d).slice(0, 16)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 // Bump PARSER when ics.ts changes how events are read, so saved copies of links are read again at once.
-const PARSER = 4;
+const PARSER = 5;
 const keyFor = async (deviceId: string, f: Feed, tz: string) => (f.url ? 'u:' + (await sha(f.url + '|' + tz + '|' + PARSER)) : `f:${deviceId}:${f.id}`);
 
 // Events are stored small: [title, start ms, all-day 0/1, date, end ms, end date]
-type Packed = [string, number, number, string | null, number | null, string | null];
-const pack = (e: IcsEvent): Packed => [e.title, e.ms, e.allDay ? 1 : 0, e.dateOnly ?? null, e.endMs ?? null, e.endDateOnly ?? null];
-const unpack = (p: Packed): IcsEvent => ({ title: p[0], ms: p[1], allDay: p[2] === 1, dateOnly: p[3] ?? undefined, endMs: p[4] ?? undefined, endDateOnly: p[5] ?? undefined });
+type Packed = [string, number, number, string | null, number | null, string | null, string?];
+const pack = (e: IcsEvent): Packed => (e.location ? [e.title, e.ms, e.allDay ? 1 : 0, e.dateOnly ?? null, e.endMs ?? null, e.endDateOnly ?? null, e.location] : [e.title, e.ms, e.allDay ? 1 : 0, e.dateOnly ?? null, e.endMs ?? null, e.endDateOnly ?? null]);
+const unpack = (p: Packed): IcsEvent => ({ title: p[0], ms: p[1], allDay: p[2] === 1, dateOnly: p[3] ?? undefined, endMs: p[4] ?? undefined, endDateOnly: p[5] ?? undefined, ...(p[6] ? { location: p[6] } : {}) });
 
 // Reads a link. Returns the events, or a sentence saying what went wrong.
 export async function fetchFeed(url: string, tz: string, nowMs: number): Promise<{ events: IcsEvent[] } | { error: string }> {
@@ -135,19 +140,28 @@ export async function feedEvents(db: any, deviceId: string, f: Feed, tz: string,
 
 // Everything from all of a calendar's feeds, from `fromMs` on, in the shape today.ts collects
 // Google's events in.
-export async function allFeedEvents(db: any, deviceId: string, tz: string, nowMs: number, fromMs: number) {
+export async function allFeedEvents(db: any, deviceId: string, tz: string, nowMs: number, fromMs: number): Promise<NamedEvent[]> {
 	const feeds = await listFeeds(db, deviceId);
 	if (!feeds.length) return [];
 	const lists = await Promise.all(feeds.map((f) => feedEvents(db, deviceId, f, tz, nowMs).catch(() => ({ events: [] as IcsEvent[] }))));
-	const out: { title: string; ms: number; allDay: boolean; dateOnly?: string; endMs?: number; endDateOnly?: string }[] = [];
+	// class names, rooms and room changes (src/lib/classes.ts), worked out over everything we have
+	const { names, opts } = await loadClasses(db, deviceId);
+	const out: NamedEvent[] = [];
 	for (const l of lists)
-		for (const e of l.events) {
+		for (const e of applyClasses(l.events, names, opts)) {
 			const end = e.allDay ? (e.endDateOnly ? Date.parse(e.endDateOnly + 'T00:00:00Z') : e.ms + 86400000) : e.endMs ?? e.ms;
 			if (Math.max(end, e.ms + 1) <= fromMs) continue; // already over (ones still going count, as with Google)
 			out.push(e);
 		}
 	out.sort((a, b) => a.ms - b.ms);
-	return out.slice(0, 30);
+	return out.slice(0, 400); // the whole window: Due soon and the week view look further ahead than the screen's list
+}
+
+// Every event from a calendar's links and files, as read (for the class list on the dashboard).
+export async function rawFeedEvents(db: any, deviceId: string, tz: string, nowMs: number): Promise<IcsEvent[]> {
+	const feeds = await listFeeds(db, deviceId);
+	const lists = await Promise.all(feeds.map((f) => feedEvents(db, deviceId, f, tz, nowMs).catch(() => ({ events: [] as IcsEvent[] }))));
+	return lists.flatMap((l) => l.events);
 }
 
 export async function statusOf(db: any, deviceId: string, f: Feed, tz: string, nowMs: number, force = false): Promise<FeedStatus> {

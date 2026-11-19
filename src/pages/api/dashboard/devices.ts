@@ -4,6 +4,7 @@
 import { sanitizeSchedule, activeStyle } from '../../../lib/eink/schedule';
 import { sanitizeReminders } from '../../../lib/eink/reminders';
 import { sanitizeHabits } from '../../../lib/eink/habits';
+import { sanitizeDayCfg } from '../../../lib/eink/dayCfg';
 import { sanitizeCfg, utcOffset } from '../../../lib/messages';
 import { listDesigns } from '../../../lib/designs';
 import { isStyleId, DEFAULT_STYLE } from '../../../data/calendarStyles';
@@ -146,6 +147,11 @@ export async function GET({ request, locals }) {
 		const rr = await db.prepare('SELECT id, reminders FROM devices WHERE user_id = ?').bind(userId).all();
 		for (const e of rr.results ?? []) rems.set(e.id, sanitizeReminders(e.reminders));
 	} catch {}
+	const dayCfgs = new Map<string, unknown>();
+	try {
+		const dr = await db.prepare('SELECT id, day_cfg FROM devices WHERE user_id = ?').bind(userId).all();
+		for (const e of dr.results ?? []) dayCfgs.set(e.id, sanitizeDayCfg(e.day_cfg));
+	} catch {} // schema-school.sql
 	const habs = new Map<string, unknown>();
 	try {
 		const hr = await db.prepare('SELECT id, habits FROM devices WHERE user_id = ?').bind(userId).all();
@@ -173,6 +179,7 @@ export async function GET({ request, locals }) {
 		nextStyle,
 		reminders: rems.get(d.id) ?? [],
 		habits: habs.get(d.id) ?? [],
+		dayCfg: dayCfgs.get(d.id) ?? sanitizeDayCfg(null),
 		clock: clocks.get(d.id) ?? '24',
 		firmware: fws.get(d.id) ?? null,
 		update: (() => {

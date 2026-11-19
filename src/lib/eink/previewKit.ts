@@ -62,6 +62,36 @@ export const SAMPLE_TASKS: TaskItem[] = [
 	{ title: 'Pay the electricity bill', done: true },
 	{ title: 'Back up the photos', done: true },
 ];
+// A school week (Night before, School week): classes with rooms, one room change, things to bring,
+// and a test, from this week's Monday.
+export function sampleSchool(nowLocal: number): CalEvent[] {
+	const today = Math.floor(nowLocal / 86400);
+	const wd = new Date(today * 86400000).getUTCDay();
+	const monday = wd === 6 ? today + 2 : wd === 0 ? today + 1 : today - (wd - 1);
+	const P: [number, number][] = [[8, 50], [9, 45], [11, 0], [11, 55], [13, 35]];
+	const week = [
+		['English', 'Maths Methods', 'Physics', 'Geography', 'PE'],
+		['Chemistry', 'English', 'Building & Construction', 'Maths Methods', 'Physics'],
+		['Maths Methods', 'Physics', 'English', 'Chemistry', 'Geography'],
+		['Geography', 'Building & Construction', 'Maths Methods', 'English', 'Chemistry'],
+		['Physics', 'Chemistry', 'PE', 'Maths Methods', 'English'],
+	];
+	const ROOM: Record<string, string> = { English: 'B12', 'Maths Methods': 'M4', Physics: 'Lab 2', Geography: 'HEC4', PE: 'Gym', Chemistry: 'Lab 1', 'Building & Construction': 'D1' };
+	const BRING: Record<string, string> = { PE: 'Sports gear', Chemistry: 'Lab coat', 'Building & Construction': 'Safety boots' };
+	const out: CalEvent[] = [];
+	week.forEach((day, i) =>
+		day.forEach((name, p) => {
+			const start = (monday + i) * 86400 + P[p][0] * 3600 + P[p][1] * 60;
+			const moved = i === 2 && name === 'Physics';
+			const room = moved ? 'Lab 4' : ROOM[name];
+			out.push({ title: `${name} · ${room}${moved ? ' (moved)' : ''}`, name, room, moved: moved || undefined, bring: BRING[name], startLocal: start, endLocal: start + 50 * 60, allDay: false });
+		})
+	);
+	out.push({ title: 'Physics test', name: 'Physics test', startLocal: (monday + 3) * 86400 + 9 * 3600 + 45 * 60, endLocal: (monday + 3) * 86400 + 10 * 3600 + 35 * 60, allDay: false });
+	out.push({ title: 'English essay due', name: 'English essay due', startLocal: (monday + 7) * 86400, endLocal: (monday + 8) * 86400, allDay: true });
+	return out.sort((a, b) => a.startLocal - b.startLocal);
+}
+
 // The sample tasks' due dates are written as words, so they stay overdue / today / tomorrow whatever the date is.
 function sampleTasks(nowLocal: number): TaskItem[] {
 	const day = Math.floor(nowLocal / 86400);
@@ -116,7 +146,7 @@ export function drawListFor(o: PreviewOptions): string {
 		o.style,
 		{
 			nowLocal,
-			events: timeline ? sampleDay(nowLocal) : sampleEvents(nowLocal),
+			events: timeline ? sampleDay(nowLocal) : o.style === 'tomorrow' || o.style === 'timetable' ? sampleSchool(nowLocal) : sampleEvents(nowLocal),
 			weather: o.hasWeather ? sampleWeather(nowLocal) : null,
 			vbat: o.vbat ?? null,
 			dark: o.dark,
