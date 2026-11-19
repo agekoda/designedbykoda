@@ -17,12 +17,12 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	<div class="bld-mobile">
 		<div class="bld-mobile-t">Use a computer for this</div>
 		<p>The layout builder needs a bigger screen and a mouse. Open this page on a desktop or laptop to design your own screen.</p>
-		<a class="btn" href={`/dashboard/display?device=${encodeURIComponent(deviceId)}`}>Back to Customize display</a>
+		<a class="btn" href={`/dashboard/settings?device=${encodeURIComponent(deviceId)}`}>Back to Settings</a>
 	</div>
 	<div class="bld" data-device={deviceId} data-families={JSON.stringify(families)}>
 		<div class="topbar">
 			<div class="tb-left">
-				<a class="back" id="back" href={`/dashboard/display?device=${encodeURIComponent(deviceId)}`}>← Customize display</a>
+				<a class="back" id="back" href={`/dashboard/settings?device=${encodeURIComponent(deviceId)}`}>← Settings</a>
 				<div class="bld-title" id="title">Layout builder</div>
 				<!-- Your designs (schema-designs.sql): switch and new in the dropdown; then rename, duplicate, share and delete -->
 				<div class="designs" id="designs" hidden>
@@ -1319,7 +1319,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const n = layoutNeeds(layout);
 		const types = new Set(layout.widgets.map((w) => w.t));
 		const notes: string[] = [];
-		if (n.tasks && !info.tasksGranted) notes.push('The To-do list needs Google Tasks. Connect it on the <a href="/dashboard/display?device=' + encodeURIComponent(deviceId) + '">Customize display</a> page (Change screen, then To-do). Until then your screen will say so.');
+		if (n.tasks && !info.tasksGranted) notes.push('The To-do list needs Google Tasks. Connect it on the <a href="/dashboard/settings?device=' + encodeURIComponent(deviceId) + '">Settings</a> page (Choose a screen, then To-do). Until then your screen will say so.');
 		if (n.countdown && !info.countdown) notes.push('Click the Countdown widget and fill in its name and date on the right. Until then the preview shows an example.');
 		if (n.picture && !info.cornerBits) notes.push('Click the Picture widget and choose your picture on the right. Nothing is drawn on the display until you do.');
 		if ((types.has('sun_times') || types.has('moon')) && !info.loc) notes.push('Add your city (weather location) to get sunrise and sunset times and the right way up moon.');
@@ -1426,7 +1426,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	let leaving = false;
-	const leave = () => (leaving = true, location.href = `/dashboard/display?device=${encodeURIComponent(deviceId)}`);
+	const leave = () => (leaving = true, location.href = `/dashboard/settings?device=${encodeURIComponent(deviceId)}`);
 	// Saving also puts the design on the calendar (it's the one you're working on).
 	async function save(thenLeave = false) {
 		flushCommit();
