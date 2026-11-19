@@ -43,16 +43,17 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		<div class="stage">
 			<nav class="snav" id="snav" aria-label="Settings">
 				<div class="sg">Screen</div>
-				<button type="button" data-pane="screen"><span class="si">▦</span>Choose a screen</button>
+				<button type="button" data-pane="screen"><span class="si"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.2"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.2"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.2"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.2"/></svg></span>Choose a screen</button>
 				<button type="button" data-pane="look"><span class="si">Aa</span>Look and font</button>
 				<button type="button" data-pane="lang"><span class="si">文</span>Language and units</button>
+				<button type="button" class="snav-out" id="nav-builder"><span class="si"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><rect x="4" y="4" width="4.5" height="3.5" rx="0.8"/><path d="M4 10.5h8M10.5 4.5h1.5"/></svg></span>Layout builder<span class="sarrow" aria-hidden="true">↗</span></button>
 				<div class="sg">On the screen</div>
-				<button type="button" data-pane="calendars"><span class="si">▤</span>Calendars and timetables</button>
+				<button type="button" data-pane="calendars"><span class="si"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M1.5 6.5h13M5 1v3M11 1v3"/></svg></span>Calendars and timetables</button>
 				<button type="button" data-pane="classes"><span class="si">✎</span>Class names<span class="snew">New</span></button>
 				<button type="button" data-pane="weather"><span class="si">☀</span>Weather</button>
 				<button type="button" data-pane="habits"><span class="si">✓</span>Habits<span class="snew">New</span></button>
 				<button type="button" data-pane="reminders"><span class="si">↻</span>Reminders</button>
-				<button type="button" data-pane="countdown"><span class="si">⏳</span>Countdown</button>
+				<button type="button" data-pane="countdown"><span class="si"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h8M4 14.5h8M4.5 1.5c0 3.5 3.5 4.5 3.5 6.5s-3.5 3-3.5 6.5M11.5 1.5c0 3.5-3.5 4.5-3.5 6.5s3.5 3 3.5 6.5"/></svg></span>Countdown</button>
 				<button type="button" data-pane="messages"><span class="si">✉</span>Messages<span class="scount" id="nav-msgs"></span></button>
 				<div class="sg">When</div>
 				<button type="button" data-pane="schedule"><span class="si">◷</span>Schedule and button</button>
@@ -1383,6 +1384,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 	signBuilder.addEventListener('click', (e) => openBuilder(e, true));
 	designEdit.addEventListener('click', (e) => openBuilder(e, false));
+	// the menu's Layout builder: opens the design on screen, or a new one (saving first, like the buttons above)
+	$('nav-builder').addEventListener('click', (e) => openBuilder(e, false));
 	$('design-share').addEventListener('click', async () => {
 		if (!isDesign(fs())) return;
 		const id = fs().slice(7);
@@ -2074,7 +2077,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	#opt-hab > .label.sub:first-child, #opt-rem > .label.sub:first-child { display: none; }
 	.cust .snav button:hover { color: var(--fg); background: rgba(255, 255, 255, 0.04); }
 	.cust .snav button.on { color: var(--fg); background: rgba(var(--accent-rgb), 0.14); }
-	.cust .snav .si { width: 1.4em; text-align: center; flex: none; opacity: 0.9; }
+	.cust .snav .si { width: 1.4em; text-align: center; flex: none; opacity: 0.9; display: inline-grid; place-items: center; }
+	/* drawn icons: crisp at any zoom, unlike the box-drawing characters they replaced */
+	.cust .snav .si svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+	.cust .snav .sarrow { margin-left: auto; color: var(--muted); font-size: 0.9em; }
 	.cust .snav .snew { margin-left: auto; font-size: 0.66em; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
 	.cust .snav .scount { margin-left: auto; font-size: 0.75em; min-width: 1.5em; text-align: center; padding: 0.05em 0.45em; border-radius: 999px; background: var(--accent); color: var(--bg); }
 	.cust .snav .scount:empty { display: none; }
@@ -2162,6 +2168,12 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.feed-dlg .fd-field { display: grid; gap: 0.35em; margin-top: 0.7em; }
 	.feed-dlg .fd-field > span { font-size: 0.78em; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 	.feed-dlg .fd-field .x-dlg-field { margin: 0; }
+	.feed-dlg .fd-file { display: flex; align-items: center; gap: 0.8em; cursor: pointer; min-width: 0; }
+	.feed-dlg .fd-file input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+	.feed-dlg .fd-file-btn { flex: 0 0 auto; border: 1px solid var(--border); border-radius: 999px; padding: 0.5em 1.1em; font-weight: 700; font-size: 0.9em; color: var(--fg); transition: border-color 0.2s, background 0.2s; }
+	.feed-dlg .fd-file:hover .fd-file-btn { border-color: var(--muted); background: rgba(255, 255, 255, 0.04); }
+	.feed-dlg .fd-file input:focus-visible + .fd-file-btn { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.feed-dlg .fd-file-name { color: var(--muted); font-size: 0.88em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.feed-dlg .fd-fine { color: var(--muted); font-size: 0.82em; margin: 0.8em 0 0; line-height: 1.45; }
 	.feed-dlg input[type='file'] { font: inherit; font-size: 0.9em; color: var(--muted); }
 	.feed-dlg input[type='file']::file-selector-button { margin-right: 0.8em; padding: 0.5em 1em; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); font: inherit; font-weight: 600; }
