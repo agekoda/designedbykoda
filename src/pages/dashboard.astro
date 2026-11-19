@@ -54,6 +54,8 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 
 <script>
 	import { createCitySearch } from '../lib/citySearch';
+	// Subject names to pick from when naming classes (WA senior school, plus general ones). Any name can be typed too.
+	const SUBJECTS = ['English', 'Literature', 'English as an Additional Language', 'Mathematics', 'Mathematics Methods', 'Mathematics Applications', 'Mathematics Specialist', 'Mathematics Essential', 'Science', 'Physics', 'Chemistry', 'Biology', 'Human Biology', 'Psychology', 'Earth and Environmental Science', 'Integrated Science', 'Marine and Maritime Studies', 'HASS', 'Geography', 'Modern History', 'Ancient History', 'Economics', 'Accounting and Finance', 'Business Management and Enterprise', 'Politics and Law', 'Philosophy and Ethics', 'Religion and Life', 'Career and Enterprise', 'Building & Construction', 'Engineering Studies', 'Design', 'Materials Design and Technology', 'Computer Science', 'Applied Information Technology', 'Digital Technologies', 'Automotive Engineering and Technology', 'Food Science and Technology', 'Hospitality', 'Children, Family and the Community', 'Health and PE', 'Physical Education Studies', 'PE', 'Health Studies', 'Outdoor Education', 'Sport and Recreation', 'Visual Arts', 'Drama', 'Music', 'Dance', 'Media Production and Analysis', 'Japanese', 'French', 'Italian', 'Chinese', 'Indonesian', 'German', 'Spanish', 'Workplace Learning', 'Tutor group', 'Form', 'Assembly', 'Study period'];
 	import { renderPreview, paintScreen } from '../lib/eink/previewKit';
 	import { batteryPercent } from '../lib/eink/battery';
 	import { estimate, measured, lifeText } from '../lib/eink/batteryLife';
@@ -185,6 +187,7 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 					<div class="label">Timetables and other calendars</div>
 					<div class="feed-list" data-feeds></div>
 					<button type="button" class="link feed-add" data-feed-add>+ Add a school timetable or calendar</button>
+					<button type="button" class="link feed-add" data-classes hidden>Name your classes</button>
 				</div>
 			</div>
 			<div class="dev-body">
@@ -207,6 +210,18 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 					<div class="label">Weather</div>
 					<div data-weather></div>
 					<p class="muted small weather-hint">Today's high and low. Leave empty for none.</p>
+				</div>
+
+				<div class="daycfg">
+					<div class="label">Away and quiet hours</div>
+					<div class="dc-away">
+						<label class="dc-f"><span>Away until</span><input type="date" class="txt" data-away-until /></label>
+						<label class="dc-f grow"><span>Note on the screen</span><input class="txt" data-away-note maxlength="60" placeholder="Camping at Margaret River" autocomplete="off" /></label>
+						<button type="button" class="btn small" data-away-set>Set</button>
+					</div>
+					<p class="muted small dc-state" data-away-state hidden></p>
+					<label class="dc-quiet"><input type="checkbox" data-quiet-on /><span>No updates from</span><input type="time" class="txt" data-quiet-from /><span>to</span><input type="time" class="txt" data-quiet-to /></label>
+					<p class="muted small weather-hint">Away shows "Away until…" and only checks in every two days. Quiet hours pause timed updates overnight; the button still works.</p>
 				</div>
 
 				<div class="dev-foot">
@@ -348,7 +363,7 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 			const when = n ? (n.allDay ? new Date(n.ms).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : new Date(n.ms).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })) : '';
 			return `${f.count} coming up${n ? ` · next: ${esc(n.title)}, ${esc(when)}` : ''}`;
 		};
-		const drawFeeds = () => {
+		let drawFeeds = () => {
 			feedBox.innerHTML = feeds
 				.map((f) => `<div class="feed" data-id="${esc(f.id)}"><span class="feed-ico" aria-hidden="true">${f.kind === 'file' ? '▤' : '↻'}</span><span class="feed-t"><span class="feed-name">${esc(f.name)}</span><span class="feed-sub">${f.kind === 'file' ? 'File' : esc(f.host || 'Link')} · ${feedLine(f)}</span></span><button type="button" class="feed-del" data-del aria-label="Remove ${esc(f.name)}">&times;</button></div>`)
 				.join('');
@@ -439,6 +454,101 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 				flash(note, 'Could not add it.', true);
 			}
 		}
+
+		// class names for school timetables (src/lib/classes.ts)
+		const clsBtn = el.querySelector('[data-classes]') as HTMLButtonElement;
+		const showClsBtn = () => (clsBtn.hidden = !feeds.length);
+		const _drawFeeds = drawFeeds;
+		drawFeeds = () => {
+			_drawFeeds();
+			showClsBtn();
+		};
+		clsBtn.addEventListener('click', async () => {
+			flash(note, 'Loading your classes…');
+			let j: any;
+			try {
+				j = await (await fetch('/api/dashboard/classes?deviceId=' + encodeURIComponent(d.id))).json();
+			} catch {
+				return flash(note, 'Could not load your classes.', true);
+			}
+			flash(note, '');
+			const list: any[] = Array.isArray(j.classes) ? j.classes : [];
+			if (!list.length) return flash(note, 'No classes found yet. They show up once your timetable has some repeats in it.', true);
+			const body = document.createElement('div');
+			body.className = 'cls-dlg';
+			body.innerHTML = `
+				<datalist id="subj-${esc(d.id)}">${SUBJECTS.map((s) => `<option value="${esc(s)}"></option>`).join('')}</datalist>
+				<div class="cls-head"><span>Code</span><span>Name on the screen</span><span>Bring</span></div>
+				<div class="cls-list">${list
+					.map(
+						(c) => `<div class="cls-row" data-code="${esc(c.code)}">
+							<div class="cls-code"><b>${esc(c.code)}</b><span>${c.room ? esc(c.room) + ' · ' : ''}${c.count ? c.count + '×' : 'not on now'}</span></div>
+							<input class="x-dlg-field" data-n list="subj-${esc(d.id)}" maxlength="40" placeholder="${esc(c.code)}" value="${esc(c.name)}" autocomplete="off" />
+							<input class="x-dlg-field" data-b maxlength="40" placeholder="Nothing" value="${esc(c.bring)}" autocomplete="off" />
+						</div>`
+					)
+					.join('')}</div>
+				<label class="cls-opt"><input type="checkbox" data-rooms ${j.opts?.rooms !== false ? 'checked' : ''} /> Show the room after the name</label>
+				<label class="cls-opt"><input type="checkbox" data-moves ${j.opts?.moves !== false ? 'checked' : ''} /> Point out room changes</label>`;
+			if (!(await ask('Give your class codes proper names. Pick one from the list or type your own. Bring shows on the Night before screen.', { title: 'Name your classes', ok: 'Save', body }))) return;
+			const classes = [...body.querySelectorAll<HTMLElement>('.cls-row')].map((r) => ({ code: r.dataset.code, name: (r.querySelector('[data-n]') as HTMLInputElement).value.trim(), bring: (r.querySelector('[data-b]') as HTMLInputElement).value.trim() }));
+			const opts = { rooms: (body.querySelector('[data-rooms]') as HTMLInputElement).checked, moves: (body.querySelector('[data-moves]') as HTMLInputElement).checked };
+			const r = await post('/api/dashboard/classes', { deviceId: d.id, classes, opts });
+			flash(note, r.ok ? 'Saved. Your calendar uses the names from its next update.' : r.error || 'Could not save.', !r.ok);
+		});
+
+		// away mode and quiet hours (src/lib/eink/dayCfg.ts)
+		let dayCfg: any = d.dayCfg ?? { away: null, quiet: { on: false, from: 1320, to: 360 } };
+		const $q = <T extends HTMLElement>(s: string) => el.querySelector(s) as T;
+		const awayUntil = $q<HTMLInputElement>('[data-away-until]');
+		const awayNote = $q<HTMLInputElement>('[data-away-note]');
+		const awayState = $q<HTMLElement>('[data-away-state]');
+		const awaySet = $q<HTMLButtonElement>('[data-away-set]');
+		const qOn = $q<HTMLInputElement>('[data-quiet-on]');
+		const qFrom = $q<HTMLInputElement>('[data-quiet-from]');
+		const qTo = $q<HTMLInputElement>('[data-quiet-to]');
+		const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+		const mOf = (v: string) => {
+			const [h, m] = v.split(':').map(Number);
+			return (h || 0) * 60 + (m || 0);
+		};
+		const todayIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+		const drawDay = () => {
+			const on = dayCfg.away && dayCfg.away.until > todayIso();
+			awayUntil.min = todayIso();
+			awayUntil.value = on ? dayCfg.away.until : '';
+			awayNote.value = on ? dayCfg.away.note || '' : '';
+			awaySet.textContent = on ? 'Back now' : 'Set';
+			awaySet.classList.toggle('ghost', !!on);
+			awayState.hidden = !on;
+			if (on) awayState.textContent = `Away until ${new Date(dayCfg.away.until + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}. The screen changes at its next update, or press the button.`;
+			qOn.checked = !!dayCfg.quiet?.on;
+			qFrom.value = hm(dayCfg.quiet?.from ?? 1320);
+			qTo.value = hm(dayCfg.quiet?.to ?? 360);
+			qFrom.disabled = qTo.disabled = !qOn.checked;
+		};
+		const saveDay = async (msg: string) => {
+			const r = await post('/api/dashboard/daycfg', { deviceId: d.id, cfg: dayCfg });
+			if (r.ok) {
+				drawDay();
+				flash(note, msg);
+			} else flash(note, r.error || 'Could not save.', true);
+		};
+		awaySet.addEventListener('click', () => {
+			if (dayCfg.away && dayCfg.away.until > todayIso()) {
+				dayCfg = { ...dayCfg, away: null };
+				return saveDay('Welcome back. Press the button to update the screen now.');
+			}
+			if (!awayUntil.value || awayUntil.value <= todayIso()) return flash(note, 'Pick the day you’re back.', true);
+			dayCfg = { ...dayCfg, away: { until: awayUntil.value, note: awayNote.value.trim() } };
+			saveDay('Away mode on.');
+		});
+		for (const i of [qOn, qFrom, qTo])
+			i.addEventListener('change', () => {
+				dayCfg = { ...dayCfg, quiet: { on: qOn.checked, from: mOf(qFrom.value), to: mOf(qTo.value) } };
+				saveDay(qOn.checked ? `No updates from ${qFrom.value} to ${qTo.value}.` : 'Quiet hours off.');
+			});
+		drawDay();
 
 		// weather location: saves the moment you pick (or clear) a city
 		el.querySelector('[data-weather]')!.appendChild(
@@ -789,7 +899,27 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 	.dash .feed-err { color: #d9776f; white-space: normal; }
 	.dash .feed-del { background: none; border: none; color: var(--muted); font-size: 1.3em; line-height: 1; padding: 0.1em 0.35em; }
 	.dash .feed-del:hover { color: var(--fg); }
-	.dash .feed-add { margin-top: 0.6em; font-size: 0.88em; }
+	.dash .feed-add { margin-top: 0.6em; font-size: 0.88em; margin-right: 1.2em; }
+	.x-dlg:has(.cls-dlg) { width: min(600px, 100%); }
+	.cls-dlg { margin: -0.4em 0 1em; font-size: 0.9em; }
+	.cls-dlg .cls-head, .cls-dlg .cls-row { display: grid; grid-template-columns: 7em 1.3fr 1fr; gap: 0.5em; align-items: center; }
+	.cls-dlg .cls-head { font-size: 0.72em; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.4em; }
+	.cls-dlg .cls-list { max-height: min(46vh, 420px); overflow-y: auto; display: grid; gap: 0.45em; padding-right: 0.2em; }
+	.cls-dlg .cls-code { display: grid; min-width: 0; }
+	.cls-dlg .cls-code b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.cls-dlg .cls-code span { font-size: 0.78em; color: var(--muted); }
+	.cls-dlg .x-dlg-field { margin: 0; padding: 0.5em 0.6em; font-size: 0.92em; min-width: 0; }
+	.cls-dlg .cls-opt { display: flex; gap: 0.5em; align-items: center; margin-top: 0.8em; color: var(--muted); }
+	.dash .daycfg { margin-top: 1.4em; }
+	.dash .dc-away { display: flex; gap: 0.6em; align-items: end; flex-wrap: wrap; }
+	.dash .dc-f { display: grid; gap: 0.3em; font-size: 0.8em; color: var(--muted); }
+	.dash .dc-f.grow { flex: 1; min-width: 10em; }
+	.dash .dc-f .txt { font-size: 1.15em; }
+	.dash .dc-state { margin: 0.6em 0 0; }
+	.dash .dc-state[hidden] { display: none; }
+	.dash .dc-quiet { display: flex; gap: 0.5em; align-items: center; flex-wrap: wrap; margin-top: 0.9em; font-size: 0.92em; }
+	.dash .dc-quiet .txt { width: auto; padding: 0.35em 0.5em; }
+	.dash .dc-quiet .txt:disabled { opacity: 0.45; }
 	.feed-dlg { margin: -0.4em 0 1.1em; font-size: 0.92em; }
 	.feed-dlg .fd-tabs { display: flex; gap: 0.35em; margin-bottom: 0.9em; flex-wrap: wrap; }
 	.feed-dlg .fd-tab { padding: 0.45em 0.9em; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--muted); font: inherit; font-size: 0.9em; font-weight: 600; }

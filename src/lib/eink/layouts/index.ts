@@ -6,7 +6,7 @@
 // No firmware change is needed, devices pick it up the next time they wake.
 import { DEFAULT_FAMILY, isFamily, type Family } from '../fonts';
 import { getClock, isClock, setClock } from '../clock';
-import type { LayoutCtx } from '../context';
+import type { CalEvent, LayoutCtx } from '../context';
 import { cleanText, cleanTitle, toAscii } from '../draw';
 import { getLang, isLang, setLang } from '../i18n';
 import { convertWeather, getUnit, isTempUnit, setUnit } from '../units';
@@ -27,6 +27,9 @@ import { messages } from './messages';
 import { reminders } from './reminders';
 import { habits } from './habits';
 import { notes } from './notes';
+import { tomorrow } from './tomorrow';
+import { timetable } from './timetable';
+import { away } from './away';
 import { renderCustom } from '../builder/render';
 import { sanitizeLayout, sanitizeSign, signLayout, type SignStyle } from '../builder/model';
 
@@ -59,6 +62,9 @@ export const LAYOUTS: Record<string, LayoutEntry> = {
 	reminders: { render: reminders, font: 'sans' },
 	habits: { render: habits, font: 'sans' },
 	notes: { render: notes, font: 'sans' },
+	tomorrow: { render: tomorrow, font: 'sans' },
+	timetable: { render: timetable, font: 'sans' },
+	away: { render: away, font: 'sans' },
 };
 
 // The font a layout uses when nothing else is chosen.
@@ -75,7 +81,10 @@ const JAPANESE_EVENT_TITLES = false;
 export function renderLayout(styleId: string, ctx: Omit<LayoutCtx, 'family'>, familyOverride?: unknown): string {
 	const entry = LAYOUTS[styleId] ?? LAYOUTS.agenda;
 	const family = isFamily(familyOverride) ? familyOverride : isFamily(entry.font) ? entry.font : DEFAULT_FAMILY;
-	const events = ctx.events.map((e) => ({ ...e, title: JAPANESE_EVENT_TITLES ? cleanText(e.title, true) || '(event)' : cleanTitle(e.title) }));
+	const ct = (t: string) => (JAPANESE_EVENT_TITLES ? cleanText(t, true) || '(event)' : cleanTitle(t));
+	const cleanEv = (e: CalEvent): CalEvent => ({ ...e, title: ct(e.title), ...(e.name ? { name: ct(e.name) } : {}), ...(e.room ? { room: ct(e.room) } : {}), ...(e.bring ? { bring: ct(e.bring) } : {}) });
+	const events = ctx.events.map(cleanEv);
+	const due = ctx.due ? ctx.due.map(cleanEv) : ctx.due;
 	const tasks = ctx.tasks ? ctx.tasks.map((t) => ({ ...t, title: JAPANESE_EVENT_TITLES ? cleanText(t.title, true) : toAscii(t.title, true) })) : ctx.tasks;
 	const before = getLang();
 	const beforeUnit = getUnit();
@@ -85,7 +94,7 @@ export function renderLayout(styleId: string, ctx: Omit<LayoutCtx, 'family'>, fa
 	setUnit(unit);
 	setClock(isClock(ctx.clock) ? ctx.clock : '24');
 	try {
-		return entry.render({ ...ctx, events, tasks, family, weather: convertWeather(ctx.weather, unit) });
+		return entry.render({ ...ctx, events, due, tasks, family, weather: convertWeather(ctx.weather, unit) });
 	} finally {
 		setLang(before);
 		setUnit(beforeUnit);

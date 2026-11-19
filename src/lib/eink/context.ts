@@ -13,6 +13,12 @@ export interface CalEvent {
 	startLocal: number; // local wall-clock seconds (all-day events: that date's midnight)
 	allDay: boolean;
 	endLocal?: number; // local wall-clock end (all-day events: the midnight after the last day)
+	// School timetables (src/lib/classes.ts): the class name without the room, its room, whether
+	// that's not its usual room, and what to bring.
+	name?: string;
+	room?: string;
+	moved?: boolean;
+	bring?: string;
 }
 
 // One day of the weather forecast (Open-Meteo weather code, temperatures in C, rain chance %, wind km/h).
@@ -63,6 +69,10 @@ export interface LayoutCtx {
 	reminders?: import('./reminders').Reminder[] | null;
 	// Habits ticked off in Customize display (src/lib/eink/habits.ts).
 	habits?: import('./habits').Habit[] | null;
+	// Tests, exams and assignments in the next two weeks (src/lib/eink/school.ts), soonest first.
+	due?: CalEvent[] | null;
+	// Away mode: the date it's back (YYYY-MM-DD) and a note (src/lib/eink/dayCfg.ts).
+	away?: { until: string; note: string } | null;
 }
 
 export interface ScreenMsg {
@@ -174,4 +184,10 @@ export function relDayText(evDay: number, today: number): string {
 	if (n <= 0) return tr('Today');
 	if (n === 1) return tr('Tomorrow');
 	return tr(`in ${n} days`);
+}
+
+// "08:50" (or "8:50 am", by the clock setting) for a local wall-clock time.
+export function timeTextOf(localSec: number): string {
+	const t = tmOf(localSec);
+	return timeText(t.hour, t.min);
 }

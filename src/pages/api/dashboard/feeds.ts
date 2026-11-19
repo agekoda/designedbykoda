@@ -95,7 +95,7 @@ export async function POST({ request, locals }: any) {
 	if ('error' in r) return json({ error: r.error }, 400);
 	if (!r.events.length) return json({ error: 'That file has nothing in it from today on.' }, 400);
 	const f: Feed = { id: newId(), name: cleanName(body.name, 'Timetable'), url: null, createdAt: Math.floor(now / 1000) };
-	await db.prepare('INSERT INTO device_feeds (device_id, id, name, url, created_at) VALUES (?, ?, NULL, ?, ?)').bind(deviceId, f.id, f.name, f.createdAt).run();
+	await db.prepare('INSERT INTO device_feeds (device_id, id, name, url, created_at) VALUES (?, ?, ?, NULL, ?)').bind(deviceId, f.id, f.name, f.createdAt).run();
 	await storeEvents(db, deviceId, f, tz, r.events, f.createdAt);
 	return json({ ok: true, feed: await statusOf(db, deviceId, f, tz, now) });
 }
