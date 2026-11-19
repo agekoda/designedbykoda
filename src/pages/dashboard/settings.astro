@@ -73,6 +73,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 					<div class="details" id="details">
 					<div id="opt-sign" hidden>
 						<div id="sign-fields"></div>
+						<p class="muted small sign-note" id="sign-note" hidden></p>
 						<a class="btn small ghost" id="sign-builder" href="#">Edit the layout in the builder</a>
 						<p class="muted small hint">Opens it in the layout builder as a new design of your own, where you can move things around and add widgets.</p>
 					</div>
@@ -396,7 +397,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const layoutOf = (id: string) => (id === 'custom' ? customLayout : designOf(id)?.layout ?? null);
 	const renderId = (id: string) => (isDesign(id) ? 'custom' : id);
 	// which group each ready-made screen sits in, for the picker's filters
-	const GROUP: Record<string, string> = { agenda: 'cal', month: 'cal', week: 'cal', bigdate: 'cal', timeline: 'cal', tomorrow: 'cal', timetable: 'cal', nextup: 'cal', planner: 'cal', room: 'sign', guest: 'sign', nameplate: 'sign', messages: 'glance', notes: 'glance', habits: 'glance', reminders: 'glance', moon: 'glance', quote: 'glance', countdown: 'glance', todo: 'glance', frame: 'glance', custom: 'mine' };
+	const GROUP: Record<string, string> = { agenda: 'cal', month: 'cal', week: 'cal', bigdate: 'cal', timeline: 'cal', tomorrow: 'cal', timetable: 'cal', nextup: 'cal', planner: 'cal', room: 'sign', guest: 'sign', nameplate: 'sign', waiting: 'sign', messages: 'glance', notes: 'glance', habits: 'glance', reminders: 'glance', moon: 'glance', quote: 'glance', countdown: 'glance', todo: 'glance', frame: 'glance', custom: 'mine' };
 	const families: { id: string; label: string }[] = JSON.parse(root.dataset.families!);
 	const dithers: { id: string; label: string; note: string }[] = JSON.parse(root.dataset.dithers!);
 	const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -1240,6 +1241,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			{ key: 'name', label: 'Name', max: 40 },
 			{ key: 'role', label: 'Role', max: 40 },
 		],
+		waiting: [
+			{ key: 'title', label: 'Name of the place', max: 40 },
+			{ key: 'note', label: 'Bottom line', max: 60 },
+		],
 	};
 	let signFor = '';
 	function syncSignFields() {
@@ -1261,6 +1266,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				if (document.activeElement !== el && el.value !== (vals[el.dataset.k!] ?? '')) el.value = vals[el.dataset.k!] ?? '';
 			});
 		}
+		const note = $('sign-note');
+		note.hidden = id !== 'waiting';
+		if (id === 'waiting') note.innerHTML = 'Names come from today\u2019s appointments in <a href="#calendars" data-go="calendars">your calendars</a>, like a booking system\u2019s calendar link. Only the first name and the first letter of the surname show (Sam K.). You can change that in the builder.';
 		signBuilder.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId) + '&seed=1';
 		signBuilder.dataset.builder = '1';
 	}
@@ -1941,6 +1949,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .cat.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 	.cust .picker-scroll { flex: 1; overflow-y: auto; padding: 1.2em 1.4em 2em; }
 	.cust .lay[hidden], .cust #mine-head[hidden], .cust #design-cards[hidden] { display: none; }
+	.cust .sign-note { margin: 0.4em 0 1.1em; }
 	.cust .gname { font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 1.8em 0 0.8em; }
 	.cust .lay { position: relative; display: block; }
 	.cust .lay-edit { position: absolute; top: 0.9em; right: 0.9em; background: var(--fg); color: var(--bg); font-size: 0.75em; font-weight: 700; padding: 0.25em 0.75em; border-radius: 999px; text-decoration: none; opacity: 0; transition: opacity 0.2s; }
@@ -2031,7 +2040,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.sp-add { margin-top: 0.9em; }
 	.sp-adds { display: flex; gap: 0.6em; flex-wrap: wrap; margin-top: 0.9em; }
 	.sp-adds [hidden] { display: none; }
-	.sp-hint { margin: 0.9em 0 0; }
+	.sp-hint { margin: 1.1em 0 0; } /* the gap under every list or button in Settings: keep them all the same */
 	.sp-empty { padding: 1.2em; border: 1px dashed var(--border); border-radius: 14px; display: grid; gap: 0.4em; justify-items: start; }
 	.sp-empty p { margin: 0 0 0.5em; }
 	.sp-save { margin-top: 1.1em; }
@@ -2293,7 +2302,6 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	/* Google calendars: the Primary pill sits after the name */
 	.sp-inline { display: flex; align-items: center; gap: 0.6em; flex-wrap: wrap; }
 	.sp-inline .sp-tag { margin-left: 0; }
-	#sp-weather .sp-hint, #sp-feeds .sp-add + .sp-hint { margin-top: 1.1em; }
 	.sp-fc { margin-top: 1.6em; }
 	.sp-fc:empty { display: none; }
 	.sp-fc-today { display: flex; align-items: center; gap: 0.8em; margin: 0.6em 0 1em; font-size: 1.15em; }

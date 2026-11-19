@@ -36,6 +36,7 @@ export const CALENDAR_STYLES: CalendarStyle[] = [
 	{ id: 'room', label: 'Meeting room', note: 'Free or in use, and today\'s bookings', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 16, sign: true, setup: false },
 	{ id: 'guest', label: 'Guest welcome', note: 'Wi-Fi QR code, house rules and check-out', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 17, sign: true, setup: false },
 	{ id: 'nameplate', label: 'Desk name plate', note: 'Your name, role, and if you\'re free', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 18, sign: true, setup: false },
+	{ id: 'waiting', label: 'Waiting room', note: 'Who\'s being seen now, and who\'s next', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 25, sign: true, setup: false },
 	{ id: 'month', label: 'Month', note: 'The whole month, with marks on busy days', image: '/images/polls/eink-styles/month.png', imageDark: '/images/polls/eink-styles/month-dark.png', view: 4 },
 	{ id: 'bigdate', label: 'Big date', note: 'A huge date beside an upcoming list', image: '/images/polls/eink-styles/bigdate.png', imageDark: '/images/polls/eink-styles/bigdate-dark.png', view: 5 },
 	{ id: 'week', label: 'Week', note: 'This week, day by day', image: '/images/polls/eink-styles/week.png', imageDark: '/images/polls/eink-styles/week-dark.png', view: 6 },

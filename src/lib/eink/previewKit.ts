@@ -52,6 +52,13 @@ export function sampleDay(nowLocal: number): CalEvent[] {
 	];
 }
 
+// A day of appointments, for the Waiting room preview (titles the way booking systems write them).
+export function sampleAppointments(nowLocal: number): CalEvent[] {
+	const day = Math.floor(nowLocal / 86400) * 86400;
+	const names = ['Priya Mehta - Initial consult', 'Sam Kowalski - Follow-up', 'Jordan Taylor - Follow-up', 'Mei Chen - Review', 'Lee Wong - Initial consult', 'Ava Brown - Follow-up', 'Noah Singh - Review', 'Ruby Clarke - Follow-up'];
+	return names.map((title, i) => ({ title, startLocal: day + 9 * 3600 + i * 45 * 60, endLocal: day + 9 * 3600 + i * 45 * 60 + 40 * 60, allDay: false }));
+}
+
 // Example tasks for the To-do preview.
 export const SAMPLE_TASKS: TaskItem[] = [
 	{ title: 'Book the dentist', done: false, due: 'overdue' },
@@ -142,11 +149,14 @@ export function drawListFor(o: PreviewOptions): string {
 	const timeline = o.style === 'timeline';
 	// The live Timeline preview pretends it is 9:00 am, so the moving bar is always on show.
 	if ((timeline || o.style === 'timetable') && (o.refreshSec ?? 86400) < 86400) nowLocal = Math.floor(nowLocal / 86400) * 86400 + 9 * 3600;
+	// The Waiting room preview pretends it is 9:55 am, so someone is being seen and others are waiting.
+	const waiting = o.style === 'waiting';
+	if (waiting) nowLocal = Math.floor(nowLocal / 86400) * 86400 + 9 * 3600 + 55 * 60;
 	return renderLayout(
 		o.style,
 		{
 			nowLocal,
-			events: timeline ? sampleDay(nowLocal) : o.style === 'tomorrow' || o.style === 'timetable' ? sampleSchool(nowLocal) : sampleEvents(nowLocal),
+			events: waiting ? sampleAppointments(nowLocal) : timeline ? sampleDay(nowLocal) : o.style === 'tomorrow' || o.style === 'timetable' ? sampleSchool(nowLocal) : sampleEvents(nowLocal),
 			weather: o.hasWeather ? sampleWeather(nowLocal) : null,
 			vbat: o.vbat ?? null,
 			dark: o.dark,

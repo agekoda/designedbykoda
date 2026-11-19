@@ -56,7 +56,7 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 	import { renderPreview, paintScreen } from '../lib/eink/previewKit';
 	import { batteryPercent } from '../lib/eink/battery';
 	import { estimate, measured, lifeText } from '../lib/eink/batteryLife';
-	import { layoutNeeds } from '../lib/eink/builder/model';
+	import { layoutNeeds, LIVE_SIGNS } from '../lib/eink/builder/model';
 	import { CALENDAR_STYLES } from '../data/calendarStyles';
 	import { ask } from '../lib/dialog';
 	const list = document.getElementById('devices')!;
@@ -169,7 +169,7 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 			if (needs) el.classList.add('warn');
 			// days left: from real use once there's enough of it, else from the settings
 			const real = measured(d.batteryAnchorMv, d.batteryAnchorAt, d.batteryMv, d.batteryAt);
-			const live = layoutNeeds(layoutFor(d, d.style)).live || d.style === 'room' || d.style === 'nameplate';
+			const live = layoutNeeds(layoutFor(d, d.style)).live || LIVE_SIGNS.includes(d.style);
 			const left = real ? real.left : (estimate({ style: d.style, refreshSec: d.refreshIntervalSec, schedule: d.schedule, live, msgCheck: d.msgCheck }) * pct) / 100;
 			const leftText = needs ? ' · Needs charging' : pct >= 99 && !real ? '' : ` · ${lifeText(left)} left`;
 			battery = `<span class="sep">·</span><button type="button" data-batt aria-expanded="false" class="batt${needs ? ' needs' : ''}" title="Battery level${d.batteryAt ? ', ' + ago(d.batteryAt) : ''}${real ? '. Time left is from how fast it has actually been using its battery.' : '. Time left is an estimate from its settings.'}"><span class="batt-icon ${needs ? 'flat' : pct < 20 ? 'low' : ''}"><i style="width:${Math.max(6, pct)}%"></i></span>${pct}%${leftText}<span class="caret" aria-hidden="true">▾</span></button>`;

@@ -25,6 +25,7 @@ export const isJa = (): boolean => current === 'ja';
 const JA: Record<string, string> = {
 	// headers
 	'now': '今', 'Now': '今',
+	'Now seeing': 'ただいまの順番', 'No more appointments today': '本日の予約は終了しました', 'Please let reception know you\'re here': '受付にお声がけください',
 	'UPCOMING': '今後の予定',
 	'NEXT UP': '次の予定',
 	'COUNTDOWN': 'カウントダウン',
@@ -181,6 +182,7 @@ const PATTERNS: [RegExp, (...m: string[]) => string][] = [
 	[/^(Today|Tomorrow), all day$/, (_a, w) => `${w === 'Today' ? '今日' : '明日'}・終日`],
 	[/^(Today|Tomorrow), (\d\d:\d\d)$/, (_a, w, t) => `${w === 'Today' ? '今日' : '明日'} ${t}`],
 	[/^All day: (.*)$/, (_a, rest) => `終日: ${rest}`],
+	[/^Next, at (.+)$/, (_a, t) => `次: ${t}`],
 	[/^in (\d+) min$/, (_a, n) => `あと${n}分`],
 	[/^in (\d+)h (\d+)m$/, (_a, h, m) => `あと${h}時間${m}分`],
 	[/^in (\d+) h$/, (_a, h) => `あと${h}時間`],
