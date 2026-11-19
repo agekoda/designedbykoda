@@ -8,6 +8,7 @@
 // is actually moving across the timeline: from the first visible hour to the last, then
 // it sleeps until midnight.
 import { deg } from '../units';
+import { tr } from '../i18n';
 import { hourText, minutesText, rangeText } from '../clock';
 import { Draw, PAPER } from '../draw';
 import { firstThatFits, measure } from '../measure';
@@ -103,7 +104,8 @@ function wrapLines(fam: LayoutCtx['family'], role: 's' | 'sb', text: string, max
 
 // Draws `text` wrapped onto up to `maxLines` lines from baseline y; returns the baseline after it.
 function para(d: Draw, fam: LayoutCtx['family'], x: number, y: number, role: 's' | 'sb', text: string, maxW: number, maxLines = 2, lh = 17): number {
-	for (const ln of wrapLines(fam, role, text, maxW, maxLines)) {
+	// translate the whole line first: a wrapped half of "in 20 min" wouldn't match a translation
+	for (const ln of wrapLines(fam, role, tr(text), maxW, maxLines)) {
 		d.text(x, y, role, ln, { maxW });
 		y += lh;
 	}
@@ -147,14 +149,18 @@ export function timeline(ctx: LayoutCtx): string {
 
 	// hour ruler
 	const step = hourPx >= 15 ? 1 : hourPx * 2 >= 15 ? 2 : hourPx * 3 >= 15 ? 3 : 4;
-	const labelW = measure(fam, 's', '00:00').right;
+	// the label column fits the widest label actually drawn ("午前8時" is wider than "8am" or "08:00")
+	const labels = new Map<number, string>();
+	for (let h = w.start; h <= w.end; h++) if ((h - w.start) % step === 0) labels.set(h, tr(hourText(h, h === w.start)));
+	const labelW = Math.max(measure(fam, 's', '00:00').right, ...[...labels.values()].map((t) => measure(fam, 's', t).right));
 	const lineX = 8 + labelW + 6;
 	const blockX = lineX + 4;
 	const blockR = 262;
 	for (let h = w.start; h <= w.end; h++) {
 		const y = Math.round(yOf(h));
 		d.dots(lineX, y, blockR - lineX, 4);
-		if ((h - w.start) % step === 0) d.text(8, y + 4, 's', hourText(h, h === w.start));
+		const lab = labels.get(h);
+		if (lab) d.text(8, y + 4, 's', lab);
 	}
 
 	// the bar for "now" (only while it moves across the timeline)

@@ -24,6 +24,7 @@ export const isJa = (): boolean => current === 'ja';
 // Whole-phrase translations (the whole drawn string has to match).
 const JA: Record<string, string> = {
 	// headers
+	'now': '今', 'Now': '今',
 	'UPCOMING': '今後の予定',
 	'NEXT UP': '次の予定',
 	'COUNTDOWN': 'カウントダウン',
@@ -180,6 +181,9 @@ const PATTERNS: [RegExp, (...m: string[]) => string][] = [
 	[/^(Today|Tomorrow), all day$/, (_a, w) => `${w === 'Today' ? '今日' : '明日'}・終日`],
 	[/^(Today|Tomorrow), (\d\d:\d\d)$/, (_a, w, t) => `${w === 'Today' ? '今日' : '明日'} ${t}`],
 	[/^All day: (.*)$/, (_a, rest) => `終日: ${rest}`],
+	[/^in (\d+) min$/, (_a, n) => `あと${n}分`],
+	[/^in (\d+)h (\d+)m$/, (_a, h, m) => `あと${h}時間${m}分`],
+	[/^in (\d+) h$/, (_a, h) => `あと${h}時間`],
 ];
 
 export function tr(s: string): string {

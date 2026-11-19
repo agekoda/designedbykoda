@@ -325,6 +325,7 @@ export function mountWeather(box: HTMLElement, d: any, toast: Toast) {
 				if (r.ok) {
 					d.location = c ? { name: c.label } : null;
 					toast(c ? 'Saved. Weather appears on the next update.' : 'Weather removed.');
+					loadForecast();
 				} else toast(r.error || 'Could not save the location.', true);
 			},
 		})
@@ -333,6 +334,39 @@ export function mountWeather(box: HTMLElement, d: any, toast: Toast) {
 	p.className = 'muted small sp-hint';
 	p.textContent = "Today's high and low, the forecast on screens that show it, and sunrise and sunset for Moon & Sun. Leave it empty for no weather.";
 	box.appendChild(p);
+	// the forecast the calendar will show: from the same shared copy it uses, so looking costs nothing
+	const fc = document.createElement('div');
+	fc.className = 'sp-fc';
+	box.appendChild(fc);
+	const ICON: Record<string, string> = { clear: '☀', partly: '⛅', cloudy: '☁', fog: '🌫', drizzle: '🌦', rain: '🌧', snow: '❄', thunder: '⛈' };
+	const kind = (c: number) => (c <= 1 ? 'clear' : c === 2 ? 'partly' : c === 3 ? 'cloudy' : c === 45 || c === 48 ? 'fog' : c >= 51 && c <= 57 ? 'drizzle' : (c >= 61 && c <= 67) || (c >= 80 && c <= 82) ? 'rain' : (c >= 71 && c <= 77) || c === 85 || c === 86 ? 'snow' : c >= 95 ? 'thunder' : 'cloudy');
+	async function loadForecast() {
+		if (!d.location) {
+			fc.innerHTML = '';
+			return;
+		}
+		fc.innerHTML = '<p class="muted small">Loading the forecast…</p>';
+		try {
+			const r = await fetch('/api/dashboard/weather?deviceId=' + encodeURIComponent(d.id));
+			const j = await r.json();
+			if (!j.ok || !j.days?.length) {
+				fc.innerHTML = j.error ? `<p class="muted small">${esc(j.error)}</p>` : '';
+				return;
+			}
+			const f = d.unit === 'f';
+			const t = (c: number) => `${Math.round(f ? (c * 9) / 5 + 32 : c)}°`;
+			const day = (iso: string, i: number) => (i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : iso ? new Date(iso + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short' }) : '');
+			const [today, ...rest] = j.days;
+			const extra = [today.rain != null ? `${today.rain}% chance of rain` : '', today.wind != null ? `wind up to ${today.wind} km/h` : ''].filter(Boolean).join(' · ');
+			fc.innerHTML = `<div class="label sub">Forecast for ${esc(j.name || 'your place')}</div>
+				<div class="sp-fc-today"><span class="sp-fc-ico" aria-hidden="true">${ICON[kind(today.code)]}</span><span><b>${t(today.high)}</b> <span class="muted">/ ${t(today.low)}</span><span class="sp-fc-what">${esc(today.label)}${extra ? ' · ' + esc(extra) : ''}</span></span></div>
+				${rest.length ? `<div class="sp-fc-week">${rest.map((x: any, i: number) => `<div><span class="muted small">${esc(day(x.date, i + 1))}</span><span class="sp-fc-ico" aria-hidden="true" title="${esc(x.label)}">${ICON[kind(x.code)]}</span><b>${t(x.high)}</b><span class="muted small">${t(x.low)}</span></div>`).join('')}</div>` : ''}
+				<p class="muted small">The calendar fetches this itself when it updates. Looking here doesn't use its battery.</p>`;
+		} catch {
+			fc.innerHTML = '';
+		}
+	}
+	loadForecast();
 }
 
 // ---------------------------------------------------------------- away dates and quiet hours
