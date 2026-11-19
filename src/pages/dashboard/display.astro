@@ -105,7 +105,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						</div>
 					<div id="refresh-box" hidden>
 						<div class="label sub">How often it updates</div>
-						<div class="seg wrap" id="refreshes" role="radiogroup" aria-label="How often the Timeline updates"></div>
+						<div class="seg wrap" id="refreshes" role="radiogroup" aria-label="How often the screen updates"></div>
 						<p class="muted small hint" id="refresh-hint"></p>
 					</div>
 
@@ -624,7 +624,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	async function redraw() {
 		const common = { font: effFont(), dark: st.dark, lang: st.lang, unit: st.unit, clock: st.clock, hasWeather, vbat: vbat ?? 4.12, refreshSec: st.refreshSec };
 		try {
-			const r = await renderPreview({ ...common, style: renderId(fs()), ...extras(fs(), false), refreshSec: fs() === 'timeline' ? st.refreshSec : 86400 });
+			const r = await renderPreview({ ...common, style: renderId(fs()), ...extras(fs(), false), refreshSec: fs() === 'timeline' || fs() === 'timetable' ? st.refreshSec : 86400 });
 			paintScreen($<HTMLCanvasElement>('cur-thumb'), r.px, { mode: 'screen', scale: 1 });
 			const dpr = window.devicePixelRatio || 1;
 			// Fill the column whatever the screen size or zoom: draw at the next whole-number scale up
@@ -932,7 +932,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		langEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.lang));
 		unitEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.unit));
 		clockEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.clock));
-		refreshBox.hidden = !usedStyles().includes('timeline');
+		refreshBox.hidden = !usedStyles().some((x) => x === 'timeline' || x === 'timetable');
 		refreshEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = parseInt(i.value, 10) === st.refreshSec));
 		refreshHint.textContent = REFRESH_HINTS[st.refreshSec] ?? '';
 

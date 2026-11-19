@@ -91,6 +91,19 @@ function secondsUntilNextRefresh(nowLocal: number, intervalSec: number): number 
 	return Math.max(30, raw);
 }
 
+// School week: once a day at midnight, or every 1 / 2 / 4 / 12 hours from 7 am to 5 pm (the "now"
+// bar moves), asleep overnight apart from the midnight wake.
+function timetableSleep(nowLocal: number, intervalSec: number): number {
+	const s = ((nowLocal % 86400) + 86400) % 86400;
+	const toMidnight = 86400 - s;
+	if (intervalSec >= 86400) return Math.max(30, toMidnight);
+	const start = 7 * 3600, end = 17 * 3600;
+	if (s < start) return Math.max(30, start - s);
+	if (s >= end) return Math.max(30, toMidnight);
+	const next = start + (Math.floor((s - start) / intervalSec) + 1) * intervalSec;
+	return Math.max(30, Math.min(next, end) - s);
+}
+
 export async function GET({ params, request, locals }) {
 	const env = locals.runtime?.env ?? {};
 	const reqUrl = new URL(request.url);
@@ -603,7 +616,7 @@ export async function GET({ params, request, locals }) {
 		// How long to sleep: the layout's own answer, but wake sooner for a scheduled screen change,
 		// and (for a "Free or busy" widget) when a meeting starts or ends.
 		const evs = trimmedEvents.map((e) => ({ title: e.title, startLocal: e.startLocal, allDay: e.allDay, endLocal: e.endLocal }));
-		let sleepSec = style === 'timeline' ? timelineSleep(nowLocal, evs, intervalSec) : secondsUntilNextRefresh(nowLocal, 86400);
+		let sleepSec = style === 'timeline' ? timelineSleep(nowLocal, evs, intervalSec) : style === 'timetable' ? timetableSleep(nowLocal, intervalSec) : secondsUntilNextRefresh(nowLocal, 86400);
 		if (screens.changeIn !== null) sleepSec = Math.min(sleepSec, Math.max(30, screens.changeIn));
 		if (needs.live) {
 			const edge = secondsToNextEventEdge(evs, nowLocal);

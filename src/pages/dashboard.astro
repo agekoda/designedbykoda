@@ -256,7 +256,6 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 					<div class="label">Timetables and other calendars</div>
 					<div class="feed-list" data-feeds></div>
 					<button type="button" class="link feed-add" data-feed-add>+ Add a school timetable or calendar</button>
-					<button type="button" class="link feed-add" data-classes hidden>Name your classes</button>
 				</div>
 			</div>
 			<div class="dev-body">
@@ -283,14 +282,9 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 
 				<div class="daycfg">
 					<div class="label">Away and quiet hours</div>
-					<div class="dc-away">
-						<label class="dc-f"><span>Away until</span><input type="date" class="txt" data-away-until /></label>
-						<label class="dc-f grow"><span>Note on the screen</span><input class="txt" data-away-note maxlength="60" placeholder="Camping at Margaret River" autocomplete="off" /></label>
-						<button type="button" class="btn small" data-away-set>Set</button>
-					</div>
-					<p class="muted small dc-state" data-away-state hidden></p>
-					<label class="dc-quiet"><input type="checkbox" data-quiet-on /><span>No updates from</span><input type="time" class="txt" data-quiet-from /><span>to</span><input type="time" class="txt" data-quiet-to /></label>
-					<p class="muted small weather-hint">Away shows "Away until…" and only checks in every two days. Quiet hours pause timed updates overnight; the button still works.</p>
+					<div class="feed-list" data-dc-list></div>
+					<button type="button" class="link feed-add" data-away-add>+ Add away dates</button>
+					<button type="button" class="link feed-add" data-quiet-add>+ Add quiet hours</button>
 				</div>
 
 				<div class="dev-foot">
@@ -434,7 +428,7 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 		};
 		let drawFeeds = () => {
 			feedBox.innerHTML = feeds
-				.map((f) => `<div class="feed" data-id="${esc(f.id)}"><span class="feed-ico" aria-hidden="true">${f.kind === 'file' ? '▤' : '↻'}</span><span class="feed-t"><span class="feed-name">${esc(f.name)}</span><span class="feed-sub">${f.kind === 'file' ? 'File' : esc(f.host || 'Link')} · ${feedLine(f)}</span></span><button type="button" class="feed-del" data-del aria-label="Remove ${esc(f.name)}">&times;</button></div>`)
+				.map((f) => `<div class="feed" data-id="${esc(f.id)}"><span class="feed-ico" aria-hidden="true">${f.kind === 'file' ? '▤' : '↻'}</span><span class="feed-t"><span class="feed-name">${esc(f.name)}</span><span class="feed-sub">${f.kind === 'file' ? 'File' : esc(f.host || 'Link')} · ${feedLine(f)}</span><button type="button" class="feed-edit feed-under" data-names>Name classes</button></span><button type="button" class="feed-del" data-del aria-label="Remove ${esc(f.name)}">&times;</button></div>`)
 				.join('');
 			feedAdd.hidden = feeds.length >= feedMax;
 		};
@@ -448,6 +442,7 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 			.catch(() => {});
 		feedBox.addEventListener('click', async (e) => {
 			const row = (e.target as HTMLElement).closest<HTMLElement>('.feed');
+			if (row && (e.target as HTMLElement).closest('[data-names]')) return openClasses(false);
 			if (!row || !(e.target as HTMLElement).closest('[data-del]')) return;
 			const f = feeds.find((x) => x.id === row.dataset.id);
 			if (!f || !(await ask(`${f.name} will stop showing on this calendar.`, { title: 'Remove this calendar?', ok: 'Remove', danger: true }))) return;
@@ -519,30 +514,25 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 				feeds.push(j.feed);
 				drawFeeds();
 				flash(note, `Added. It shows on the screen at the next update, or press the button.`);
+				openClasses(true);
 			} catch {
 				flash(note, 'Could not add it.', true);
 			}
 		}
 
 		// class names for school timetables (src/lib/classes.ts)
-		const clsBtn = el.querySelector('[data-classes]') as HTMLButtonElement;
-		const showClsBtn = () => (clsBtn.hidden = !feeds.length);
-		const _drawFeeds = drawFeeds;
-		drawFeeds = () => {
-			_drawFeeds();
-			showClsBtn();
-		};
-		clsBtn.addEventListener('click', async () => {
-			flash(note, 'Loading your classes…');
+		// after adding a timetable (justAdded) it opens by itself, with Skip; it stays quiet when there are no classes
+		async function openClasses(justAdded: boolean) {
+			if (!justAdded) flash(note, 'Loading your classes…');
 			let j: any;
 			try {
 				j = await (await fetch('/api/dashboard/classes?deviceId=' + encodeURIComponent(d.id))).json();
 			} catch {
 				return flash(note, 'Could not load your classes.', true);
 			}
-			flash(note, '');
 			const list: any[] = Array.isArray(j.classes) ? j.classes : [];
-			if (!list.length) return flash(note, 'No classes found yet. They show up once your timetable has some repeats in it.', true);
+			if (!list.length) return justAdded ? undefined : flash(note, 'No classes found yet. They show up once your timetable has some repeats in it.', true);
+			if (!justAdded) flash(note, '');
 			const body = document.createElement('div');
 			body.className = 'cls-dlg';
 			body.innerHTML = `
@@ -559,64 +549,79 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 				<label class="cls-opt"><input type="checkbox" data-rooms ${j.opts?.rooms !== false ? 'checked' : ''} /> Show the room after the name</label>
 				<label class="cls-opt"><input type="checkbox" data-moves ${j.opts?.moves !== false ? 'checked' : ''} /> Point out room changes</label>`;
 			body.querySelectorAll<HTMLElement>('.cls-row').forEach((r, i) => r.querySelector('[data-nslot]')!.replaceWith(subjectBox(list[i].name || '', list[i].code)));
-			if (!(await ask('Give your class codes proper names. Pick one from the list or type your own. Bring shows on the School day screen.', { title: 'Name your classes', ok: 'Save', body }))) return;
+			const intro = justAdded ? 'Your timetable calls classes by codes. Give them proper names now, or skip and do it later from the timetable on your dashboard.' : 'Give your class codes proper names. Pick one from the list or type your own. Bring shows on the School day screen.';
+			if (!(await ask(intro, { title: 'Name your classes', ok: 'Save', cancel: justAdded ? 'Skip' : 'Cancel', body }))) return;
 			const classes = [...body.querySelectorAll<HTMLElement>('.cls-row')].map((r) => ({ code: r.dataset.code, name: (r.querySelector('.cs-input') as HTMLInputElement).value.trim(), bring: (r.querySelector('[data-b]') as HTMLInputElement).value.trim() }));
 			const opts = { rooms: (body.querySelector('[data-rooms]') as HTMLInputElement).checked, moves: (body.querySelector('[data-moves]') as HTMLInputElement).checked };
 			const r = await post('/api/dashboard/classes', { deviceId: d.id, classes, opts });
 			flash(note, r.ok ? 'Saved. Your calendar uses the names from its next update.' : r.error || 'Could not save.', !r.ok);
-		});
+		}
 
-		// away mode and quiet hours (src/lib/eink/dayCfg.ts)
+		// away mode and quiet hours (src/lib/eink/dayCfg.ts): rows like the timetable list, added and edited in a box
 		let dayCfg: any = d.dayCfg ?? { away: null, quiet: { on: false, from: 1320, to: 360 } };
-		const $q = <T extends HTMLElement>(s: string) => el.querySelector(s) as T;
-		const awayUntil = $q<HTMLInputElement>('[data-away-until]');
-		const awayNote = $q<HTMLInputElement>('[data-away-note]');
-		const awayState = $q<HTMLElement>('[data-away-state]');
-		const awaySet = $q<HTMLButtonElement>('[data-away-set]');
-		const qOn = $q<HTMLInputElement>('[data-quiet-on]');
-		const qFrom = $q<HTMLInputElement>('[data-quiet-from]');
-		const qTo = $q<HTMLInputElement>('[data-quiet-to]');
+		const dcList = el.querySelector('[data-dc-list]') as HTMLElement;
+		const awayAdd = el.querySelector('[data-away-add]') as HTMLButtonElement;
+		const quietAdd = el.querySelector('[data-quiet-add]') as HTMLButtonElement;
 		const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 		const mOf = (v: string) => {
 			const [h, m] = v.split(':').map(Number);
 			return (h || 0) * 60 + (m || 0);
 		};
+		const clock = (m: number) => new Date(2000, 0, 1, Math.floor(m / 60), m % 60).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 		const todayIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+		const awayOn = () => !!dayCfg.away && dayCfg.away.until > todayIso();
 		const drawDay = () => {
-			const on = dayCfg.away && dayCfg.away.until > todayIso();
-			awayUntil.min = todayIso();
-			awayUntil.value = on ? dayCfg.away.until : '';
-			awayNote.value = on ? dayCfg.away.note || '' : '';
-			awaySet.textContent = on ? 'Back now' : 'Set';
-			awaySet.classList.toggle('ghost', !!on);
-			awayState.hidden = !on;
-			if (on) awayState.textContent = `Away until ${new Date(dayCfg.away.until + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}. The screen changes at its next update, or press the button.`;
-			qOn.checked = !!dayCfg.quiet?.on;
-			qFrom.value = hm(dayCfg.quiet?.from ?? 1320);
-			qTo.value = hm(dayCfg.quiet?.to ?? 360);
-			qFrom.disabled = qTo.disabled = !qOn.checked;
-		};
-		const saveDay = async (msg: string) => {
-			const r = await post('/api/dashboard/daycfg', { deviceId: d.id, cfg: dayCfg });
-			if (r.ok) {
-				drawDay();
-				flash(note, msg);
-			} else flash(note, r.error || 'Could not save.', true);
-		};
-		awaySet.addEventListener('click', () => {
-			if (dayCfg.away && dayCfg.away.until > todayIso()) {
-				dayCfg = { ...dayCfg, away: null };
-				return saveDay('Welcome back. Press the button to update the screen now.');
+			const rows: string[] = [];
+			if (awayOn()) {
+				const when = new Date(dayCfg.away.until + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+				rows.push(`<div class="feed" data-k="away"><span class="feed-ico" aria-hidden="true">✈</span><span class="feed-t"><span class="feed-name">Away until ${esc(when)}</span><span class="feed-sub">${dayCfg.away.note ? esc(dayCfg.away.note) : 'No note'} · checks in every two days</span></span><button type="button" class="feed-edit" data-edit>Edit</button><button type="button" class="feed-del" data-del aria-label="Remove away dates">&times;</button></div>`);
 			}
-			if (!awayUntil.value || awayUntil.value <= todayIso()) return flash(note, 'Pick the day you’re back.', true);
-			dayCfg = { ...dayCfg, away: { until: awayUntil.value, note: awayNote.value.trim() } };
-			saveDay('Away mode on.');
+			if (dayCfg.quiet?.on) rows.push(`<div class="feed" data-k="quiet"><span class="feed-ico" aria-hidden="true">☾</span><span class="feed-t"><span class="feed-name">Quiet ${esc(clock(dayCfg.quiet.from))} to ${esc(clock(dayCfg.quiet.to))}</span><span class="feed-sub">No timed updates. The button still works.</span></span><button type="button" class="feed-edit" data-edit>Edit</button><button type="button" class="feed-del" data-del aria-label="Remove quiet hours">&times;</button></div>`);
+			dcList.innerHTML = rows.join('');
+			awayAdd.hidden = awayOn();
+			quietAdd.hidden = !!dayCfg.quiet?.on;
+		};
+		const saveDay = async (next: any, msg: string) => {
+			const r = await post('/api/dashboard/daycfg', { deviceId: d.id, cfg: next });
+			if (!r.ok) return flash(note, r.error || 'Could not save.', true);
+			dayCfg = next;
+			drawDay();
+			flash(note, msg);
+		};
+		const field = (label: string, input: string) => `<label class="dc-f"><span>${label}</span>${input}</label>`;
+		async function editAway() {
+			const body = document.createElement('div');
+			body.className = 'dc-dlg';
+			const cur = awayOn() ? dayCfg.away : { until: '', note: '' };
+			body.innerHTML = field('Back on', `<input type="date" class="x-dlg-field" data-until min="${todayIso()}" value="${esc(cur.until)}" />`) + field('Note on the screen (optional)', `<input class="x-dlg-field" data-awaynote maxlength="60" placeholder="Camping at Margaret River" value="${esc(cur.note || '')}" autocomplete="off" />`);
+			if (!(await ask('The screen says "Away until…" and the calendar only checks in every two days, which saves battery. It goes back to normal on the day you choose.', { title: 'Away dates', ok: 'Save', body }))) return;
+			const until = (body.querySelector('[data-until]') as HTMLInputElement).value;
+			if (!until || until <= todayIso()) return flash(note, 'Pick the day you\u2019re back.', true);
+			saveDay({ ...dayCfg, away: { until, note: (body.querySelector('[data-awaynote]') as HTMLInputElement).value.trim() } }, 'Away dates saved. The screen changes at its next update, or press the button.');
+		}
+		async function editQuiet() {
+			const body = document.createElement('div');
+			body.className = 'dc-dlg';
+			const q = dayCfg.quiet ?? { from: 1320, to: 360 };
+			body.innerHTML = `<div class="dc-two">${field('From', `<input type="time" class="x-dlg-field" data-from value="${hm(q.from)}" />`)}${field('To', `<input type="time" class="x-dlg-field" data-to value="${hm(q.to)}" />`)}</div>`;
+			if (!(await ask('No timed updates between these times, every day. Pressing the button still updates the screen.', { title: 'Quiet hours', ok: 'Save', body }))) return;
+			const from = mOf((body.querySelector('[data-from]') as HTMLInputElement).value);
+			const to = mOf((body.querySelector('[data-to]') as HTMLInputElement).value);
+			if (from === to) return flash(note, 'Pick two different times.', true);
+			saveDay({ ...dayCfg, quiet: { on: true, from, to } }, 'Quiet hours saved.');
+		}
+		awayAdd.addEventListener('click', editAway);
+		quietAdd.addEventListener('click', editQuiet);
+		dcList.addEventListener('click', (e) => {
+			const t = e.target as HTMLElement;
+			const k = t.closest<HTMLElement>('.feed')?.dataset.k;
+			if (!k) return;
+			if (t.closest('[data-edit]')) return k === 'away' ? editAway() : editQuiet();
+			if (t.closest('[data-del]')) {
+				if (k === 'away') saveDay({ ...dayCfg, away: null }, 'Away dates removed. Press the button to update the screen now.');
+				else saveDay({ ...dayCfg, quiet: { ...dayCfg.quiet, on: false } }, 'Quiet hours removed.');
+			}
 		});
-		for (const i of [qOn, qFrom, qTo])
-			i.addEventListener('change', () => {
-				dayCfg = { ...dayCfg, quiet: { on: qOn.checked, from: mOf(qFrom.value), to: mOf(qTo.value) } };
-				saveDay(qOn.checked ? `No updates from ${qFrom.value} to ${qTo.value}.` : 'Quiet hours off.');
-			});
 		drawDay();
 
 		// weather location: saves the moment you pick (or clear) a city
@@ -983,15 +988,16 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 	.cls-dlg .citysearch.subj .cs-list li { padding: 0.5em 0.7em; font-size: 0.9em; }
 	.cls-dlg .cls-opt { display: flex; gap: 0.5em; align-items: center; margin-top: 0.8em; color: var(--muted); }
 	.dash .daycfg { margin-top: 1.4em; }
-	.dash .dc-away { display: flex; gap: 0.6em; align-items: end; flex-wrap: wrap; }
-	.dash .dc-f { display: grid; gap: 0.3em; font-size: 0.8em; color: var(--muted); }
-	.dash .dc-f.grow { flex: 1; min-width: 10em; }
-	.dash .dc-f .txt { font-size: 1.15em; }
-	.dash .dc-state { margin: 0.6em 0 0; }
-	.dash .dc-state[hidden] { display: none; }
-	.dash .dc-quiet { display: flex; gap: 0.5em; align-items: center; flex-wrap: wrap; margin-top: 0.9em; font-size: 0.92em; }
-	.dash .dc-quiet .txt { width: auto; padding: 0.35em 0.5em; }
-	.dash .dc-quiet .txt:disabled { opacity: 0.45; }
+	.dash .daycfg .feed-list:not(:empty) { margin-bottom: 0.2em; }
+	.dash .feed-edit { background: none; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font: inherit; font-size: 0.78em; font-weight: 600; padding: 0.3em 0.8em; white-space: nowrap; }
+	.dash .feed-edit:hover { color: var(--fg); border-color: var(--muted); }
+	.dash .feed-edit.feed-under { justify-self: start; margin-top: 0.45em; }
+	.dc-dlg { margin: -0.4em 0 0.4em; }
+	.dc-dlg .dc-f { display: grid; gap: 0.35em; margin-bottom: 0.9em; }
+	.dc-dlg .dc-f > span { font-size: 0.75em; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+	.dc-dlg .x-dlg-field { margin: 0; font-size: 0.95em; color-scheme: dark; }
+	:root[data-mode='light'] .dc-dlg .x-dlg-field { color-scheme: light; }
+	.dc-dlg .dc-two { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7em; }
 	.feed-dlg { margin: -0.4em 0 1.1em; font-size: 0.92em; }
 	.feed-dlg .fd-tabs { display: flex; gap: 0.35em; margin-bottom: 0.9em; flex-wrap: wrap; }
 	.feed-dlg .fd-tab { padding: 0.45em 0.9em; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--muted); font: inherit; font-size: 0.9em; font-weight: 600; }
