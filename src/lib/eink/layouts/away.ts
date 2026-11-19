@@ -12,7 +12,7 @@ export function away(ctx: LayoutCtx): string {
 	batteryIcon(d, ctx, 392, 4, 'right', PAPER);
 	d.text(200, 118, 'bb', 'Away', { align: 'center', scale: 2 });
 	if (back !== null) d.text(200, 168, 'mb', `until ${dateShort(tmFromDayIdx(back))}`, { align: 'center' });
-	if (a?.note) d.text(200, 206, 'm', a.note, { align: 'center', maxW: 360 });
+	if (a?.note) d.text(200, 206, 'm', a.note, { align: 'center', maxW: 370 });
 	d.hline(150, 236, 100);
 	if (back !== null) d.text(200, 266, 's', `Back to normal on ${dateLong(tmFromDayIdx(back))}`, { align: 'center', maxW: 380 });
 	return d.toString();

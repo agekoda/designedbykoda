@@ -28,7 +28,7 @@ try {
 			</div>
 			<div class="tb-right">
 				<button type="button" class="btn small" id="share-btn" aria-expanded="false" aria-controls="share">{hasLink ? 'Shared link' : 'Create shared link'}</button>
-				<a class="btn ghost small" id="to-display" href="#">Customize display</a>
+				<a class="btn ghost small" id="to-display" href="#">Settings</a>
 			</div>
 			<!-- the shared link, opened from the top bar -->
 			<div class="share" id="share" hidden>
@@ -379,7 +379,7 @@ try {
 			flash('Your calendar now shows the Message board. Press its button to see it now.');
 		} catch {
 			b.disabled = false;
-			flash('Couldn’t change the layout. Try again from Customize display.', true);
+			flash('Couldn’t change the layout. Try again from Settings.', true);
 		}
 	});
 
@@ -422,7 +422,7 @@ try {
 		const devs = await (await fetch('/api/dashboard/devices')).json().catch(() => ({ devices: [] }));
 		if (!deviceId) deviceId = devs.devices?.[0]?.id ?? '';
 		dev = (devs.devices ?? []).find((x: any) => x.id === deviceId) ?? null;
-		$<HTMLAnchorElement>('to-display').href = '/dashboard/display?device=' + encodeURIComponent(deviceId);
+		$<HTMLAnchorElement>('to-display').href = '/dashboard/settings?device=' + encodeURIComponent(deviceId);
 		await load();
 		syncSend();
 	})();

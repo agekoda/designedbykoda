@@ -9,6 +9,7 @@ import { VMETRICS } from '../vmetrics';
 import { batteryIcon } from '../batteryIcon';
 import { dateShort, dayIdx, dayShort, tmOf, type LayoutCtx, type ScreenMsg } from '../context';
 import { tr } from '../i18n';
+import { centred } from './centred';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 // "14:05", "Yesterday 18:02", "Mon 09:15", "3 Nov"
@@ -97,8 +98,7 @@ export function messages(ctx: LayoutCtx): string {
 	batteryIcon(d, ctx, 200, 4, 'center', PAPER);
 	if (!ctx.messages?.length) {
 		d.text(200, 140, 'mb', 'No messages yet', { align: 'center' });
-		d.text(200, 168, 's', 'Send one from your dashboard,', { align: 'center' });
-		d.text(200, 186, 's', "or share your calendar's message link.", { align: 'center' });
+		centred(d, ctx.family, 168, 's', "Send one from your dashboard, or share your calendar's message link.");
 		return d.toString();
 	}
 	messageList(d, ctx, { x: 12, y: 42, w: 376, h: 250 }, { big: true });

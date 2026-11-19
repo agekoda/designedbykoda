@@ -53,78 +53,6 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 </Layout>
 
 <script>
-	import { createCitySearch } from '../lib/citySearch';
-	// Subject names to pick from when naming classes (WA senior school, plus general ones). Any name can be typed too.
-	const SUBJECTS = ['English', 'Literature', 'English as an Additional Language', 'Mathematics', 'Mathematics Methods', 'Mathematics Applications', 'Mathematics Specialist', 'Mathematics Essential', 'Science', 'Physics', 'Chemistry', 'Biology', 'Human Biology', 'Psychology', 'Earth and Environmental Science', 'Integrated Science', 'Marine and Maritime Studies', 'HASS', 'Geography', 'Modern History', 'Ancient History', 'Economics', 'Accounting and Finance', 'Business Management and Enterprise', 'Politics and Law', 'Philosophy and Ethics', 'Religion and Life', 'Career and Enterprise', 'Building & Construction', 'Engineering Studies', 'Design', 'Materials Design and Technology', 'Computer Science', 'Applied Information Technology', 'Digital Technologies', 'Automotive Engineering and Technology', 'Food Science and Technology', 'Hospitality', 'Children, Family and the Community', 'Health and PE', 'Physical Education Studies', 'PE', 'Health Studies', 'Outdoor Education', 'Sport and Recreation', 'Visual Arts', 'Drama', 'Music', 'Dance', 'Media Production and Analysis', 'Japanese', 'French', 'Italian', 'Chinese', 'Indonesian', 'German', 'Spanish', 'Workplace Learning', 'Tutor group', 'Form', 'Assembly', 'Study period'];
-
-	// A name box with suggestions, in the same style as the city search (CitySearchStyles.astro).
-	// Any text is allowed; the list just helps. The list is fixed-position so a scrolling dialog can't clip it.
-	function subjectBox(value: string, placeholder: string): HTMLElement {
-		const wrap = document.createElement('div');
-		wrap.className = 'citysearch subj';
-		wrap.innerHTML = `<input type="text" class="cs-input" role="combobox" aria-expanded="false" aria-autocomplete="list" autocomplete="off" spellcheck="false" maxlength="40" aria-label="Name on the screen" /><ul class="cs-list" role="listbox" hidden></ul>`;
-		const input = wrap.querySelector('.cs-input') as HTMLInputElement;
-		const list = wrap.querySelector('.cs-list') as HTMLUListElement;
-		input.value = value;
-		input.placeholder = placeholder;
-		let items: string[] = [];
-		let active = -1;
-		const e = (v: string) => v.replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]!);
-		const close = () => {
-			list.hidden = true;
-			input.setAttribute('aria-expanded', 'false');
-			active = -1;
-		};
-		const open = () => {
-			const q = input.value.trim().toLowerCase();
-			items = q ? SUBJECTS.filter((s) => s.toLowerCase().startsWith(q)).concat(SUBJECTS.filter((s) => !s.toLowerCase().startsWith(q) && s.toLowerCase().includes(q))) : SUBJECTS.slice();
-			items = items.filter((s) => s !== input.value.trim()).slice(0, 40);
-			if (!items.length) return close();
-			list.innerHTML = items.map((s, i) => `<li role="option" data-i="${i}" class="${i === active ? 'on' : ''}">${e(s)}</li>`).join('');
-			const r = input.getBoundingClientRect();
-			Object.assign(list.style, { position: 'fixed', left: r.left + 'px', width: Math.max(r.width, 220) + 'px', top: r.bottom + 6 + 'px', right: 'auto', maxHeight: Math.max(140, Math.min(280, innerHeight - r.bottom - 16)) + 'px', zIndex: '1000' });
-			list.hidden = false;
-			input.setAttribute('aria-expanded', 'true');
-			// the dialog scrolling would leave the list behind: close it
-			const onScroll = (ev: Event) => {
-				if (list.contains(ev.target as Node)) return addEventListener('scroll', onScroll, { capture: true, once: true });
-				close();
-			};
-			addEventListener('scroll', onScroll, { capture: true, once: true });
-		};
-		const pick = (s: string) => {
-			input.value = s;
-			close();
-		};
-		input.addEventListener('focus', open);
-		input.addEventListener('input', () => {
-			active = -1;
-			open();
-		});
-		input.addEventListener('keydown', (ev) => {
-			if (list.hidden || !items.length) return;
-			if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
-				ev.preventDefault();
-				active = (active + (ev.key === 'ArrowDown' ? 1 : items.length - 1) + (active < 0 && ev.key === 'ArrowUp' ? 1 : 0)) % items.length;
-				open();
-				list.querySelector('li.on')?.scrollIntoView({ block: 'nearest' });
-			} else if (ev.key === 'Enter' && active >= 0) {
-				ev.preventDefault();
-				ev.stopPropagation();
-				pick(items[active]);
-			} else if (ev.key === 'Escape') {
-				ev.stopPropagation();
-				close();
-			}
-		});
-		list.addEventListener('mousedown', (ev) => {
-			ev.preventDefault();
-			const li = (ev.target as HTMLElement).closest('li[data-i]') as HTMLElement | null;
-			if (li) pick(items[+li.dataset.i!]);
-		});
-		input.addEventListener('blur', close);
-		return wrap;
-	}
 	import { renderPreview, paintScreen } from '../lib/eink/previewKit';
 	import { batteryPercent } from '../lib/eink/battery';
 	import { estimate, measured, lifeText } from '../lib/eink/batteryLife';
@@ -249,14 +177,7 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 		const paired = d.createdAt ? new Date(d.createdAt * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 		el.innerHTML = `
 			<div class="dev-left">
-				<a class="dev-preview" data-preview href="/dashboard/display?device=${encodeURIComponent(d.id)}" aria-label="Customize this display"><canvas data-canvas width="800" height="600"></canvas><span class="dev-preview-cap">Preview</span></a>
-				<div class="cals">
-					<div class="label">Calendars</div>
-					<div class="cal-list" data-cals><p class="muted small">Loading calendars…</p></div>
-					<div class="label">Timetables and other calendars</div>
-					<div class="feed-list" data-feeds></div>
-					<button type="button" class="link feed-add" data-feed-add>+ Add a school timetable or calendar</button>
-				</div>
+				<a class="dev-preview" data-preview href="/dashboard/settings?device=${encodeURIComponent(d.id)}" aria-label="Open this calendar's settings"><canvas data-canvas width="800" height="600"></canvas><span class="dev-preview-cap">Preview</span></a>
 			</div>
 			<div class="dev-body">
 				<input class="dev-name" maxlength="40" value="${esc(d.name)}" placeholder="E-Ink Calendar${index ? ' ' + (index + 1) : ''}" aria-label="Device name" />
@@ -264,8 +185,9 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 				<div class="dev-meta">${status}${battery}</div>
 				<div class="batt-hist" data-bhist hidden></div>
 				<div class="onnow" data-onnow></div>
+				<a class="summary" data-summary href="/dashboard/settings?device=${encodeURIComponent(d.id)}#calendars"></a>
 				<div class="actions">
-					<a class="btn customize" href="/dashboard/display?device=${encodeURIComponent(d.id)}">Customize display</a>
+					<a class="btn customize" href="/dashboard/settings?device=${encodeURIComponent(d.id)}">Settings</a>
 					<a class="btn ghost customize" data-msgbtn href="/dashboard/messages?device=${encodeURIComponent(d.id)}">Messages${d.msgCount ? ` <span class="msg-count">${d.msgCount}</span>` : ''}</a>
 				</div>
 				<form class="quick" data-quick hidden>
@@ -274,19 +196,6 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 				</form>
 
 				<p class="note" data-note aria-live="polite"></p>
-				<div class="weather">
-					<div class="label">Weather</div>
-					<div data-weather></div>
-					<p class="muted small weather-hint">Today's high and low. Leave empty for none.</p>
-				</div>
-
-				<div class="daycfg">
-					<div class="label">Away and quiet hours</div>
-					<div class="feed-list" data-dc-list></div>
-					<button type="button" class="link feed-add" data-away-add>+ Add away dates</button>
-					<button type="button" class="link feed-add" data-quiet-add>+ Add quiet hours</button>
-				</div>
-
 				<div class="dev-foot">
 					${paired ? `<span class="muted small paired">Paired ${paired}</span>` : ''}
 					${d.firmware ? `<span class="muted small paired">Firmware ${esc(d.firmware)}</span>` : ''}
@@ -383,262 +292,28 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 		nameInput.addEventListener('change', saveName);
 		nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') nameInput.blur(); });
 
-		// calendars: saves shortly after you stop toggling
-		const calBox = el.querySelector('[data-cals]') as HTMLElement;
-		const drawCalendars = () => {
-			if (!allCalendars) {
-				calBox.innerHTML = '<p class="muted small">Couldn\'t load your calendars right now.</p>';
-				return;
-			}
-			const sel: string[] = d.calendarIds.length ? d.calendarIds : allCalendars.filter((c) => c.primary).map((c) => c.id);
-			calBox.innerHTML = allCalendars
-				.map((c) => `<label class="cal-opt"><input type="checkbox" value="${esc(c.id)}" ${sel.includes(c.id) ? 'checked' : ''} /><span class="box" aria-hidden="true"></span><span class="cal-name">${esc(c.summary)}${c.primary ? ' <em>primary</em>' : ''}</span></label>`)
-				.join('');
-			let timer: any;
-			calBox.querySelectorAll<HTMLInputElement>('input').forEach((cb) =>
-				cb.addEventListener('change', () => {
-					const ids = Array.from(calBox.querySelectorAll<HTMLInputElement>('input:checked')).map((x) => x.value);
-					if (!ids.length) {
-						cb.checked = true;
-						flash(note, 'Keep at least one calendar selected.', true);
-						return;
-					}
-					clearTimeout(timer);
-					timer = setTimeout(async () => {
-						const res = await post('/api/dashboard/devices', { deviceId: d.id, calendarIds: ids });
-						if (res.ok) { d.calendarIds = ids; flash(note, 'Saved'); } else flash(note, res.error || 'Could not save.', true);
-					}, 500);
-				})
-			);
+		// a one-line summary of where its events come from, and away / quiet hours (all changed in Settings)
+		const sumEl = el.querySelector('[data-summary]') as HTMLAnchorElement;
+		const drawSummary = (feedNames: string[]) => {
+			const cals = (allCalendars ?? []).filter((c) => (d.calendarIds.length ? d.calendarIds.includes(c.id) : c.primary)).map((c) => c.summary);
+			const src = [...cals, ...feedNames];
+			const parts = [src.length ? `<b>Calendars:</b> ${src.map(esc).join(', ')}` : '<b>Calendars:</b> none chosen'];
+			const dc = d.dayCfg;
+			const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+			if (dc?.away && dc.away.until > today) parts.push('Away until ' + new Date(dc.away.until + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }));
+			else if (dc?.quiet?.on) parts.push('Quiet hours on');
+			sumEl.innerHTML = parts.join(' · ');
 		};
-		(el as any)._draw = drawCalendars;
-		if (allCalendars !== null) drawCalendars();
-
-		// school timetables and other calendars (.ics links and files)
-		const feedBox = el.querySelector('[data-feeds]') as HTMLElement;
-		const feedAdd = el.querySelector('[data-feed-add]') as HTMLButtonElement;
-		let feeds: any[] = [];
-		let feedMax = 4;
-		const feedLine = (f: any) => {
-			if (f.error) return `<span class="feed-err">${esc(f.error)}</span>`;
-			if (!f.count) return f.kind === 'file' ? 'Nothing coming up in this file. Upload a new one.' : 'Nothing coming up';
-			const n = f.next;
-			const when = n ? (n.allDay ? new Date(n.ms).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : new Date(n.ms).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })) : '';
-			return `${f.count} coming up${n ? ` · next: ${esc(n.title)}, ${esc(when)}` : ''}`;
-		};
-		let drawFeeds = () => {
-			feedBox.innerHTML = feeds
-				.map((f) => `<div class="feed" data-id="${esc(f.id)}"><span class="feed-ico" aria-hidden="true">${f.kind === 'file' ? '▤' : '↻'}</span><span class="feed-t"><span class="feed-name">${esc(f.name)}</span><span class="feed-sub">${f.kind === 'file' ? 'File' : esc(f.host || 'Link')} · ${feedLine(f)}</span><button type="button" class="feed-edit feed-under" data-names>Name classes</button></span><button type="button" class="feed-del" data-del aria-label="Remove ${esc(f.name)}">&times;</button></div>`)
-				.join('');
-			feedAdd.hidden = feeds.length >= feedMax;
-		};
+		let feedNames: string[] = [];
+		(el as any)._draw = () => drawSummary(feedNames);
+		if (allCalendars !== null) drawSummary(feedNames);
 		fetch('/api/dashboard/feeds?deviceId=' + encodeURIComponent(d.id))
 			.then((r) => r.json())
 			.then((j) => {
-				feeds = Array.isArray(j.feeds) ? j.feeds : [];
-				feedMax = j.max || 4;
-				drawFeeds();
+				feedNames = (j.feeds ?? []).map((f: any) => f.name);
+				drawSummary(feedNames);
 			})
 			.catch(() => {});
-		feedBox.addEventListener('click', async (e) => {
-			const row = (e.target as HTMLElement).closest<HTMLElement>('.feed');
-			if (row && (e.target as HTMLElement).closest('[data-names]')) return openClasses(false);
-			if (!row || !(e.target as HTMLElement).closest('[data-del]')) return;
-			const f = feeds.find((x) => x.id === row.dataset.id);
-			if (!f || !(await ask(`${f.name} will stop showing on this calendar.`, { title: 'Remove this calendar?', ok: 'Remove', danger: true }))) return;
-			const r = await post('/api/dashboard/feeds', { deviceId: d.id, action: 'remove', id: f.id });
-			if (r.ok) {
-				feeds = feeds.filter((x) => x.id !== f.id);
-				drawFeeds();
-				flash(note, 'Removed');
-			} else flash(note, r.error || 'Could not remove it.', true);
-		});
-		feedAdd.addEventListener('click', () => addFeed());
-		async function addFeed() {
-			const body = document.createElement('div');
-			body.className = 'feed-dlg';
-			body.innerHTML = `
-				<div class="fd-tabs" role="tablist">
-					<button type="button" class="fd-tab on" data-k="compass">Compass</button>
-					<button type="button" class="fd-tab" data-k="seqta">SEQTA</button>
-					<button type="button" class="fd-tab" data-k="other">Another calendar</button>
-				</div>
-				<div class="fd-how" data-how="compass"><ol>
-					<li>Sign in to Compass in a web browser.</li>
-					<li>Open the menu (the gear or your profile, top right) and choose <b>Sync My Schedule</b>.</li>
-					<li>If it asks, click to turn on private schedule access.</li>
-					<li>Copy the calendar link at the bottom of that page and paste it below.</li>
-				</ol></div>
-				<div class="fd-how" data-how="seqta" hidden>
-					<p>SEQTA doesn't give out a calendar link, so use a timetable file instead.</p>
-					<ol>
-						<li>Export your timetable as an <b>.ics</b> file. The free DesQTA app can: open Timetable, then Export, then Export as ICS.</li>
-						<li>Choose that file below.</li>
-					</ol>
-					<p class="fd-fine">A file doesn't update itself, so add a new one when your timetable changes (each term, say). If your school's SEQTA does show a calendar link, use Another calendar.</p>
-				</div>
-				<div class="fd-how" data-how="other" hidden>
-					<p>Paste any calendar link (iCal, .ics or webcal://): Outlook, iCloud, a sports club, your school's events. Or choose an .ics file.</p>
-				</div>
-				<label class="fd-field"><span>Name on your dashboard</span><input class="x-dlg-field" data-name maxlength="30" placeholder="Compass" autocomplete="off" /></label>
-				<label class="fd-field" data-linkrow><span>Calendar link</span><input class="x-dlg-field" data-url placeholder="https://…" autocomplete="off" spellcheck="false" /></label>
-				<label class="fd-field" data-filerow hidden><span>Timetable file</span><input type="file" data-file accept=".ics,text/calendar" /></label>
-				<p class="fd-fine">The link is private to you. It's only used to read your timetable for this calendar.</p>`;
-			let kind = 'compass';
-			const $b = <T extends HTMLElement>(s: string) => body.querySelector(s) as T;
-			const setKind = (k: string) => {
-				kind = k;
-				body.querySelectorAll<HTMLElement>('.fd-tab').forEach((t) => t.classList.toggle('on', t.dataset.k === k));
-				body.querySelectorAll<HTMLElement>('.fd-how').forEach((h) => (h.hidden = h.dataset.how !== k));
-				$b<HTMLElement>('[data-linkrow]').hidden = k === 'seqta';
-				$b<HTMLElement>('[data-filerow]').hidden = k === 'compass';
-				$b<HTMLInputElement>('[data-name]').placeholder = k === 'compass' ? 'Compass' : k === 'seqta' ? 'SEQTA timetable' : 'Calendar';
-			};
-			body.querySelectorAll<HTMLElement>('.fd-tab').forEach((t) => t.addEventListener('click', () => setKind(t.dataset.k!)));
-			setKind('compass');
-			if (!(await ask('Shows your classes and school events on this calendar, with your Google ones.', { title: 'Add a timetable or calendar', ok: 'Add it', body }))) return;
-			const name = $b<HTMLInputElement>('[data-name]').value.trim() || $b<HTMLInputElement>('[data-name]').placeholder;
-			const url = $b<HTMLInputElement>('[data-url]').value.trim();
-			const file = $b<HTMLInputElement>('[data-file]').files?.[0] ?? null;
-			let req: any;
-			if (file && (kind === 'seqta' || !url)) {
-				if (file.size > 4_000_000) return flash(note, 'That file is too big.', true);
-				req = { deviceId: d.id, action: 'file', name, ics: await file.text() };
-			} else if (url && kind !== 'seqta') req = { deviceId: d.id, action: 'link', name, url };
-			else return flash(note, kind === 'seqta' ? 'Choose your timetable file first.' : 'Paste the calendar link first.', true);
-			flash(note, 'Adding…');
-			try {
-				const res = await fetch('/api/dashboard/feeds', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) });
-				const j = await res.json().catch(() => ({}));
-				if (!res.ok || !j.ok) return flash(note, j.error || 'Could not add it.', true);
-				feeds.push(j.feed);
-				drawFeeds();
-				flash(note, `Added. It shows on the screen at the next update, or press the button.`);
-				openClasses(true);
-			} catch {
-				flash(note, 'Could not add it.', true);
-			}
-		}
-
-		// class names for school timetables (src/lib/classes.ts)
-		// after adding a timetable (justAdded) it opens by itself, with Skip; it stays quiet when there are no classes
-		async function openClasses(justAdded: boolean) {
-			if (!justAdded) flash(note, 'Loading your classes…');
-			let j: any;
-			try {
-				j = await (await fetch('/api/dashboard/classes?deviceId=' + encodeURIComponent(d.id))).json();
-			} catch {
-				return flash(note, 'Could not load your classes.', true);
-			}
-			const list: any[] = Array.isArray(j.classes) ? j.classes : [];
-			if (!list.length) return justAdded ? undefined : flash(note, 'No classes found yet. They show up once your timetable has some repeats in it.', true);
-			if (!justAdded) flash(note, '');
-			const body = document.createElement('div');
-			body.className = 'cls-dlg';
-			body.innerHTML = `
-				<div class="cls-head"><span>Code</span><span>Name on the screen</span><span>Bring</span></div>
-				<div class="cls-list">${list
-					.map(
-						(c) => `<div class="cls-row" data-code="${esc(c.code)}">
-							<div class="cls-code"><b>${esc(c.code)}</b><span>${c.room ? esc(c.room) + ' · ' : ''}${c.count ? c.count + '×' : 'not on now'}</span></div>
-							<div data-nslot></div>
-							<input class="x-dlg-field" data-b maxlength="40" placeholder="Nothing" value="${esc(c.bring)}" autocomplete="off" />
-						</div>`
-					)
-					.join('')}</div>
-				<label class="cls-opt"><input type="checkbox" data-rooms ${j.opts?.rooms !== false ? 'checked' : ''} /> Show the room after the name</label>
-				<label class="cls-opt"><input type="checkbox" data-moves ${j.opts?.moves !== false ? 'checked' : ''} /> Point out room changes</label>`;
-			body.querySelectorAll<HTMLElement>('.cls-row').forEach((r, i) => r.querySelector('[data-nslot]')!.replaceWith(subjectBox(list[i].name || '', list[i].code)));
-			const intro = justAdded ? 'Your timetable calls classes by codes. Give them proper names now, or skip and do it later from the timetable on your dashboard.' : 'Give your class codes proper names. Pick one from the list or type your own. Bring shows on the School day screen.';
-			if (!(await ask(intro, { title: 'Name your classes', ok: 'Save', cancel: justAdded ? 'Skip' : 'Cancel', body }))) return;
-			const classes = [...body.querySelectorAll<HTMLElement>('.cls-row')].map((r) => ({ code: r.dataset.code, name: (r.querySelector('.cs-input') as HTMLInputElement).value.trim(), bring: (r.querySelector('[data-b]') as HTMLInputElement).value.trim() }));
-			const opts = { rooms: (body.querySelector('[data-rooms]') as HTMLInputElement).checked, moves: (body.querySelector('[data-moves]') as HTMLInputElement).checked };
-			const r = await post('/api/dashboard/classes', { deviceId: d.id, classes, opts });
-			flash(note, r.ok ? 'Saved. Your calendar uses the names from its next update.' : r.error || 'Could not save.', !r.ok);
-		}
-
-		// away mode and quiet hours (src/lib/eink/dayCfg.ts): rows like the timetable list, added and edited in a box
-		let dayCfg: any = d.dayCfg ?? { away: null, quiet: { on: false, from: 1320, to: 360 } };
-		const dcList = el.querySelector('[data-dc-list]') as HTMLElement;
-		const awayAdd = el.querySelector('[data-away-add]') as HTMLButtonElement;
-		const quietAdd = el.querySelector('[data-quiet-add]') as HTMLButtonElement;
-		const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-		const mOf = (v: string) => {
-			const [h, m] = v.split(':').map(Number);
-			return (h || 0) * 60 + (m || 0);
-		};
-		const clock = (m: number) => new Date(2000, 0, 1, Math.floor(m / 60), m % 60).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-		const todayIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-		const awayOn = () => !!dayCfg.away && dayCfg.away.until > todayIso();
-		const drawDay = () => {
-			const rows: string[] = [];
-			if (awayOn()) {
-				const when = new Date(dayCfg.away.until + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-				rows.push(`<div class="feed" data-k="away"><span class="feed-ico" aria-hidden="true">✈</span><span class="feed-t"><span class="feed-name">Away until ${esc(when)}</span><span class="feed-sub">${dayCfg.away.note ? esc(dayCfg.away.note) : 'No note'} · checks in every two days</span></span><button type="button" class="feed-edit" data-edit>Edit</button><button type="button" class="feed-del" data-del aria-label="Remove away dates">&times;</button></div>`);
-			}
-			if (dayCfg.quiet?.on) rows.push(`<div class="feed" data-k="quiet"><span class="feed-ico" aria-hidden="true">☾</span><span class="feed-t"><span class="feed-name">Quiet ${esc(clock(dayCfg.quiet.from))} to ${esc(clock(dayCfg.quiet.to))}</span><span class="feed-sub">No timed updates. The button still works.</span></span><button type="button" class="feed-edit" data-edit>Edit</button><button type="button" class="feed-del" data-del aria-label="Remove quiet hours">&times;</button></div>`);
-			dcList.innerHTML = rows.join('');
-			awayAdd.hidden = awayOn();
-			quietAdd.hidden = !!dayCfg.quiet?.on;
-		};
-		const saveDay = async (next: any, msg: string) => {
-			const r = await post('/api/dashboard/daycfg', { deviceId: d.id, cfg: next });
-			if (!r.ok) return flash(note, r.error || 'Could not save.', true);
-			dayCfg = next;
-			drawDay();
-			flash(note, msg);
-		};
-		const field = (label: string, input: string) => `<label class="dc-f"><span>${label}</span>${input}</label>`;
-		async function editAway() {
-			const body = document.createElement('div');
-			body.className = 'dc-dlg';
-			const cur = awayOn() ? dayCfg.away : { until: '', note: '' };
-			body.innerHTML = field('Back on', `<input type="date" class="x-dlg-field" data-until min="${todayIso()}" value="${esc(cur.until)}" />`) + field('Note on the screen (optional)', `<input class="x-dlg-field" data-awaynote maxlength="60" placeholder="Camping at Margaret River" value="${esc(cur.note || '')}" autocomplete="off" />`);
-			if (!(await ask('The screen says "Away until…" and the calendar only checks in every two days, which saves battery. It goes back to normal on the day you choose.', { title: 'Away dates', ok: 'Save', body }))) return;
-			const until = (body.querySelector('[data-until]') as HTMLInputElement).value;
-			if (!until || until <= todayIso()) return flash(note, 'Pick the day you\u2019re back.', true);
-			saveDay({ ...dayCfg, away: { until, note: (body.querySelector('[data-awaynote]') as HTMLInputElement).value.trim() } }, 'Away dates saved. The screen changes at its next update, or press the button.');
-		}
-		async function editQuiet() {
-			const body = document.createElement('div');
-			body.className = 'dc-dlg';
-			const q = dayCfg.quiet ?? { from: 1320, to: 360 };
-			body.innerHTML = `<div class="dc-two">${field('From', `<input type="time" class="x-dlg-field" data-from value="${hm(q.from)}" />`)}${field('To', `<input type="time" class="x-dlg-field" data-to value="${hm(q.to)}" />`)}</div>`;
-			if (!(await ask('No timed updates between these times, every day. Pressing the button still updates the screen.', { title: 'Quiet hours', ok: 'Save', body }))) return;
-			const from = mOf((body.querySelector('[data-from]') as HTMLInputElement).value);
-			const to = mOf((body.querySelector('[data-to]') as HTMLInputElement).value);
-			if (from === to) return flash(note, 'Pick two different times.', true);
-			saveDay({ ...dayCfg, quiet: { on: true, from, to } }, 'Quiet hours saved.');
-		}
-		awayAdd.addEventListener('click', editAway);
-		quietAdd.addEventListener('click', editQuiet);
-		dcList.addEventListener('click', (e) => {
-			const t = e.target as HTMLElement;
-			const k = t.closest<HTMLElement>('.feed')?.dataset.k;
-			if (!k) return;
-			if (t.closest('[data-edit]')) return k === 'away' ? editAway() : editQuiet();
-			if (t.closest('[data-del]')) {
-				if (k === 'away') saveDay({ ...dayCfg, away: null }, 'Away dates removed. Press the button to update the screen now.');
-				else saveDay({ ...dayCfg, quiet: { ...dayCfg.quiet, on: false } }, 'Quiet hours removed.');
-			}
-		});
-		drawDay();
-
-		// weather location: saves the moment you pick (or clear) a city
-		el.querySelector('[data-weather]')!.appendChild(
-			createCitySearch({
-				value: d.location?.name || '',
-				placeholder: 'Search for a city…',
-				onSelect: async (c) => {
-					const res = await post('/api/dashboard/devices', {
-						deviceId: d.id,
-						location: c ? { name: c.label, lat: c.lat, lon: c.lon } : null,
-					});
-					if (res.ok) flash(note, c ? 'Saved. Weather appears on the next refresh.' : 'Weather removed.');
-					else flash(note, res.error || 'Could not save the location.', true);
-				},
-			})
-		);
 
 		// copy this calendar's settings to another one (only when there's another one)
 		const copyBtn = el.querySelector('[data-copy]') as HTMLButtonElement;
@@ -963,6 +638,10 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 	.dash .cal-list { display: grid; gap: 0.5em; }
 	.dash .cal-opt { display: flex; align-items: center; gap: 0.8em; padding: 0.65em 0.9em; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--fg); font-size: 0.95em; transition: border-color 0.2s, background 0.2s; }
 	.dash .cal-opt:hover { border-color: var(--muted); }
+	.dash .summary { display: block; margin: 0.7em 0 0; font-size: 0.88em; color: var(--muted); text-decoration: none; line-height: 1.45; }
+	.dash .summary b { color: var(--fg); font-weight: 700; }
+	.dash .summary:hover { color: var(--fg); }
+	.dash .summary:empty { display: none; }
 	.dash .feed-list { display: grid; gap: 0.5em; }
 	.dash .feed-list:empty { display: none; }
 	.dash .feed { display: flex; align-items: center; gap: 0.8em; padding: 0.6em 0.5em 0.6em 0.9em; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; }

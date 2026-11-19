@@ -2,6 +2,7 @@
 import { Draw, PAPER } from '../draw';
 import { FRAME, FRAME_BYTES } from '../image';
 import type { LayoutCtx } from '../context';
+import { centred } from './centred';
 
 export function frame(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -15,7 +16,6 @@ export function frame(ctx: LayoutCtx): string {
 	d.fill(0, 0, 400, 30);
 	d.text(10, 21, 'sb', 'PHOTO FRAME', { color: PAPER });
 	d.text(200, 130, 'mb', 'Add your photo', { align: 'center' });
-	d.text(200, 158, 's', 'Open your dashboard, choose Customize,', { align: 'center' });
-	d.text(200, 176, 's', 'then add your photo.', { align: 'center' });
+	centred(d, ctx.family, 158, 's', 'Open Settings on your dashboard, then add your photo.');
 	return d.toString();
 }
