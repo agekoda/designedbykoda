@@ -1561,7 +1561,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		if (vbat !== null) parts.push(`<b>Battery ${batteryPercent(vbat)}%</b>`);
 		parts.push(`With these settings a full charge lasts <b>${lifeText(full)}</b>`);
 		const m = measured(battAnchor?.mv ?? null, battAnchor?.at ?? null, vbat !== null ? Math.round(vbat * 1000) : null, battAt);
-		if (m) parts.push(`At its current rate: ${lifeText(m.left)} left`);
+		if (m) {
+			// the measured rate covers everything since the charge: old settings, button presses, testing
+			const fast = m.full < full * 0.5;
+			parts.push(`Going by how it's actually drained since its last charge: ${lifeText(m.left)} left${fast ? ' (faster than these settings, so earlier settings or lots of button presses used more)' : ''}`);
+		}
 		battLine.innerHTML = parts.join(' · ');
 	}
 

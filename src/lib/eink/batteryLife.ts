@@ -62,13 +62,14 @@ export function estimate(u: UsageInput): number {
 	return (BATTERY.capacityMah * BATTERY.usable) / perDay;
 }
 
-// From real readings: days left, and days a full charge lasts at this rate. Needs two days and a
-// 3% drop since the last charge, so a fresh charge doesn't give a silly answer.
+// From real readings: days left, and days a full charge lasts at this rate. Needs three days and a
+// 3% drop since the starting reading, so a fresh charge doesn't give a silly answer. The starting
+// reading should be a settled one (see settledAnchor), not the one taken just after charging.
 export function measured(anchorMv: number | null, anchorAt: number | null, nowMv: number | null, nowAt: number | null): { left: number; full: number } | null {
 	if (!anchorMv || !anchorAt || !nowMv || !nowAt) return null;
 	const days = (nowAt - anchorAt) / 86400;
 	const drop = batteryPercent(anchorMv / 1000) - batteryPercent(nowMv / 1000);
-	if (days < 2 || drop < 3) return null;
+	if (days < 3 || drop < 3) return null;
 	const perDay = drop / days;
 	return { left: batteryPercent(nowMv / 1000) / perDay, full: 100 / perDay };
 }
@@ -81,4 +82,19 @@ export function lifeText(days: number): string {
 	if (days < 60) return `about ${Math.round(days / 7)} weeks`;
 	if (days < 365) return `about ${Math.round(days / 30.4)} months`;
 	return 'over a year';
+}
+
+// Just after a charge the cell reads high (it's still on the charger, or has surface charge) and
+// falls 50-100 mV over the next few hours whatever the calendar does. Measuring from there made a
+// calendar look like it was emptying in weeks. So measure from the first logged reading a day after
+// the charge instead; until there is one, there's no measured answer and the estimate is shown.
+export const SETTLE_SEC = 86400;
+export async function settledAnchor(db: any, deviceId: string, anchorAt: number | null): Promise<{ mv: number; at: number } | null> {
+	if (!anchorAt) return null;
+	try {
+		const r: any = await db.prepare('SELECT at, mv FROM battery_log WHERE device_id = ? AND at >= ? ORDER BY at LIMIT 1').bind(deviceId, anchorAt + SETTLE_SEC).first();
+		return r?.mv && r?.at ? { mv: r.mv, at: r.at } : null;
+	} catch {
+		return null; // before schema-battery.sql
+	}
 }
