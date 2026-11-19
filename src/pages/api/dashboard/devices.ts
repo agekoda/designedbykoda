@@ -1,6 +1,7 @@
 // The logged-in user's paired devices: list them, and edit one device's
 // name / layout / calendars. Everything is checked against the session's
 // user, so you can only ever see or change your own devices.
+import { settledAnchor } from '../../../lib/eink/batteryLife';
 import { sanitizeSchedule, activeStyle } from '../../../lib/eink/schedule';
 import { sanitizeReminders } from '../../../lib/eink/reminders';
 import { sanitizeHabits } from '../../../lib/eink/habits';
@@ -108,6 +109,12 @@ export async function GET({ request, locals }) {
 				// a screen picked with the button, still showing (until the schedule changes, or the next press)
 				override: isStyleId(e.screen_override) && (e.override_until == null || e.override_until > nowUnix) ? e.screen_override : null,
 			});
+		// measure battery drain from a settled reading, not the one taken straight after charging
+		for (const [id, v] of scr) {
+			const a = await settledAnchor(db, id, v.anchorAt);
+			v.anchorMv = a?.mv ?? null;
+			v.anchorAt = a?.at ?? null;
+		}
 	} catch {}
 
 	// Message board (schema-messages.sql): how often each checks, and how many messages are showing.
