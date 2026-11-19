@@ -1,6 +1,6 @@
-// Night before: tomorrow's day (or today's, before noon), so you can pack your bag. Classes with
-// their rooms on the left, the weather, what to bring and what's due soon on the right.
-// Meant for the screen schedule: "Night before from 6 pm to 7 am".
+// School day: today's classes until 6 pm, then tomorrow's, so the evening screen helps you pack your
+// bag. Classes with their rooms on the left (the one on now marked), the weather, what to bring and
+// what's due soon on the right. The calendar wakes at 6 pm to switch (today.ts).
 import { Draw, INK, PAPER } from '../draw';
 import { fontId, type Family, type Role } from '../fonts';
 import { VMETRICS } from '../vmetrics';
@@ -16,11 +16,13 @@ function vm(fam: Family, role: Role) {
 	return { asc: v[0], desc: v[3], lh: v[4] };
 }
 
+export const SWITCH_AT = 18 * 3600; // 6 pm: from here on it shows tomorrow
+
 export function tomorrow(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
 	const fam = ctx.family;
 	const today = dayIdx(ctx.nowLocal);
-	const evening = ((ctx.nowLocal % 86400) + 86400) % 86400 >= 12 * 3600;
+	const evening = ((ctx.nowLocal % 86400) + 86400) % 86400 >= SWITCH_AT;
 	const day = evening ? today + 1 : today;
 	d.fill(0, 0, 400, 30);
 	d.text(10, 21, 'sb', evening ? 'TOMORROW' : 'TODAY', { color: PAPER });
@@ -47,7 +49,12 @@ export function tomorrow(ctx: LayoutCtx): string {
 		for (const e of timed) {
 			if (y + rowH > 296) break;
 			const base = y + Math.round((rowH + bv.asc - bv.desc) / 2);
-			d.text(L, base, 'sb', timeTextOf(e.startLocal));
+			const now = ctx.nowLocal >= e.startLocal && ctx.nowLocal < (e.endLocal ?? e.startLocal + 3000);
+			if (now) {
+				// the class on now: its time in a black box
+				d.fillRound(L - 3, y + 2, timeW - 2, rowH - 4, 3);
+				d.text(L, base, 'sb', timeTextOf(e.startLocal), { color: PAPER });
+			} else d.text(L, base, 'sb', timeTextOf(e.startLocal));
 			let right = R;
 			if (e.room) {
 				const w = measure(fam, 's', e.room).w;

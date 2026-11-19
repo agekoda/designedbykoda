@@ -56,6 +56,75 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 	import { createCitySearch } from '../lib/citySearch';
 	// Subject names to pick from when naming classes (WA senior school, plus general ones). Any name can be typed too.
 	const SUBJECTS = ['English', 'Literature', 'English as an Additional Language', 'Mathematics', 'Mathematics Methods', 'Mathematics Applications', 'Mathematics Specialist', 'Mathematics Essential', 'Science', 'Physics', 'Chemistry', 'Biology', 'Human Biology', 'Psychology', 'Earth and Environmental Science', 'Integrated Science', 'Marine and Maritime Studies', 'HASS', 'Geography', 'Modern History', 'Ancient History', 'Economics', 'Accounting and Finance', 'Business Management and Enterprise', 'Politics and Law', 'Philosophy and Ethics', 'Religion and Life', 'Career and Enterprise', 'Building & Construction', 'Engineering Studies', 'Design', 'Materials Design and Technology', 'Computer Science', 'Applied Information Technology', 'Digital Technologies', 'Automotive Engineering and Technology', 'Food Science and Technology', 'Hospitality', 'Children, Family and the Community', 'Health and PE', 'Physical Education Studies', 'PE', 'Health Studies', 'Outdoor Education', 'Sport and Recreation', 'Visual Arts', 'Drama', 'Music', 'Dance', 'Media Production and Analysis', 'Japanese', 'French', 'Italian', 'Chinese', 'Indonesian', 'German', 'Spanish', 'Workplace Learning', 'Tutor group', 'Form', 'Assembly', 'Study period'];
+
+	// A name box with suggestions, in the same style as the city search (CitySearchStyles.astro).
+	// Any text is allowed; the list just helps. The list is fixed-position so a scrolling dialog can't clip it.
+	function subjectBox(value: string, placeholder: string): HTMLElement {
+		const wrap = document.createElement('div');
+		wrap.className = 'citysearch subj';
+		wrap.innerHTML = `<input type="text" class="cs-input" role="combobox" aria-expanded="false" aria-autocomplete="list" autocomplete="off" spellcheck="false" maxlength="40" aria-label="Name on the screen" /><ul class="cs-list" role="listbox" hidden></ul>`;
+		const input = wrap.querySelector('.cs-input') as HTMLInputElement;
+		const list = wrap.querySelector('.cs-list') as HTMLUListElement;
+		input.value = value;
+		input.placeholder = placeholder;
+		let items: string[] = [];
+		let active = -1;
+		const e = (v: string) => v.replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]!);
+		const close = () => {
+			list.hidden = true;
+			input.setAttribute('aria-expanded', 'false');
+			active = -1;
+		};
+		const open = () => {
+			const q = input.value.trim().toLowerCase();
+			items = q ? SUBJECTS.filter((s) => s.toLowerCase().startsWith(q)).concat(SUBJECTS.filter((s) => !s.toLowerCase().startsWith(q) && s.toLowerCase().includes(q))) : SUBJECTS.slice();
+			items = items.filter((s) => s !== input.value.trim()).slice(0, 40);
+			if (!items.length) return close();
+			list.innerHTML = items.map((s, i) => `<li role="option" data-i="${i}" class="${i === active ? 'on' : ''}">${e(s)}</li>`).join('');
+			const r = input.getBoundingClientRect();
+			Object.assign(list.style, { position: 'fixed', left: r.left + 'px', width: Math.max(r.width, 220) + 'px', top: r.bottom + 6 + 'px', right: 'auto', maxHeight: Math.max(140, Math.min(280, innerHeight - r.bottom - 16)) + 'px', zIndex: '1000' });
+			list.hidden = false;
+			input.setAttribute('aria-expanded', 'true');
+			// the dialog scrolling would leave the list behind: close it
+			const onScroll = (ev: Event) => {
+				if (list.contains(ev.target as Node)) return addEventListener('scroll', onScroll, { capture: true, once: true });
+				close();
+			};
+			addEventListener('scroll', onScroll, { capture: true, once: true });
+		};
+		const pick = (s: string) => {
+			input.value = s;
+			close();
+		};
+		input.addEventListener('focus', open);
+		input.addEventListener('input', () => {
+			active = -1;
+			open();
+		});
+		input.addEventListener('keydown', (ev) => {
+			if (list.hidden || !items.length) return;
+			if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+				ev.preventDefault();
+				active = (active + (ev.key === 'ArrowDown' ? 1 : items.length - 1) + (active < 0 && ev.key === 'ArrowUp' ? 1 : 0)) % items.length;
+				open();
+				list.querySelector('li.on')?.scrollIntoView({ block: 'nearest' });
+			} else if (ev.key === 'Enter' && active >= 0) {
+				ev.preventDefault();
+				ev.stopPropagation();
+				pick(items[active]);
+			} else if (ev.key === 'Escape') {
+				ev.stopPropagation();
+				close();
+			}
+		});
+		list.addEventListener('mousedown', (ev) => {
+			ev.preventDefault();
+			const li = (ev.target as HTMLElement).closest('li[data-i]') as HTMLElement | null;
+			if (li) pick(items[+li.dataset.i!]);
+		});
+		input.addEventListener('blur', close);
+		return wrap;
+	}
 	import { renderPreview, paintScreen } from '../lib/eink/previewKit';
 	import { batteryPercent } from '../lib/eink/battery';
 	import { estimate, measured, lifeText } from '../lib/eink/batteryLife';
@@ -477,21 +546,21 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 			const body = document.createElement('div');
 			body.className = 'cls-dlg';
 			body.innerHTML = `
-				<datalist id="subj-${esc(d.id)}">${SUBJECTS.map((s) => `<option value="${esc(s)}"></option>`).join('')}</datalist>
 				<div class="cls-head"><span>Code</span><span>Name on the screen</span><span>Bring</span></div>
 				<div class="cls-list">${list
 					.map(
 						(c) => `<div class="cls-row" data-code="${esc(c.code)}">
 							<div class="cls-code"><b>${esc(c.code)}</b><span>${c.room ? esc(c.room) + ' · ' : ''}${c.count ? c.count + '×' : 'not on now'}</span></div>
-							<input class="x-dlg-field" data-n list="subj-${esc(d.id)}" maxlength="40" placeholder="${esc(c.code)}" value="${esc(c.name)}" autocomplete="off" />
+							<div data-nslot></div>
 							<input class="x-dlg-field" data-b maxlength="40" placeholder="Nothing" value="${esc(c.bring)}" autocomplete="off" />
 						</div>`
 					)
 					.join('')}</div>
 				<label class="cls-opt"><input type="checkbox" data-rooms ${j.opts?.rooms !== false ? 'checked' : ''} /> Show the room after the name</label>
 				<label class="cls-opt"><input type="checkbox" data-moves ${j.opts?.moves !== false ? 'checked' : ''} /> Point out room changes</label>`;
-			if (!(await ask('Give your class codes proper names. Pick one from the list or type your own. Bring shows on the Night before screen.', { title: 'Name your classes', ok: 'Save', body }))) return;
-			const classes = [...body.querySelectorAll<HTMLElement>('.cls-row')].map((r) => ({ code: r.dataset.code, name: (r.querySelector('[data-n]') as HTMLInputElement).value.trim(), bring: (r.querySelector('[data-b]') as HTMLInputElement).value.trim() }));
+			body.querySelectorAll<HTMLElement>('.cls-row').forEach((r, i) => r.querySelector('[data-nslot]')!.replaceWith(subjectBox(list[i].name || '', list[i].code)));
+			if (!(await ask('Give your class codes proper names. Pick one from the list or type your own. Bring shows on the School day screen.', { title: 'Name your classes', ok: 'Save', body }))) return;
+			const classes = [...body.querySelectorAll<HTMLElement>('.cls-row')].map((r) => ({ code: r.dataset.code, name: (r.querySelector('.cs-input') as HTMLInputElement).value.trim(), bring: (r.querySelector('[data-b]') as HTMLInputElement).value.trim() }));
 			const opts = { rooms: (body.querySelector('[data-rooms]') as HTMLInputElement).checked, moves: (body.querySelector('[data-moves]') as HTMLInputElement).checked };
 			const r = await post('/api/dashboard/classes', { deviceId: d.id, classes, opts });
 			flash(note, r.ok ? 'Saved. Your calendar uses the names from its next update.' : r.error || 'Could not save.', !r.ok);
@@ -909,6 +978,9 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 	.cls-dlg .cls-code b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.cls-dlg .cls-code span { font-size: 0.78em; color: var(--muted); }
 	.cls-dlg .x-dlg-field { margin: 0; padding: 0.5em 0.6em; font-size: 0.92em; min-width: 0; }
+	.cls-dlg .citysearch.subj { min-width: 0; }
+	.cls-dlg .citysearch.subj .cs-input { padding: 0.5em 0.6em; font-size: 0.92em; border-radius: 10px; }
+	.cls-dlg .citysearch.subj .cs-list li { padding: 0.5em 0.7em; font-size: 0.9em; }
 	.cls-dlg .cls-opt { display: flex; gap: 0.5em; align-items: center; margin-top: 0.8em; color: var(--muted); }
 	.dash .daycfg { margin-top: 1.4em; }
 	.dash .dc-away { display: flex; gap: 0.6em; align-items: end; flex-wrap: wrap; }
