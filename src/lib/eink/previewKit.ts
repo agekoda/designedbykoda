@@ -179,7 +179,8 @@ export function drawListFor(o: PreviewOptions): string {
 			cornerImage: o.cornerImage ?? null,
 			cornerSize: o.cornerSize ?? null,
 			refreshSec: o.refreshSec ?? 86400,
-			loc: o.loc ?? null,
+			// a preview with example weather gets an example place too, so sunrise and sunset show
+			loc: o.loc ?? (o.hasWeather ? { lat: -31.95, lon: 115.86 } : null),
 			utcOffsetSec: -new Date().getTimezoneOffset() * 60,
 			countdown: o.countdown ?? null,
 			frameImage: o.frameImage ?? null,

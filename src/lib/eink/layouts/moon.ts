@@ -63,7 +63,7 @@ export function moon(ctx: LayoutCtx): string {
 
 	// the sun
 	if (!ctx.loc) {
-		wrapText(ctx.family, 's', 'Add a weather location in setup to see sunrise and sunset times.', PW).forEach((ln, i) => d.text(PX, 178 + i * 18, 's', ln));
+		wrapText(ctx.family, 's', 'Add a weather place in Settings to see sunrise and sunset times.', PW).forEach((ln, i) => d.text(PX, 178 + i * 18, 's', ln));
 		return d.toString();
 	}
 	const sun = sunTimes(now.year, now.mon, now.mday, ctx.loc.lat, ctx.loc.lon);

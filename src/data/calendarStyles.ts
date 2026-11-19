@@ -25,6 +25,7 @@ export const CALENDAR_STYLES: CalendarStyle[] = [
 	{ id: 'nextup', label: 'Next up', note: 'Your very next event, big and clear', image: '/images/polls/eink-styles/nextup.png', imageDark: '/images/polls/eink-styles/nextup-dark.png', view: 7 },
 	{ id: 'todo', label: 'To-do', note: 'Your Google Tasks, with tick boxes', image: '/images/polls/eink-styles/todo.png', imageDark: '/images/polls/eink-styles/todo-dark.png', view: 13, setup: false },
 	{ id: 'moon', label: 'Moon & Sun', note: "Tonight's moon, plus sunrise and sunset", image: '/images/polls/eink-styles/moon.png', imageDark: '/images/polls/eink-styles/moon-dark.png', view: 9, setup: false },
+	{ id: 'forecast', label: 'Forecast', note: 'Today\'s weather big, the next five days, and sunrise and sunset', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 26, setup: false },
 	{ id: 'countdown', label: 'Countdown', note: 'Days until something you are looking forward to', image: '/images/polls/eink-styles/countdown.png', imageDark: '/images/polls/eink-styles/countdown-dark.png', view: 11, setup: false },
 	{ id: 'messages', label: 'Message board', note: 'Messages sent from the dashboard or a shared link', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 19, setup: false },
 	{ id: 'reminders', label: 'Reminders', note: 'Bin day and other things that repeat', image: '/images/polls/eink-styles/custom.png', imageDark: '/images/polls/eink-styles/custom-dark.png', view: 20, setup: false },

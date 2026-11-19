@@ -137,7 +137,9 @@ const JA: Record<string, string> = {
 	'Waning Gibbous': '寝待月',
 	'Last Quarter': '下弦の月',
 	'Waning Crescent': '有明月',
-	'Add a weather location in setup to see sunrise and sunset times.': '設定で天気の場所を追加すると、日の出と日の入りの時刻が表示されます。',
+	'Add a weather place in Settings to see sunrise and sunset times.': '設定で天気の場所を追加すると、日の出と日の入りの時刻が表示されます。',
+	'Add a weather place in Settings': '設定で天気の場所を追加してください',
+	FORECAST: '天気予報', 'Where are you?': '場所を教えてください', 'Add your weather place in Settings on your dashboard, and the forecast shows here.': 'ダッシュボードの設定で天気の場所を追加すると、ここに天気予報が表示されます。',
 	'The sun stays up all day today.': '今日は一日中、日が沈みません。',
 	'The sun stays down all day today.': '今日は一日中、日が昇りません。',
 	// weather

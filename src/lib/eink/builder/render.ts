@@ -451,7 +451,7 @@ function sunTimesWidget(env: Env, w: Widget, o: Opts) {
 	const { ctx, d } = env;
 	const { inner, color } = chrome(env, w, o);
 	if (!ctx.loc) {
-		const fit = fitText(env, 'Add a weather location in setup', inner.w, inner.h, ['s'], false);
+		const fit = fitText(env, 'Add a weather place in Settings', inner.w, inner.h, ['s'], false);
 		return drawLines(env, inner, fit.lines, fit.face, 'left', 'middle', color);
 	}
 	const now = tmOf(ctx.nowLocal);
