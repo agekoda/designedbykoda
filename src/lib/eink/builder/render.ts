@@ -25,6 +25,8 @@ import { toAscii } from '../draw';
 import { messageList } from '../layouts/messages';
 import { reminderList } from '../layouts/reminders';
 import { habitGrid } from '../layouts/habits';
+import { birthdayList } from '../layouts/birthdays';
+import { wordOfDay } from '../jpWords';
 import { personName, type NameStyle } from '../waiting';
 
 interface Env {
@@ -815,8 +817,10 @@ const hm = (local: number) => {
 
 function roomStatusWidget(env: Env, w: Widget, o: Opts) {
 	const { d, ctx } = env;
-	const now = currentEvent(ctx);
-	const busy = !!now;
+	// a status set from a phone ("In a meeting") wins over the calendar, and looks busy
+	const status = ctx.deskStatus ?? null;
+	const now = status ? null : currentEvent(ctx);
+	const busy = !!now || !!status;
 	let color: Color = INK;
 	if (busy && o.black === true) {
 		d.fillRound(w.x, w.y, w.w, w.h, 4, INK);
@@ -828,7 +832,9 @@ function roomStatusWidget(env: Env, w: Widget, o: Opts) {
 	const pad = (busy && o.black === true) || o.border === true ? 8 : 0;
 	const inner: Box = { x: w.x + pad, y: w.y + pad, w: Math.max(1, w.w - pad * 2), h: Math.max(1, w.h - pad * 2) };
 	const detail: string[] = [];
-	if (o.detail === true) {
+	if (status) {
+		if (status.untilLocal !== null) detail.push(`until ${hm(status.untilLocal)}`);
+	} else if (o.detail === true) {
 		const today = dayIdx(ctx.nowLocal);
 		if (now) {
 			if (o.title === true) detail.push(now.title);
@@ -841,7 +847,7 @@ function roomStatusWidget(env: Env, w: Widget, o: Opts) {
 	}
 	const sv = vm(env, FACES.s);
 	const detailH = detail.length ? detail.length * sv.lh + 2 : 0;
-	const word = String((busy ? o.busy : o.free) ?? '') || (busy ? 'Busy' : 'Free');
+	const word = status ? status.text : String((busy ? o.busy : o.free) ?? '') || (busy ? 'Busy' : 'Free');
 	const bigBox: Box = { x: inner.x, y: inner.y, w: inner.w, h: Math.max(14, inner.h - detailH) };
 	const fit = fitText(env, word, bigBox.w, bigBox.h, ORDER, true);
 	drawLines(env, bigBox, fit.lines, fit.face, o.align, 'middle', color);
@@ -849,7 +855,37 @@ function roomStatusWidget(env: Env, w: Widget, o: Opts) {
 		const a: Align = o.align === 'center' ? 'center' : o.align === 'right' ? 'right' : 'left';
 		const x = a === 'center' ? inner.x + inner.w / 2 : a === 'right' ? inner.x + inner.w : inner.x;
 		const top = inner.y + inner.h - detail.length * sv.lh + sv.asc - sv.desc + 2;
-		detail.forEach((ln, i) => d.text(x, top + i * sv.lh, i === 0 && busy && o.title === true ? 'sb' : 's', ln, { align: a, color, maxW: inner.w }));
+		detail.forEach((ln, i) => d.text(x, top + i * sv.lh, i === 0 && !!now && o.title === true ? 'sb' : 's', ln, { align: a, color, maxW: inner.w }));
+	}
+}
+
+// Japanese word of the day: the word big, its reading in kana under it, then romaji and the meaning.
+function jpWordWidget(env: Env, w: Widget, o: Opts) {
+	const { d, ctx } = env;
+	const [word, kana, romaji, meaning] = wordOfDay(dayIdx(ctx.nowLocal));
+	const a: Align = o.align === 'center' ? 'center' : o.align === 'right' ? 'right' : 'left';
+	const x = a === 'center' ? w.x + w.w / 2 : a === 'right' ? w.x + w.w : w.x;
+	const sv = vm(env, FACES.s);
+	let top = w.y;
+	if (o.label !== false) {
+		d.text(x, top + sv.asc, 'sb', 'Word of the day', { align: a, maxW: w.w });
+		top += sv.lh + 4;
+	}
+	// the lines under the word, from the bottom up
+	const under: { text: string; role: 's' | 'sb' }[] = [];
+	if (kana !== word) under.push({ text: kana, role: 's' });
+	if (o.romaji !== false) under.push({ text: romaji, role: 's' });
+	if (o.meaning !== false) under.push({ text: meaning, role: 'sb' });
+	const underH = under.length * sv.lh;
+	const bigBox: Box = { x: w.x, y: top, w: w.w, h: Math.max(16, w.y + w.h - top - underH - 2) };
+	// at most three times the pixel font's size: bigger than that and the kanji turn to blocks
+	const fit = fitText(env, word, bigBox.w, bigBox.h, ['xl', 'l', 'm', 's'], false);
+	drawLines(env, bigBox, fit.lines.slice(0, 1), fit.face, a, 'middle', INK);
+	let y = bigBox.y + bigBox.h + sv.asc - sv.desc + 4;
+	for (const ln of under) {
+		// the meaning stays English: it's what the word means, not a label to translate
+		d.text(x, y, ln.role, ln.text, { align: a, maxW: w.w, raw: true });
+		y += sv.lh;
 	}
 }
 
@@ -957,6 +993,10 @@ function drawWidget(env: Env, w: Widget) {
 			return lineWidget(env, w, o);
 		case 'reminders':
 			return reminderList(env.d, env.ctx, w, { bigToday: o.big === true, days: Number(o.days) || 7 });
+		case 'jpword':
+			return jpWordWidget(env, w, o);
+		case 'birthdays':
+			return birthdayList(env.d, env.ctx, w, { count: Number(o.count) || 4, days: Number(o.days) || 31, label: o.label !== false });
 		case 'habits':
 			return habitGrid(env.d, env.ctx, w, { days: Number(o.days) || 0, streak: o.streak !== false, letters: o.letters === true });
 		case 'qr':

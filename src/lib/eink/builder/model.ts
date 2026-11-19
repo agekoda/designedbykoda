@@ -380,6 +380,34 @@ export const WIDGETS: Record<string, WidgetDef> = {
 			{ key: 'days', label: 'Looks ahead', kind: 'choice', choices: [['1', 'Today'], ['2', '2 days'], ['7', 'A week'], ['14', '2 weeks']], def: '7' },
 		],
 	},
+	jpword: {
+		label: 'Japanese word',
+		group: 'Extras',
+		blurb: 'A Japanese word of the day: the kanji, how to read it, and what it means. A new one each day',
+		w: 220,
+		h: 150,
+		min: { w: 90, h: 60 },
+		opts: [
+			{ key: 'label', label: 'Heading', kind: 'toggle', def: true },
+			{ key: 'romaji', label: 'Romaji (mizu)', kind: 'toggle', def: true },
+			{ key: 'meaning', label: 'Meaning', kind: 'toggle', def: true },
+			ALIGN,
+		],
+		def: { align: 'center' },
+	},
+	birthdays: {
+		label: 'Birthdays',
+		group: 'Extras',
+		blurb: 'The next few birthdays, from your Google contacts and any birthday on your calendars',
+		w: 250,
+		h: 110,
+		min: { w: 110, h: 30 },
+		opts: [
+			{ key: 'count', label: 'How many', kind: 'choice', choices: [['2', '2'], ['3', '3'], ['4', '4'], ['6', '6']], def: '4' },
+			{ key: 'days', label: 'Looks ahead', kind: 'choice', choices: [['7', 'A week'], ['31', 'A month'], ['60', '2 months']], def: '31' },
+			{ key: 'label', label: 'Heading', kind: 'toggle', def: true },
+		],
+	},
 	habits: {
 		label: 'Habits',
 		group: 'Extras',
@@ -597,6 +625,8 @@ export function layoutNeeds(layout: CustomLayout | null | undefined) {
 		live: types.has('room_status') || types.has('queue'),
 		reminders: types.has('reminders'),
 		habits: types.has('habits'),
+		birthdays: types.has('birthdays'),
+		jpword: types.has('jpword'),
 	};
 }
 

@@ -50,6 +50,9 @@ export interface LayoutCtx {
 	countdown?: { title: string; date: string } | null;
 	// The Photo frame layout: a full-screen 1-bit picture (see image.ts, FRAME). 1 = dark dot.
 	frameImage?: Uint8Array | null;
+	frameDeco?: import('./festive').FrameDeco | null; // a festive border round the photo
+	birthdays?: import('../birthdays').Birthday[]; // for the Birthdays widget
+	deskStatus?: { text: string; untilLocal: number | null } | null; // set from a phone: shows in place of free or busy
 	// The To-do layout: tasks from Google Tasks, and whether we were allowed to read them.
 	tasks?: TaskItem[] | null;
 	tasksState?: 'ok' | 'needs_permission' | 'error';

@@ -80,6 +80,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 							<select id="sign-cal-add" aria-label="Add a calendar"></select>
 							<p class="muted small sp-hint" id="sign-cal-hint"></p>
 						</div>
+						<div class="desk" id="desk" hidden>
+							<div class="label sub">Status from your phone</div>
+							<div id="desk-body"></div>
+						</div>
 						<a class="btn small ghost" id="sign-builder" href="#">Edit the layout in the builder</a>
 						<p class="muted small hint">Opens it in the layout builder as a new design of your own, where you can move things around and add widgets.</p>
 					</div>
@@ -152,6 +156,16 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						</div>
 					</div>
 
+						</div>
+						<div id="deco-box" hidden>
+							<div class="label sub">Festive border</div>
+							<div class="seg" id="deco-when" role="radiogroup" aria-label="Festive border">
+								<label><input type="radio" name="deco" value="off" /><span>Off</span></label>
+								<label><input type="radio" name="deco" value="december" /><span>In December</span></label>
+								<label><input type="radio" name="deco" value="always" /><span>Always</span></label>
+							</div>
+							<label class="deco-text" id="deco-text-row"><span class="label sub">Greeting along the bottom</span><input class="txt" id="deco-text" type="text" placeholder="Leave empty for none" autocomplete="off" /></label>
+							<p class="muted small sp-hint" id="deco-hint"></p>
 						</div>
 					</div>
 					</section>
@@ -366,6 +380,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	import { TEMPLATES, sanitizeLayout, isSignStyle, sanitizeSign, signLayout, SIGN_DEFAULTS, type SignCfg } from '../../lib/eink/builder/model';
 	import { renderDrawList } from '../../lib/eink/preview';
 	import { sampleFrameBytes } from '../../lib/eink/sampleFrame';
+	import { ask } from '../../lib/dialog';
+	import { DECO_DEFAULT, DECO_TEXT_MAX, sanitizeDeco, type FrameDeco } from '../../lib/eink/festive';
 	import { EMPTY_SCHEDULE, SCHEDULE_PRESETS, ALL_DAYS, WEEKDAYS, MAX_SLOTS, activeSlot, activeStyle, cycleList, daysText, minutesToHHMM, hhmmToMinutes, type Schedule, type Slot } from '../../lib/eink/schedule';
 	import { estimate, measured, lifeText } from '../../lib/eink/batteryLife';
 	import { batteryPercent } from '../../lib/eink/battery';
@@ -425,6 +441,22 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const edNote = $('ed-note');
 	const optCountdown = $('opt-countdown');
 	const optTodo = $('opt-todo');
+	const decoBox = $('deco-box');
+	const decoText = $('deco-text') as HTMLInputElement;
+	decoText.maxLength = DECO_TEXT_MAX;
+	decoBox.addEventListener('change', (e) => {
+		const t = e.target as HTMLInputElement;
+		if (t.name !== 'deco') return;
+		st.deco = { ...st.deco, when: t.value as FrameDeco['when'] };
+		syncControls();
+		schedule(false);
+		changed();
+	});
+	decoText.addEventListener('input', () => {
+		st.deco = { ...st.deco, text: decoText.value };
+		schedule(false);
+		changed();
+	});
 	const optSign = $('opt-sign');
 	const optMsgs = $('opt-msgs');
 	const optRem = $('opt-rem');
@@ -495,6 +527,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		sign: SignCfg;
 		reminders: Reminder[];
 		habits: Habit[];
+		deco: FrameDeco; // the Photo frame's festive border
 	}
 	// The picture editor works on one of two pictures: the Agenda's corner picture, or the Photo frame's full-screen one.
 	type PicKey = 'corner' | 'frame';
@@ -532,6 +565,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		sign: JSON.parse(JSON.stringify(SIGN_DEFAULTS)),
 		reminders: [],
 		habits: [],
+		deco: { ...DECO_DEFAULT },
 	};
 	let base = JSON.stringify(st);
 	// A layout picked in the Schedule tab is previewed (and its Picture / Options tabs shown)
@@ -586,7 +620,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const cd = st.countdown.title.trim() && st.countdown.date ? st.countdown : thumb ? { title: 'Japan trip', date: sampleDate() } : null;
 		return {
 			cornerImage: s?.corner && st.cornerMode === 'image' ? pics.corner.bytes : null,
-			frameImage: s?.frame ? (pics.frame.bytes ?? (thumb ? sampleFrameBytes() : null)) : null,
+			frameImage: s?.frame ? (pics.frame.bytes ?? (thumb || st.deco.when !== 'off' ? sampleFrameBytes() : null)) : null,
+			// the big preview shows the border whenever it's on, even "December only" in November
+			frameDeco: s?.frame && !thumb && st.deco.when !== 'off' ? { ...st.deco, when: 'always' as const } : null,
 			loc,
 			countdown: styleId === 'countdown' ? cd : null,
 			custom: styleId === 'custom' ? (thumb && !customLayout?.widgets?.length ? sanitizeLayout(TEMPLATES.find((x) => x.id === 'sky')!.build()) : customLayout) : isDesign(styleId) ? layoutOf(styleId) : null,
@@ -1021,6 +1057,18 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		refreshEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = parseInt(i.value, 10) === st.refreshSec));
 		refreshHint.textContent = REFRESH_HINTS[st.refreshSec] ?? '';
 
+		// The Photo frame's festive border
+		decoBox.hidden = !isFrame();
+		decoBox.querySelectorAll<HTMLInputElement>('input[name="deco"]').forEach((r) => (r.checked = r.value === st.deco.when));
+		$('deco-text-row').hidden = st.deco.when === 'off';
+		if (document.activeElement !== decoText) decoText.value = st.deco.text;
+		$('deco-hint').textContent =
+			st.deco.when === 'off'
+				? 'Snowflakes, trees and baubles round your photo, with a greeting if you like.'
+				: st.deco.when === 'december'
+					? 'Shows from 1 to 31 December, then your photo goes back to normal by itself. The preview shows it now so you can see it.'
+					: 'Shows all the time, until you turn it off.';
+
 		// Picture tab: the Agenda's corner picture, or the Photo frame's whole-screen one
 		picBox.hidden = !(supportsCorner() || isFrame());
 		cornerSeg.hidden = isFrame();
@@ -1273,9 +1321,82 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			});
 		}
 		drawSignCals(id);
+		drawDesk(id);
 		signBuilder.href = '/dashboard/builder?device=' + encodeURIComponent(deviceId) + '&seed=1';
 		signBuilder.dataset.builder = '1';
 	}
+	// Desk name plate: a private link that sets what the sign says from your phone (src/lib/deskStatus.ts).
+	let deskLink: { token: string; check: number; now: { text: string; until: number | null } | null } | null | undefined;
+	let deskLoading = false;
+	async function deskApi(body?: any) {
+		const r = body
+			? await fetch('/api/dashboard/desk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceId, ...body }) })
+			: await fetch('/api/dashboard/desk?deviceId=' + encodeURIComponent(deviceId));
+		const j = await r.json().catch(() => ({}));
+		if (!r.ok || !j.ok) throw new Error(j.error || 'Could not do that.');
+		deskLink = j.link;
+	}
+	function drawDesk(id: string) {
+		const box = $('desk');
+		box.hidden = id !== 'nameplate';
+		if (box.hidden) return;
+		const body = $('desk-body');
+		if (deskLink === undefined) {
+			body.innerHTML = '<p class="muted small">Loading\u2026</p>';
+			if (!deskLoading) {
+				deskLoading = true;
+				deskApi()
+					.catch(() => (deskLink = null))
+					.finally(() => {
+						deskLoading = false;
+						if (fs() === 'nameplate') drawDesk('nameplate');
+					});
+			}
+			return;
+		}
+		if (!deskLink) {
+			body.innerHTML = `<p class="muted small">Set the sign to \u201cIn a meeting\u201d, \u201cBack soon\u201d or anything else from your phone, without opening the dashboard. You get a private link to keep on your home screen, and it works with iPhone Shortcuts too.</p>
+				<button type="button" class="btn small" data-desk="make">Make a status link</button>`;
+			return;
+		}
+		const url = location.origin + '/desk/' + deskLink.token;
+		const every = (c: number) => (c >= 3600 ? '1 hour' : c / 60 + ' min');
+		body.innerHTML = `<div class="desk-link"><input class="txt" readonly value="${escHtml(url)}" aria-label="Your status link" /><button type="button" class="sp-pill" data-desk="copy">Copy</button><a class="sp-pill" href="${escHtml(url)}" target="_blank" rel="noopener">Open</a></div>
+			<p class="muted small sp-hint">${deskLink.now ? `Showing <b>${escHtml(deskLink.now.text)}</b> now.` : 'Showing free or busy from your calendar now.'} Anyone with this link can change what the sign says, so keep it to yourself.</p>
+			<div class="label sub" style="margin-top:1.3em">How often the sign looks for a new status</div>
+			<div class="seg" role="radiogroup" aria-label="How often it looks">${[600, 900, 1800, 3600].map((c) => `<label><input type="radio" name="desk-check" value="${c}" ${c === deskLink!.check ? 'checked' : ''} /><span>${every(c)}</span></label>`).join('')}</div>
+			<p class="muted small sp-hint">Between 7 am and 10 pm. More often changes sooner but uses more battery.</p>
+			<div class="desk-acts"><button type="button" class="sp-pill" data-desk="make">Make a new link</button><button type="button" class="sp-pill" data-desk="remove">Turn it off</button></div>`;
+	}
+	$('desk').addEventListener('click', async (e) => {
+		const b = (e.target as HTMLElement).closest<HTMLElement>('[data-desk]');
+		if (!b) return;
+		const what = b.dataset.desk;
+		try {
+			if (what === 'copy') {
+				await navigator.clipboard.writeText(location.origin + '/desk/' + deskLink!.token);
+				return toast('Link copied');
+			}
+			if (what === 'make' && deskLink && !(await ask('The old link stops working straight away.', { title: 'Make a new link?', ok: 'Make a new one' }))) return;
+			if (what === 'remove' && !(await ask('The link stops working, and the sign goes back to free or busy from your calendar.', { title: 'Turn off the status link?', ok: 'Turn it off', danger: true }))) return;
+			await deskApi({ action: what });
+			drawDesk('nameplate');
+			toast(what === 'remove' ? 'Turned off' : 'Link ready. Copy it, or open it on your phone.');
+		} catch (err: any) {
+			toast(err.message || 'Could not do that.', true);
+		}
+	});
+	$('desk').addEventListener('change', async (e) => {
+		const t = e.target as HTMLInputElement;
+		if (t.name !== 'desk-check') return;
+		try {
+			await deskApi({ action: 'check', check: Number(t.value) });
+			toast('Saved');
+		} catch (err: any) {
+			toast(err.message || 'Could not save that.', true);
+		}
+	});
+
 	// Meeting room and Waiting room: which of your calendars this sign reads. Picked here, they're used
 	// instead of the ones in Calendars and timetables while this sign is on the screen, so work and
 	// home never mix, and switching to Agenda goes straight back to your usual ones.
@@ -1699,6 +1820,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		if (JSON.stringify(st.sch) !== JSON.stringify(baseState.sch)) body.schedule = st.sch;
 		if (JSON.stringify(st.sign) !== JSON.stringify(baseState.sign)) body.sign = st.sign;
 		if (JSON.stringify(st.reminders) !== JSON.stringify(baseState.reminders)) body.reminders = st.reminders.filter((r) => r.text.trim());
+		if (JSON.stringify(st.deco) !== JSON.stringify(baseState.deco)) body.frameDeco = st.deco;
 		if (JSON.stringify(st.habits) !== JSON.stringify(baseState.habits)) body.habits = st.habits.filter((h) => h.name.trim());
 		if (st.clock !== baseState.clock) body.clock = st.clock;
 		if (st.unit !== baseState.unit) body.unit = st.unit; // only when changed, so a server without schema-screens.sql still saves the rest
@@ -1949,6 +2071,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				sign: sanitizeSign(info.sign),
 				reminders: sanitizeReminders(info.reminders),
 				habits: sanitizeHabits(info.habits),
+				deco: sanitizeDeco(info.frameDeco),
 			};
 			screensReady = info.screensReady !== false;
 			battAnchor = info.batteryAnchor ?? null;
@@ -2033,6 +2156,13 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.cust .picker-scroll { flex: 1; overflow-y: auto; padding: 1.2em 1.4em 2em; }
 	.cust .lay[hidden], .cust #mine-head[hidden], .cust #design-cards[hidden] { display: none; }
 	.cust .sign-cals { margin: 0.6em 0 1.4em; }
+	.cust .desk { margin: 0.6em 0 1.6em; }
+	.cust .desk-link { display: flex; gap: 0.5em; align-items: center; }
+	.cust .desk-link .txt { flex: 1; min-width: 0; font-size: 0.9em; }
+	.cust .desk-acts { display: flex; gap: 0.5em; flex-wrap: wrap; margin-top: 1.2em; }
+	.cust #deco-box { margin-top: 1.6em; }
+	.cust .deco-text { display: grid; gap: 0.4em; margin-top: 1em; }
+	.cust .deco-text[hidden] { display: none; }
 	.cust .sign-cals .sp-list:not(:empty) { margin-bottom: 0.7em; }
 	.cust .gname { font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 1.8em 0 0.8em; }
 	.cust .lay { position: relative; display: block; }

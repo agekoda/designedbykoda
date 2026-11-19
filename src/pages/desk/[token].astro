@@ -1,0 +1,120 @@
+---
+// The phone page for a desk name plate's status: tap "In a meeting" and the sign says so at its next
+// check. No sign-in: the private link is the key (src/lib/deskStatus.ts).
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+import { statusByToken, activeStatus, STATUS_PRESETS, STATUS_MAX } from '../../lib/deskStatus';
+
+const token = String(Astro.params.token ?? '');
+const db = Astro.locals.runtime?.env?.DB;
+const s = db ? await statusByToken(db, token) : null;
+const now = activeStatus(s, Math.floor(Date.now() / 1000));
+let name = '';
+let check = 900;
+if (s && db) {
+	check = s.check;
+	try {
+		const d: any = await db.prepare('SELECT name FROM devices WHERE id = ?').bind(s.deviceId).first();
+		name = d?.name ?? '';
+	} catch {}
+}
+Astro.response.headers.set('X-Robots-Tag', 'noindex');
+Astro.response.headers.set('Referrer-Policy', 'no-referrer');
+---
+
+<Layout title="Desk status - designedbykoda" description="Set what your desk sign says." noindex>
+	{!s ? (
+		<div class="dk-missing">
+			<h1>This link doesn't work any more</h1>
+			<p>It was turned off, or a new one was made. Get the current link from your dashboard, under Choose a screen, then Desk name plate.</p>
+		</div>
+	) : (
+		<div class="dk" data-token={token} data-now={now ? JSON.stringify(now) : ''}>
+			<div class="dk-head">
+				<div class="dk-kicker">{name || 'Your desk sign'}</div>
+				<h1 id="dk-now">{now ? now.text : 'Free or busy'}</h1>
+				<p class="dk-sub" id="dk-sub">{now ? '' : 'From your calendar.'}</p>
+			</div>
+			<div class="dk-label">How long</div>
+			<div class="dk-seg" role="radiogroup" aria-label="How long">
+				<label><input type="radio" name="mins" value="30" /><span>30 min</span></label>
+				<label><input type="radio" name="mins" value="60" checked /><span>1 hour</span></label>
+				<label><input type="radio" name="mins" value="120" /><span>2 hours</span></label>
+				<label><input type="radio" name="mins" value="" /><span>Until I change it</span></label>
+			</div>
+			<div class="dk-label">Show</div>
+			<div class="dk-grid">
+				{STATUS_PRESETS.map((p) => <button type="button" class="dk-btn" data-text={p}>{p}</button>)}
+			</div>
+			<form class="dk-own" id="dk-own">
+				<input id="dk-text" maxlength={STATUS_MAX} placeholder="Something else, like Back at 2" autocomplete="off" />
+				<button type="submit" class="dk-btn dk-go">Show it</button>
+			</form>
+			<button type="button" class="dk-clear" id="dk-clear">Back to free or busy</button>
+			<p class="dk-fine">The sign looks for a new status every {check >= 3600 ? 'hour' : `${check / 60} minutes`} between 7 am and 10 pm, so it can take that long to change. Keep this page on your home screen, or make an iPhone Shortcut that opens <code>{`${Astro.url.origin}/api/desk/${token}?text=In%20a%20meeting&mins=60`}</code>.</p>
+		</div>
+	)}
+</Layout>
+
+<script>
+	const root = document.querySelector<HTMLElement>('.dk');
+	if (root) {
+		const token = root.dataset.token!;
+		const $ = (id: string) => document.getElementById(id)!;
+		const show = (now: { text: string; until: number | null } | null) => {
+			$('dk-now').textContent = now ? now.text : 'Free or busy';
+			$('dk-sub').textContent = now
+				? now.until
+					? 'Until ' + new Date(now.until * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) + '. Shows at the sign’s next check.'
+					: 'Until you change it. Shows at the sign’s next check.'
+				: 'From your calendar.';
+		};
+		show(root.dataset.now ? JSON.parse(root.dataset.now) : null);
+		const send = async (body: any) => {
+			root.classList.add('busy');
+			try {
+				const r = await fetch('/api/desk/' + encodeURIComponent(token), { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
+				const j = await r.json();
+				if (j.ok) show(j.now);
+				else $('dk-sub').textContent = j.error || 'That didn’t work. Try again.';
+			} catch {
+				$('dk-sub').textContent = 'No connection. Try again.';
+			}
+			root.classList.remove('busy');
+		};
+		const mins = () => (document.querySelector<HTMLInputElement>('input[name="mins"]:checked')?.value || null);
+		root.querySelectorAll<HTMLElement>('.dk-grid .dk-btn').forEach((b) => b.addEventListener('click', () => send({ text: b.dataset.text, mins: mins() })));
+		$('dk-own').addEventListener('submit', (e) => {
+			e.preventDefault();
+			const t = ($('dk-text') as HTMLInputElement).value.trim();
+			if (t) send({ text: t, mins: mins() });
+		});
+		$('dk-clear').addEventListener('click', () => send({ clear: true }));
+	}
+</script>
+
+<style>
+	.dk, .dk-missing { max-width: 460px; margin: 0 auto; padding: 2.5em 0 4em; }
+	.dk-missing p { color: var(--muted); line-height: 1.55; }
+	.dk.busy { opacity: 0.6; pointer-events: none; }
+	.dk-head { padding: 1.4em 1.5em; border: 1px solid var(--border); border-radius: 18px; background: var(--bg-raised); margin-bottom: 1.8em; }
+	.dk-kicker { font-size: 0.75em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+	.dk-head h1 { font-size: 2.1em; margin: 0.25em 0 0.2em; line-height: 1.1; overflow-wrap: anywhere; }
+	.dk-sub { margin: 0; color: var(--muted); }
+	.dk-label { font-size: 0.75em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.6em; }
+	.dk-seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 16px; margin-bottom: 1.6em; }
+	.dk-seg label { cursor: pointer; }
+	.dk-seg input { position: absolute; opacity: 0; pointer-events: none; }
+	.dk-seg span { display: grid; place-items: center; height: 100%; text-align: center; padding: 0.55em 0.3em; border-radius: 12px; font-weight: 700; font-size: 0.88em; color: var(--muted); line-height: 1.2; }
+	.dk-seg input:checked + span { background: var(--fg); color: var(--bg); }
+	.dk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6em; margin-bottom: 0.9em; }
+	.dk-btn { padding: 1em 0.8em; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-raised); color: var(--fg); font: inherit; font-weight: 700; cursor: pointer; }
+	.dk-btn:hover { border-color: var(--muted); }
+	.dk-own { display: flex; gap: 0.6em; margin-bottom: 1.4em; }
+	.dk-own input { flex: 1; min-width: 0; padding: 0.9em 1em; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-raised); color: var(--fg); font: inherit; }
+	.dk-own input:focus { outline: none; border-color: var(--accent); }
+	.dk-go { flex: none; background: var(--fg); color: var(--bg); border-color: var(--fg); }
+	.dk-clear { width: 100%; padding: 0.9em; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--fg); font: inherit; font-weight: 700; cursor: pointer; }
+	.dk-fine { color: var(--muted); font-size: 0.82em; line-height: 1.55; margin-top: 1.6em; }
+	.dk-fine code { font-size: 0.92em; overflow-wrap: anywhere; }
+</style>

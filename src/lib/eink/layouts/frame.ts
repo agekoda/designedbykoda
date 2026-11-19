@@ -3,6 +3,7 @@ import { Draw, PAPER } from '../draw';
 import { FRAME, FRAME_BYTES } from '../image';
 import type { LayoutCtx } from '../context';
 import { centred } from './centred';
+import { decoOn, drawFestive } from '../festive';
 
 export function frame(ctx: LayoutCtx): string {
 	const d = new Draw(ctx.family, ctx.dark);
@@ -11,6 +12,7 @@ export function frame(ctx: LayoutCtx): string {
 		// Stored as dark dots; on a dark screen the ink is white, so flip it to keep the picture the right way round.
 		const bytes = ctx.dark ? img.map((b) => ~b & 0xff) : img;
 		d.bitmapBytes(FRAME.x, FRAME.y, FRAME.w, FRAME.h, bytes);
+		if (decoOn(ctx.frameDeco, ctx.nowLocal)) drawFestive(d, ctx.family, ctx.frameDeco!.text);
 		return d.toString();
 	}
 	d.fill(0, 0, 400, 30);

@@ -61,6 +61,7 @@ export interface TextOpts {
 	ring?: boolean;
 	scale?: number; // 1 to 4
 	maxW?: number;
+	raw?: boolean; // don't translate (words that are meant to stay as written)
 }
 
 const MAX_TITLE_CHARS = 90;
@@ -132,7 +133,7 @@ export class Draw {
 
 	// ---- text ----
 	text(x: number, y: number, role: Role, s: string, o: TextOpts = {}): this {
-		s = tr(s);
+		if (!o.raw) s = tr(s);
 		if (hasJp(s) || s.includes('°')) return this.mixedText(x, y, role, s, o);
 		const clean = toAscii(s);
 		if (!clean.trim()) return this;

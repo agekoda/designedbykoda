@@ -59,6 +59,17 @@ export function sampleAppointments(nowLocal: number): CalEvent[] {
 	return names.map((title, i) => ({ title, startLocal: day + 9 * 3600 + i * 45 * 60, endLocal: day + 9 * 3600 + i * 45 * 60 + 40 * 60, allDay: false }));
 }
 
+// Example birthdays for the Birthdays widget's preview.
+export function sampleBirthdays(nowLocal: number) {
+	const day = Math.floor(nowLocal / 86400) * 86400;
+	return [
+		{ name: 'Mum', dayLocal: day + 86400 },
+		{ name: 'Sam Kowalski', dayLocal: day + 5 * 86400 },
+		{ name: 'Grandpa', dayLocal: day + 12 * 86400 },
+		{ name: 'Priya', dayLocal: day + 26 * 86400 },
+	];
+}
+
 // Example tasks for the To-do preview.
 export const SAMPLE_TASKS: TaskItem[] = [
 	{ title: 'Book the dentist', done: false, due: 'overdue' },
@@ -136,6 +147,7 @@ export interface PreviewOptions {
 	loc?: { lat: number; lon: number } | null; // where the calendar lives (Moon & Sun)
 	countdown?: { title: string; date: string } | null;
 	frameImage?: Uint8Array | null; // Photo frame
+	frameDeco?: import('./festive').FrameDeco | null; // its festive border
 	tasksState?: 'ok' | 'needs_permission'; // To-do: pretend we can / cannot read Google Tasks
 	custom?: CustomLayout | null; // Your own design (layout builder)
 	sign?: unknown; // Meeting room / Guest welcome / Desk name plate words
@@ -171,6 +183,8 @@ export function drawListFor(o: PreviewOptions): string {
 			utcOffsetSec: -new Date().getTimezoneOffset() * 60,
 			countdown: o.countdown ?? null,
 			frameImage: o.frameImage ?? null,
+			frameDeco: o.frameDeco ?? null,
+			birthdays: sampleBirthdays(nowLocal),
 			tasks: o.tasksState === 'needs_permission' ? null : sampleTasks(nowLocal),
 			tasksState: o.tasksState ?? 'ok',
 			custom: o.custom ?? null,
