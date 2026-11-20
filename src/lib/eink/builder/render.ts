@@ -2,7 +2,7 @@
 // Text always fits its box (it shrinks or wraps rather than spilling out), so whatever size
 // someone drags a widget to, the result is a valid, tidy screen. Used by the server for the
 // real display and by the editor for the live preview, so they always match.
-import { deg, windText } from '../units';
+import { cToF, deg, getUnit, windText } from '../units';
 import { minutesShort, timeText } from '../clock';
 import { Draw, PAPER, INK, type Align, type Color } from '../draw';
 import { fontId, type Family, type Role } from '../fonts';
@@ -27,6 +27,7 @@ import { reminderList } from '../layouts/reminders';
 import { habitGrid } from '../layouts/habits';
 import { birthdayList } from '../layouts/birthdays';
 import { wordOfDay } from '../jpWords';
+import { feedUrl, githubUser, marketBase, marketList, youtubeRef, type GitHubDays } from '../../connect';
 import { personName, type NameStyle } from '../waiting';
 
 interface Env {
@@ -859,6 +860,206 @@ function roomStatusWidget(env: Env, w: Widget, o: Opts) {
 	}
 }
 
+// ---- connections (src/lib/connect.ts fetches the data) ----
+
+const commas = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+function shortNum(n: number): string {
+	if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'M';
+	if (n >= 1e4) return (n / 1e3).toFixed(n >= 1e5 ? 0 : 1).replace(/\.0$/, '') + 'K';
+	return commas(n);
+}
+// A small grey note in the middle of a widget: why there's nothing to show.
+function note(env: Env, w: Widget, text: string) {
+	const fit = fitText(env, text, w.w - 4, w.h, ['s'], false);
+	drawLines(env, { x: w.x + 2, y: w.y, w: w.w - 4, h: w.h }, fit.lines.slice(0, 3), fit.face, 'center', 'middle', INK);
+}
+
+function youtubeWidget(env: Env, w: Widget, o: Opts) {
+	const { d, ctx } = env;
+	const ref = youtubeRef(o.channel);
+	if (!ref) return note(env, w, 'Add your YouTube channel');
+	const s = ctx.connect?.youtube?.[ref];
+	if (!s) return note(env, w, !ctx.connect ? 'Shows when your calendar updates' : ctx.connect.youtubeKey === false ? 'YouTube isn’t set up on the site yet' : 'Couldn’t find that channel');
+	const a: Align = o.align === 'left' ? 'left' : o.align === 'right' ? 'right' : 'center';
+	const x = a === 'center' ? w.x + w.w / 2 : a === 'right' ? w.x + w.w : w.x;
+	const sv = vm(env, FACES.s);
+	let top = w.y;
+	if (o.name !== false && s.name) {
+		d.text(x, top + sv.asc, 'sb', s.name, { align: a, maxW: w.w, raw: true });
+		top += sv.lh + 2;
+	}
+	const label = s.subs === null ? 'subscribers hidden' : s.subs === 1 ? 'subscriber' : 'subscribers';
+	const box: Box = { x: w.x, y: top, w: w.w, h: Math.max(14, w.y + w.h - top - sv.lh - 2) };
+	if (s.subs !== null) {
+		const fit = fitText(env, o.short === true ? shortNum(s.subs) : commas(s.subs), box.w, box.h, ORDER, true);
+		drawLines(env, box, fit.lines.slice(0, 1), fit.face, a, 'middle', INK);
+	}
+	d.text(x, w.y + w.h - sv.desc - 1, 's', label, { align: a, maxW: w.w });
+}
+
+// GitHub's squares in black and white: darker pattern, more contributions. Drawn as one picture.
+function githubWidget(env: Env, w: Widget, o: Opts) {
+	const { d, ctx } = env;
+	const user = githubUser(o.user);
+	if (!user) return note(env, w, 'Add a GitHub username');
+	const g: GitHubDays | null | undefined = ctx.connect?.github?.[user];
+	if (!g) return note(env, w, ctx.connect ? 'Couldn’t reach GitHub' : 'Shows when your calendar updates');
+	const sv = vm(env, FACES.s);
+	const totalH = o.total !== false ? sv.lh + 3 : 0;
+	const gridH = w.h - totalH;
+	const c = Math.max(2, Math.min(12, Math.floor((gridH + 1) / 7) - 1)); // a square's size; 1 dot between
+	const step = c + 1;
+	const n = g.levels.length;
+	const allWeeks = Math.ceil(n / 7);
+	const weeks = Math.max(1, Math.min(allWeeks, Math.floor((w.w + 1) / step)));
+	const bw = weeks * step - 1;
+	const bh = 7 * step - 1;
+	const stride = (bw + 7) >> 3;
+	const bytes = new Uint8Array(stride * bh);
+	const set = (x: number, y: number) => (bytes[y * stride + (x >> 3)] |= 0x80 >> (x & 7));
+	const firstWeek = allWeeks - weeks;
+	for (let col = 0; col < weeks; col++) {
+		for (let row = 0; row < 7; row++) {
+			const i = (firstWeek + col) * 7 + row;
+			if (i >= n) continue;
+			const lv = +g.levels[i];
+			const x0 = col * step;
+			const y0 = row * step;
+			for (let y = 0; y < c; y++)
+				for (let x = 0; x < c; x++) {
+					const edge = x === 0 || y === 0 || x === c - 1 || y === c - 1;
+					const on =
+						lv >= 4 ||
+						(lv === 3 && !(x % 2 === 1 && y % 2 === 1)) ||
+						(lv === 2 && (edge || (x + y) % 2 === 0)) ||
+						(lv === 1 && edge) ||
+						(lv === 0 && x === c >> 1 && y === c >> 1);
+					if (on) set(x0 + x, y0 + y);
+				}
+		}
+	}
+	const gx = Math.round(w.x + (w.w - bw) / 2);
+	d.bitmapBytes(gx, w.y, bw, bh, bytes);
+	if (o.total !== false) d.text(gx, w.y + bh + 3 + sv.asc, 's', `${commas(g.total)} contributions in the last year`, { maxW: w.w });
+}
+
+function rssWidget(env: Env, w: Widget, o: Opts) {
+	const { d, ctx } = env;
+	const url = feedUrl(o.url);
+	if (!url) return note(env, w, 'Add a feed link');
+	const f = ctx.connect?.feeds?.[url];
+	if (!f) return note(env, w, ctx.connect ? 'Couldn’t read that feed' : 'Shows when your calendar updates');
+	const sv = vm(env, FACES.s);
+	let y = w.y;
+	if (o.title !== false && f.title) {
+		d.text(w.x, y + sv.asc, 'sb', f.title, { maxW: w.w, raw: true });
+		y += sv.lh + 4;
+	}
+	const count = Math.max(1, Math.min(5, parseInt(String(o.count ?? '3'), 10) || 3));
+	const items = f.items.slice(0, count);
+	const rows = Math.floor((w.y + w.h - y) / sv.lh);
+	// a second line for as many headlines as there's room for, from the top
+	let spare = rows - items.length;
+	for (const it of items) {
+		const per = spare > 0 ? 2 : 1;
+		let lines = wrapText(env.fam, 's', it, w.w - 10);
+		if (per === 2 && lines.length > 1) spare--;
+		if (lines.length > per) {
+			lines = lines.slice(0, per);
+			lines[per - 1] = lines[per - 1].replace(/\s*\S*$/, '') + '…';
+		}
+		if (y + sv.asc > w.y + w.h) break;
+		d.fill(w.x, y + sv.asc - 5, 3, 3);
+		for (const ln of lines) {
+			if (y + sv.asc > w.y + w.h) break;
+			d.text(w.x + 10, y + sv.asc, 's', ln, { maxW: w.w - 10, raw: true });
+			y += sv.lh;
+		}
+		y += lines.length > 1 ? 4 : 1;
+	}
+}
+
+function price(n: number): string {
+	if (n >= 1000) return commas(n);
+	if (n >= 1) return n.toFixed(2);
+	return n.toFixed(4);
+}
+function marketsWidget(env: Env, w: Widget, o: Opts) {
+	const { d, ctx } = env;
+	const base = marketBase(o.base);
+	const syms = marketList(o.list);
+	if (!syms.length) return note(env, w, 'Add some currencies, like USD or BTC');
+	const m = ctx.connect?.markets?.[`${base}|${syms.join(',')}`];
+	if (!m) return note(env, w, ctx.connect ? 'Couldn’t get prices' : 'Shows when your calendar updates');
+	const sv = vm(env, FACES.s);
+	let y = w.y;
+	if (o.label === true) {
+		d.text(w.x, y + sv.asc, 'sb', `In ${base}`, { maxW: w.w });
+		y += sv.lh + 3;
+	}
+	const rowH = Math.max(sv.lh + 2, Math.min(sv.lh + 10, Math.floor((w.y + w.h - y) / m.quotes.length)));
+	for (const q of m.quotes) {
+		if (y + sv.asc > w.y + w.h) break;
+		const ch = q.crypto && o.change !== false && q.change !== null ? `  ${q.change >= 0 ? '+' : ''}${q.change.toFixed(1)}%` : '';
+		// crypto: what one coin costs in your currency; money: what one of yours buys
+		d.text(w.x, y + sv.asc, 'sb', q.sym, { maxW: w.w / 2 });
+		d.text(w.x + w.w, y + sv.asc, 's', `${price(q.price)}${ch}`, { align: 'right', maxW: w.w - 40 });
+		y += rowH;
+	}
+}
+
+const hmTime = (_env: Env, t: number) => hm(t);
+function tidesWidget(env: Env, w: Widget, o: Opts) {
+	const { d, ctx } = env;
+	if (!ctx.loc) return note(env, w, 'Add your weather place in Settings');
+	const m = ctx.connect?.marine;
+	if (m === null) return note(env, w, 'No tides or waves here');
+	if (!m) return note(env, w, 'Shows when your calendar updates');
+	const sv = vm(env, FACES.s);
+	let y = w.y;
+	const line = (role: 's' | 'sb', text: string) => {
+		if (y + sv.asc > w.y + w.h) return;
+		d.text(w.x, y + sv.asc, role, text, { maxW: w.w });
+		y += sv.lh + 1;
+	};
+	if (o.label !== false) {
+		line('sb', o.tides === false ? 'Surf' : 'Tides');
+		y += 2;
+	}
+	if (o.tides !== false) {
+		const next = m.tides.filter((t) => t.at > ctx.nowLocal).slice(0, 2);
+		for (const t of next) line('s', `${t.high ? 'High' : 'Low'} ${hmTime(env, t.at)}  ${t.h.toFixed(1)} m`);
+		if (!next.length) line('s', 'No tide times here');
+	}
+	if (o.waves !== false && m.waveNow !== null) line('s', m.waveMax !== null && m.waveMax > m.waveNow + 0.15 ? `Waves ${m.waveNow.toFixed(1)}-${m.waveMax.toFixed(1)} m` : `Waves ${m.waveNow.toFixed(1)} m`);
+	if (o.sea !== false && m.sea !== null) line('s', `Sea ${Math.round(getUnit() === 'f' ? cToF(m.sea) : m.sea)}${deg()}`);
+}
+
+const uvWord = (u: number) => (u < 3 ? 'Low' : u < 6 ? 'Moderate' : u < 8 ? 'High' : u < 11 ? 'Very high' : 'Extreme');
+const aqiWord = (a: number) => (a <= 50 ? 'Good' : a <= 100 ? 'Moderate' : a <= 150 ? 'Poor for some' : a <= 200 ? 'Unhealthy' : a <= 300 ? 'Very unhealthy' : 'Hazardous');
+function uvAirWidget(env: Env, w: Widget, o: Opts) {
+	const { d, ctx } = env;
+	if (!ctx.loc) return note(env, w, 'Add your weather place in Settings');
+	const a = ctx.connect?.air;
+	if (!a) return note(env, w, ctx.connect ? 'Couldn’t get UV or air quality' : 'Shows when your calendar updates');
+	const sv = vm(env, FACES.s);
+	const mv = vm(env, FACES.m);
+	let y = w.y;
+	if (o.uv !== false && a.uvMax !== null) {
+		const uv = Math.round(a.uvMax);
+		const big = `UV ${uv}`;
+		d.text(w.x, y + mv.asc, 'mb', big, { maxW: w.w });
+		const bw = measure(env.fam, 'mb', tr(big)).w;
+		d.text(w.x + bw + 14, y + mv.asc, 'sb', uvWord(uv), { maxW: Math.max(10, w.w - bw - 14) });
+		y += mv.lh + 1;
+		if (uv >= 3 && a.uvMaxAt !== null && a.uvMaxAt > ctx.nowLocal - 3600) {
+			d.text(w.x, y + sv.asc, 's', `Peaks at ${hmTime(env, a.uvMaxAt)}`, { maxW: w.w });
+			y += sv.lh + 2;
+		}
+	}
+	if (o.air !== false && a.aqi !== null && y + sv.asc <= w.y + w.h) d.text(w.x, y + sv.asc, 's', `Air: ${aqiWord(a.aqi)} (${Math.round(a.aqi)})`, { maxW: w.w });
+}
+
 // Japanese word of the day: the word big, its reading in kana under it, then romaji and the meaning.
 function jpWordWidget(env: Env, w: Widget, o: Opts) {
 	const { d, ctx } = env;
@@ -993,6 +1194,18 @@ function drawWidget(env: Env, w: Widget) {
 			return lineWidget(env, w, o);
 		case 'reminders':
 			return reminderList(env.d, env.ctx, w, { bigToday: o.big === true, days: Number(o.days) || 7 });
+		case 'youtube':
+			return youtubeWidget(env, w, o);
+		case 'github':
+			return githubWidget(env, w, o);
+		case 'rss':
+			return rssWidget(env, w, o);
+		case 'markets':
+			return marketsWidget(env, w, o);
+		case 'tides':
+			return tidesWidget(env, w, o);
+		case 'uvair':
+			return uvAirWidget(env, w, o);
 		case 'jpword':
 			return jpWordWidget(env, w, o);
 		case 'birthdays':

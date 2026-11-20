@@ -8,7 +8,8 @@ import { sanitizeHabits } from './habits';
 import { loadFontPack, renderDrawList, SCREEN_W, SCREEN_H, type Rendered } from './preview';
 import { renderLayout } from './layouts';
 import type { CalEvent, TaskItem } from './context';
-import type { CustomLayout } from './builder/model';
+import { withDefaults, type CustomLayout } from './builder/model';
+import { feedUrl, githubUser, marketBase, marketList, youtubeRef } from '../connect';
 
 let fontsPromise: Promise<ReturnType<typeof loadFontPack>> | null = null;
 export function loadFonts() {
@@ -59,6 +60,40 @@ export function sampleAppointments(nowLocal: number): CalEvent[] {
 	const day = Math.floor(nowLocal / 86400) * 86400;
 	const names = ['Priya Mehta - Initial consult', 'Sam Kowalski - Follow-up', 'Jordan Taylor - Follow-up', 'Mei Chen - Review', 'Lee Wong - Initial consult', 'Ava Brown - Follow-up', 'Noah Singh - Review', 'Ruby Clarke - Follow-up'];
 	return names.map((title, i) => ({ title, startLocal: day + 9 * 3600 + i * 45 * 60, endLocal: day + 9 * 3600 + i * 45 * 60 + 40 * 60, allDay: false }));
+}
+
+// Example data for the connection widgets' previews (the real thing comes when the calendar updates).
+export function sampleConnect(custom: CustomLayout | null | undefined, nowLocal: number) {
+	if (!custom?.widgets?.some((w) => ['youtube', 'rss', 'github', 'markets', 'tides', 'uvair'].includes(w.t))) return null;
+	const out: any = { youtube: {}, feeds: {}, github: {}, markets: {} };
+	let seed = 7;
+	const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+	for (const w of custom.widgets) {
+		const o = withDefaults(w) as any;
+		if (w.t === 'youtube') out.youtube[youtubeRef(o.channel)] = { name: 'designedbykoda', subs: 12480 };
+		if (w.t === 'rss')
+			out.feeds[feedUrl(o.url)] = {
+				title: 'ABC News',
+				items: ['Perth swelters through its hottest November day in a decade', 'Rate decision due on Tuesday as inflation eases', 'New bike paths planned along the Swan River foreshore', 'Scorchers name their squad for the summer season', 'How to keep your pets cool this week'],
+			};
+		if (w.t === 'github') {
+			const levels = Array.from({ length: 371 }, (_, i) => {
+				const r = rnd() * (i % 7 === 0 || i % 7 === 6 ? 0.45 : 1);
+				return r < 0.3 ? 0 : r < 0.55 ? 1 : r < 0.75 ? 2 : r < 0.9 ? 3 : 4;
+			}).join('');
+			out.github[githubUser(o.user)] = { total: 1234, first: '2025-11-23', levels };
+		}
+		if (w.t === 'markets') {
+			const base = marketBase(o.base);
+			const syms = marketList(o.list);
+			const eg: Record<string, [number, number | null, boolean]> = { USD: [0.65, null, false], EUR: [0.6, null, false], GBP: [0.51, null, false], JPY: [99.8, null, false], NZD: [1.11, null, false], BTC: [143210, 2.1, true], ETH: [5320, -1.4, true], SOL: [312, 4.2, true], DOGE: [0.52, 0.8, true] };
+			out.markets[`${base}|${syms.join(',')}`] = { base, quotes: syms.filter((x) => eg[x]).map((x) => ({ sym: x, price: eg[x][0], change: eg[x][1], crypto: eg[x][2] })) };
+		}
+	}
+	const day = Math.floor(nowLocal / 86400) * 86400;
+	out.marine = { tides: [{ at: day + 15 * 3600 + 40 * 60, h: 0.9, high: true }, { at: day + 21 * 3600 + 52 * 60, h: 0.3, high: false }, { at: day + 86400 + 4 * 3600, h: 1.0, high: true }, { at: day + 86400 + 10 * 3600, h: 0.2, high: false }].filter((t) => t.at > nowLocal), waveNow: 0.8, waveMax: 1.2, sea: 21.4 };
+	out.air = { uvNow: 6, uvMax: 11, uvMaxAt: day + 13 * 3600, aqi: 32 };
+	return out;
 }
 
 // Example birthdays for the Birthdays widget's preview.
@@ -150,6 +185,7 @@ export interface PreviewOptions {
 	countdown?: { title: string; date: string } | null;
 	frameImage?: Uint8Array | null; // Photo frame
 	frameDeco?: import('./festive').FrameDeco | null; // its festive border
+	connect?: import('../connect').Connected | null; // real data for the connection widgets, if the page has it
 	tasksState?: 'ok' | 'needs_permission'; // To-do: pretend we can / cannot read Google Tasks
 	custom?: CustomLayout | null; // Your own design (layout builder)
 	sign?: unknown; // Meeting room / Guest welcome / Desk name plate words
@@ -188,6 +224,7 @@ export function drawListFor(o: PreviewOptions): string {
 			frameImage: o.frameImage ?? null,
 			frameDeco: o.frameDeco ?? null,
 			birthdays: sampleBirthdays(nowLocal),
+			connect: o.connect ?? sampleConnect(o.custom, nowLocal),
 			tasks: o.tasksState === 'needs_permission' ? null : sampleTasks(nowLocal),
 			tasksState: o.tasksState ?? 'ok',
 			custom: o.custom ?? null,

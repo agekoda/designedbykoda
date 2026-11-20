@@ -25,7 +25,7 @@ export const isJa = (): boolean => current === 'ja';
 const JA: Record<string, string> = {
 	// headers
 	'now': '今', 'Now': '今',
-	'Now seeing': 'ただいまの順番', 'Word of the day': '今日の言葉', 'Birthdays': '誕生日', 'No birthdays this month': '今月の誕生日はありません', 'No birthdays coming up': '近い誕生日はありません', 'No more appointments today': '本日の予約は終了しました', 'Please let reception know you\'re here': '受付にお声がけください',
+	'Now seeing': 'ただいまの順番', Tides: '潮', Surf: '波', subscribers: '登録者', subscriber: '登録者', 'subscribers hidden': '登録者数は非公開', Low: '低', Moderate: '中', High: '高', 'Very high': 'とても高い', Extreme: '極端', 'Word of the day': '今日の言葉', 'Birthdays': '誕生日', 'No birthdays this month': '今月の誕生日はありません', 'No birthdays coming up': '近い誕生日はありません', 'No more appointments today': '本日の予約は終了しました', 'Please let reception know you\'re here': '受付にお声がけください',
 	'UPCOMING': '今後の予定',
 	'NEXT UP': '次の予定',
 	'COUNTDOWN': 'カウントダウン',

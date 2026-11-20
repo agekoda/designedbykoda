@@ -62,7 +62,7 @@ const LIGHT: OptDef = { key: 'light', label: 'White text (over a black box)', ki
 // the shared look options for text-like widgets
 const TEXTY: OptDef[] = [SIZE, BOLD, ALIGN, VALIGN, INVERT, LIGHT, BORDER];
 
-export type Group = 'Text' | 'Date' | 'Calendar' | 'Weather & sky' | 'Extras' | 'Shapes';
+export type Group = 'Text' | 'Date' | 'Calendar' | 'Weather & sky' | 'Extras' | 'Connections' | 'Shapes';
 
 export interface WidgetDef {
 	label: string;
@@ -380,6 +380,86 @@ export const WIDGETS: Record<string, WidgetDef> = {
 			{ key: 'days', label: 'Looks ahead', kind: 'choice', choices: [['1', 'Today'], ['2', '2 days'], ['7', 'A week'], ['14', '2 weeks']], def: '7' },
 		],
 	},
+	youtube: {
+		label: 'YouTube subscribers',
+		group: 'Connections',
+		blurb: 'Your subscriber count, big, for any YouTube channel. Paste its @handle or link',
+		w: 260,
+		h: 110,
+		min: { w: 100, h: 40 },
+		opts: [
+			{ key: 'channel', label: 'Channel', kind: 'text', def: '@designedbykoda', max: 120, rows: 1, ph: '@yourchannel or a youtube.com link' },
+			{ key: 'short', label: 'Short number (12.4K)', kind: 'toggle', def: false },
+			{ key: 'name', label: 'Channel name', kind: 'toggle', def: true },
+			ALIGN,
+		],
+		def: { align: 'center' },
+	},
+	github: {
+		label: 'GitHub contributions',
+		group: 'Connections',
+		blurb: 'The green squares from a GitHub profile, in black and white. Any public profile, no sign-in',
+		w: 380,
+		h: 90,
+		min: { w: 120, h: 40 },
+		opts: [
+			{ key: 'user', label: 'GitHub username', kind: 'text', def: 'agekoda', max: 80, rows: 1, ph: 'username or github.com link' },
+			{ key: 'total', label: 'Contributions this year', kind: 'toggle', def: true },
+		],
+	},
+	rss: {
+		label: 'Headlines',
+		group: 'Connections',
+		blurb: 'The latest headlines from any news site, blog or podcast with an RSS feed',
+		w: 380,
+		h: 130,
+		min: { w: 120, h: 40 },
+		opts: [
+			{ key: 'url', label: 'Feed link', kind: 'text', def: 'https://www.abc.net.au/news/feed/51120/rss.xml', max: 400, rows: 2, ph: 'https://… (RSS or Atom)' },
+			{ key: 'count', label: 'How many', kind: 'choice', choices: [['2', '2'], ['3', '3'], ['4', '4'], ['5', '5']], def: '3' },
+			{ key: 'title', label: 'Feed name', kind: 'toggle', def: true },
+		],
+	},
+	markets: {
+		label: 'Money and crypto',
+		group: 'Connections',
+		blurb: 'Exchange rates and crypto prices: USD, EUR, JPY, BTC, ETH and more. Crypto shows its change over the last day',
+		w: 220,
+		h: 120,
+		min: { w: 110, h: 30 },
+		opts: [
+			{ key: 'list', label: 'Show', kind: 'text', def: 'USD, EUR, BTC, ETH', max: 60, rows: 1, ph: 'USD, EUR, BTC, ETH' },
+			{ key: 'base', label: 'In', kind: 'text', def: 'AUD', max: 3, rows: 1, ph: 'AUD' },
+			{ key: 'change', label: 'Crypto change (24 h)', kind: 'toggle', def: true },
+			{ key: 'label', label: 'Heading', kind: 'toggle', def: false },
+		],
+	},
+	tides: {
+		label: 'Tides and surf',
+		group: 'Weather & sky',
+		blurb: 'The next high and low tides, wave height and sea temperature at your weather place',
+		w: 200,
+		h: 110,
+		min: { w: 100, h: 40 },
+		opts: [
+			{ key: 'tides', label: 'Tides', kind: 'toggle', def: true },
+			{ key: 'waves', label: 'Waves', kind: 'toggle', def: true },
+			{ key: 'sea', label: 'Sea temperature', kind: 'toggle', def: true },
+			{ key: 'label', label: 'Heading', kind: 'toggle', def: true },
+		],
+	},
+	uvair: {
+		label: 'UV and air',
+		group: 'Weather & sky',
+		blurb: 'Today\'s UV (and when it peaks) and the air quality at your weather place',
+		w: 200,
+		h: 80,
+		min: { w: 100, h: 30 },
+		opts: [
+			{ key: 'uv', label: 'UV', kind: 'toggle', def: true },
+			{ key: 'air', label: 'Air quality', kind: 'toggle', def: true },
+		],
+	},
 	jpword: {
 		label: 'Japanese word',
 		group: 'Extras',
@@ -521,7 +601,7 @@ export const WIDGETS: Record<string, WidgetDef> = {
 	},
 };
 
-export const GROUPS: Group[] = ['Text', 'Date', 'Calendar', 'Weather & sky', 'Extras', 'Shapes'];
+export const GROUPS: Group[] = ['Text', 'Date', 'Calendar', 'Weather & sky', 'Extras', 'Connections', 'Shapes'];
 
 export const isWidgetType = (t: unknown): t is string => typeof t === 'string' && Object.prototype.hasOwnProperty.call(WIDGETS, t);
 
@@ -627,6 +707,7 @@ export function layoutNeeds(layout: CustomLayout | null | undefined) {
 		habits: types.has('habits'),
 		birthdays: types.has('birthdays'),
 		jpword: types.has('jpword'),
+		connect: ['youtube', 'rss', 'github', 'markets', 'tides', 'uvair'].some((t) => types.has(t)),
 	};
 }
 
