@@ -32,6 +32,7 @@ import { timetable } from './timetable';
 import { away } from './away';
 import { renderCustom } from '../builder/render';
 import { forecast } from './forecast';
+import { coast } from './coast';
 import { sanitizeLayout, sanitizeSign, signLayout, type SignStyle } from '../builder/model';
 
 // Meeting room, Guest welcome and Desk name plate: a builder design filled in from a few words.
@@ -61,6 +62,11 @@ export const LAYOUTS: Record<string, LayoutEntry> = {
 	nameplate: { render: sign('nameplate'), font: 'sans' },
 	waiting: { render: sign('waiting'), font: 'sans' },
 	forecast: { render: forecast, font: 'sans' },
+	coast: { render: coast, font: 'sans' },
+	youtube: { render: sign('youtube'), font: 'sans' },
+	github: { render: sign('github'), font: 'sans' },
+	headlines: { render: sign('headlines'), font: 'sans' },
+	markets: { render: sign('markets'), font: 'sans' },
 	messages: { render: messages, font: 'sans' },
 	reminders: { render: reminders, font: 'sans' },
 	habits: { render: habits, font: 'sans' },

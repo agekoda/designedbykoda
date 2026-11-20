@@ -997,13 +997,19 @@ function marketsWidget(env: Env, w: Widget, o: Opts) {
 		d.text(w.x, y + sv.asc, 'sb', `In ${base}`, { maxW: w.w });
 		y += sv.lh + 3;
 	}
-	const rowH = Math.max(sv.lh + 2, Math.min(sv.lh + 10, Math.floor((w.y + w.h - y) / m.quotes.length)));
+	// bigger text when every row has room for it (a whole screen of prices)
+	const mv = vm(env, FACES.m);
+	const each = Math.floor((w.y + w.h - y) / m.quotes.length);
+	const big = each >= mv.lh + 12 && w.w >= 300;
+	const v = big ? mv : sv;
+	const rowH = Math.max(v.lh + 2, Math.min(v.lh + (big ? 18 : 10), each));
 	for (const q of m.quotes) {
-		if (y + sv.asc > w.y + w.h) break;
+		if (y + v.asc > w.y + w.h) break;
 		const ch = q.crypto && o.change !== false && q.change !== null ? `  ${q.change >= 0 ? '+' : ''}${q.change.toFixed(1)}%` : '';
 		// crypto: what one coin costs in your currency; money: what one of yours buys
-		d.text(w.x, y + sv.asc, 'sb', q.sym, { maxW: w.w / 2 });
-		d.text(w.x + w.w, y + sv.asc, 's', `${price(q.price)}${ch}`, { align: 'right', maxW: w.w - 40 });
+		d.text(w.x, y + v.asc, big ? 'mb' : 'sb', q.sym, { maxW: w.w / 2 });
+		d.text(w.x + w.w, y + v.asc, big ? 'm' : 's', `${price(q.price)}${ch}`, { align: 'right', maxW: w.w - 60 });
+		if (big) d.dots(w.x, Math.round(y + v.asc + v.desc + (rowH - v.lh) / 2 + 2), w.w, 3);
 		y += rowH;
 	}
 }
@@ -1050,8 +1056,16 @@ function uvAirWidget(env: Env, w: Widget, o: Opts) {
 		const big = `UV ${uv}`;
 		d.text(w.x, y + mv.asc, 'mb', big, { maxW: w.w });
 		const bw = measure(env.fam, 'mb', tr(big)).w;
-		d.text(w.x + bw + 14, y + mv.asc, 'sb', uvWord(uv), { maxW: Math.max(10, w.w - bw - 14) });
-		y += mv.lh + 1;
+		const word = uvWord(uv);
+		// the level beside the number when it fits, on its own line when it doesn't
+		if (measure(env.fam, 'sb', tr(word)).w <= w.w - bw - 14) {
+			d.text(w.x + bw + 14, y + mv.asc, 'sb', word);
+			y += mv.lh + 1;
+		} else {
+			y += mv.lh + 1;
+			d.text(w.x, y + sv.asc, 'sb', word, { maxW: w.w });
+			y += sv.lh + 2;
+		}
 		if (uv >= 3 && a.uvMaxAt !== null && a.uvMaxAt > ctx.nowLocal - 3600) {
 			d.text(w.x, y + sv.asc, 's', `Peaks at ${hmTime(env, a.uvMaxAt)}`, { maxW: w.w });
 			y += sv.lh + 2;
