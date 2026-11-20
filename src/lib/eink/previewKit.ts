@@ -8,7 +8,7 @@ import { sanitizeHabits } from './habits';
 import { loadFontPack, renderDrawList, SCREEN_W, SCREEN_H, type Rendered } from './preview';
 import { renderLayout } from './layouts';
 import type { CalEvent, TaskItem } from './context';
-import { withDefaults, type CustomLayout } from './builder/model';
+import { withDefaults, builtinLayout, type CustomLayout } from './builder/model';
 import { feedUrl, githubUser, marketBase, marketList, youtubeRef } from '../connect';
 
 let fontsPromise: Promise<ReturnType<typeof loadFontPack>> | null = null;
@@ -224,7 +224,7 @@ export function drawListFor(o: PreviewOptions): string {
 			frameImage: o.frameImage ?? null,
 			frameDeco: o.frameDeco ?? null,
 			birthdays: sampleBirthdays(nowLocal),
-			connect: o.connect ?? sampleConnect(o.custom, nowLocal),
+			connect: o.connect ?? sampleConnect(builtinLayout(o.style, o.sign) ?? o.custom, nowLocal),
 			tasks: o.tasksState === 'needs_permission' ? null : sampleTasks(nowLocal),
 			tasksState: o.tasksState ?? 'ok',
 			custom: o.custom ?? null,

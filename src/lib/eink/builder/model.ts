@@ -849,6 +849,11 @@ export const TEMPLATES: Template[] = [
 	{ id: 'guest', label: 'Guest welcome', note: 'Wi-Fi QR code, house rules and check-out time', build: () => signLayout('guest', SIGN_DEFAULTS) },
 	{ id: 'nameplate', label: 'Desk name plate', note: 'Your name, your role, and whether you\'re free', build: () => signLayout('nameplate', SIGN_DEFAULTS) },
 	{ id: 'waiting', label: 'Waiting room', note: 'Who\'s being seen now, and who\'s next', build: () => signLayout('waiting', SIGN_DEFAULTS) },
+	{ id: 'youtube', label: 'YouTube', note: 'Your subscriber count, big', build: () => signLayout('youtube', SIGN_DEFAULTS) },
+	{ id: 'github', label: 'GitHub', note: 'Your contributions graph, with what\'s next and the weather', build: () => signLayout('github', SIGN_DEFAULTS) },
+	{ id: 'headlines', label: 'Headlines', note: 'The latest from any news site or blog', build: () => signLayout('headlines', SIGN_DEFAULTS) },
+	{ id: 'markets', label: 'Money & crypto', note: 'Exchange rates and crypto prices, with the day\'s change', build: () => signLayout('markets', SIGN_DEFAULTS) },
+	{ id: 'coast', label: 'Beach', note: 'Tides, surf, UV and the weather', build: () => COAST_LAYOUT },
 ];
 
 export function templateById(id: string): Template {
@@ -858,8 +863,10 @@ export function templateById(id: string): Template {
 // ---- signs: Meeting room, Guest welcome and Desk name plate ----
 // These are ready-made layouts (pick one, fill in a few boxes on Customize display) and also
 // builder templates. Both are built here from the same few words, so they always match.
-export type SignStyle = 'room' | 'guest' | 'nameplate' | 'waiting';
-export const SIGN_STYLES: SignStyle[] = ['room', 'guest', 'nameplate', 'waiting'];
+export type SignStyle = 'room' | 'guest' | 'nameplate' | 'waiting' | 'youtube' | 'github' | 'headlines' | 'markets';
+export const SIGN_STYLES: SignStyle[] = ['room', 'guest', 'nameplate', 'waiting', 'youtube', 'github', 'headlines', 'markets'];
+// ready-made screens built from the connection widgets (they pick their data, like a sign's words)
+export const CONNECT_SIGNS = ['youtube', 'github', 'headlines', 'markets'];
 // signs that redraw when an appointment or meeting starts or ends
 export const LIVE_SIGNS = ['room', 'nameplate', 'waiting'];
 export const isSignStyle = (s: unknown): s is SignStyle => SIGN_STYLES.includes(s as SignStyle);
@@ -869,6 +876,10 @@ export interface SignCfg {
 	guest: { title: string; ssid: string; pass: string; rules: string; checkout: string; contact: string };
 	nameplate: { name: string; role: string };
 	waiting: { title: string; note: string; cals: string[] };
+	youtube: { channel: string };
+	github: { user: string };
+	headlines: { url: string };
+	markets: { list: string; base: string };
 }
 export const SIGN_DEFAULTS: SignCfg = {
 	room: { name: 'Boardroom', cals: [] },
@@ -882,11 +893,16 @@ export const SIGN_DEFAULTS: SignCfg = {
 	},
 	nameplate: { name: 'Alex Koda', role: 'Hardware Engineer' },
 	waiting: { title: 'Riverside Physio', note: 'Please let reception know you\'re here', cals: [] },
+	youtube: { channel: '@designedbykoda' },
+	github: { user: 'agekoda' },
+	headlines: { url: 'https://www.abc.net.au/news/feed/51120/rss.xml' },
+	markets: { list: 'USD, EUR, GBP, BTC, ETH, SOL', base: 'AUD' },
 };
 // How long each box may be, and which ones are kept exactly as typed (Wi-Fi details).
 const SIGN_LIMITS: Record<string, { max: number; raw?: boolean; multiline?: boolean }> = {
 	name: { max: 40 }, title: { max: 40 }, role: { max: 40 }, checkout: { max: 30 }, contact: { max: 60 }, note: { max: 60 },
 	ssid: { max: 32, raw: true }, pass: { max: 63, raw: true }, rules: { max: 300, multiline: true },
+	channel: { max: 120, raw: true }, user: { max: 80, raw: true }, url: { max: 400, raw: true }, list: { max: 60 }, base: { max: 3 },
 };
 
 // The calendars a Meeting room or Waiting room reads, instead of the ones picked in Calendars and
@@ -925,7 +941,59 @@ export function sanitizeSign(input: unknown): SignCfg {
 	return out;
 }
 
+const githubUserText = (u: string) => (String(u || '').trim().replace(/^@/, '').replace(/^https?:\/\/github\.com\//i, '').split('/')[0] || 'GITHUB').toUpperCase();
+
 export function signLayout(sign: SignStyle, cfg: SignCfg): CustomLayout {
+	if (sign === 'youtube') {
+		return {
+			v: 1,
+			widgets: [
+				W('box', 0, 0, 400, 30, { fill: 'solid' }),
+				W('text', 10, 2, 180, 26, { text: 'YOUTUBE', light: true, bold: true, size: 's', valign: 'middle' }),
+				W('date_full', 190, 2, 200, 26, { fmt: 'med', light: true, size: 's', align: 'right', valign: 'middle' }),
+				W('youtube', 14, 44, 372, 214, { channel: cfg.youtube.channel, name: true, align: 'center' }),
+				W('updated', 10, 270, 380, 22, { align: 'center', size: 's' }),
+			],
+		};
+	}
+	if (sign === 'github') {
+		return {
+			v: 1,
+			widgets: [
+				W('box', 0, 0, 400, 30, { fill: 'solid' }),
+				W('text', 10, 2, 200, 26, { text: githubUserText(cfg.github.user), light: true, bold: true, size: 's', valign: 'middle' }),
+				W('date_full', 190, 2, 200, 26, { fmt: 'med', light: true, size: 's', align: 'right', valign: 'middle' }),
+				W('github', 10, 40, 380, 108, { user: cfg.github.user, total: true }),
+				W('line', 10, 156, 380, 2),
+				W('events', 10, 166, 250, 126, { size: 's', when: 'daytime', dots: true }),
+				W('line', 270, 166, 1, 122),
+				W('weather_icon', 296, 168, 72, 72),
+				W('weather', 280, 244, 110, 44, { size: 'm', bold: true, align: 'center', valign: 'middle' }),
+			],
+		};
+	}
+	if (sign === 'headlines') {
+		return {
+			v: 1,
+			widgets: [
+				W('box', 0, 0, 400, 30, { fill: 'solid' }),
+				W('text', 10, 2, 180, 26, { text: 'HEADLINES', light: true, bold: true, size: 's', valign: 'middle' }),
+				W('updated', 190, 2, 200, 26, { light: true, size: 's', align: 'right', valign: 'middle' }),
+				W('rss', 12, 40, 376, 254, { url: cfg.headlines.url, count: '5', title: true }),
+			],
+		};
+	}
+	if (sign === 'markets') {
+		return {
+			v: 1,
+			widgets: [
+				W('box', 0, 0, 400, 30, { fill: 'solid' }),
+				W('text', 10, 2, 180, 26, { text: `MARKETS IN ${(cfg.markets.base || 'AUD').toUpperCase()}`, light: true, bold: true, size: 's', valign: 'middle' }),
+				W('updated', 190, 2, 200, 26, { light: true, size: 's', align: 'right', valign: 'middle' }),
+				W('markets', 20, 44, 360, 246, { list: cfg.markets.list, base: cfg.markets.base, change: true, label: false }),
+			],
+		};
+	}
 	if (sign === 'room') {
 		const c = cfg.room;
 		return {
@@ -978,4 +1046,35 @@ export function signLayout(sign: SignStyle, cfg: SignCfg): CustomLayout {
 			W('room_status', 50, 192, 300, 92, { free: 'Available', busy: 'In a meeting', black: true, title: false, detail: true }),
 		],
 	};
+}
+
+// ---- Beach: the ready-made tides, surf, UV and weather screen (layouts/coast.ts draws it) ----
+let coastN = 0;
+const CW = (t: string, x: number, y: number, w: number, h: number, o: Record<string, unknown> = {}) => ({ id: `c${coastN++}`, t, x, y, w, h, o });
+
+export const COAST_LAYOUT = sanitizeLayout({
+	v: 1,
+	widgets: [
+		CW('box', 0, 0, 400, 30, { fill: 'solid' }),
+		CW('text', 10, 2, 180, 26, { text: 'BEACH', light: true, bold: true, size: 's', valign: 'middle' }),
+		CW('date_full', 190, 2, 200, 26, { fmt: 'med', light: true, size: 's', align: 'right', valign: 'middle' }),
+		CW('weather_icon', 10, 38, 76, 76),
+		CW('weather', 94, 40, 150, 42, { size: 'auto', bold: true, valign: 'middle' }),
+		CW('weather_summary', 94, 84, 150, 36, { rain: false, wind: true, size: 's', valign: 'top' }),
+		CW('line', 252, 40, 1, 80),
+		CW('uvair', 262, 40, 130, 82, { uv: true, air: true }),
+		CW('line', 10, 128, 380, 2),
+		CW('tides', 10, 138, 190, 156, { tides: true, waves: true, sea: true, label: true }),
+		CW('line', 206, 138, 1, 152),
+		CW('forecast', 214, 138, 180, 154, { days: '3', from: 'tomorrow' }),
+	],
+});
+
+
+// The widgets a ready-made connections screen draws, so the device and the preview know which
+// YouTube channel, feed, GitHub user, prices or tides to fetch for it.
+export function builtinLayout(style: string, signRaw: unknown): CustomLayout | null {
+	if (style === 'coast') return COAST_LAYOUT;
+	if (CONNECT_SIGNS.includes(style)) return signLayout(style as SignStyle, sanitizeSign(signRaw));
+	return null;
 }

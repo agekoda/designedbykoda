@@ -14,7 +14,7 @@ import { getForecast, type Forecast } from '../../../../lib/weather';
 import { renderLayout } from '../../../../lib/eink/layouts';
 import { b64ToBytes, decodePic, FRAME_BYTES } from '../../../../lib/eink/image';
 import { fetchTasks } from '../../../../lib/tasks';
-import { isSignStyle, layoutNeeds, LIVE_SIGNS, CAL_SIGNS, sanitizeSign, sanitizeLayout, type CustomLayout } from '../../../../lib/eink/builder/model';
+import { isSignStyle, builtinLayout, layoutNeeds, LIVE_SIGNS, CAL_SIGNS, sanitizeSign, sanitizeLayout, type CustomLayout } from '../../../../lib/eink/builder/model';
 import { pickScreen, secondsToNextEventEdge } from '../../../../lib/screens';
 import { activeMessages, sanitizeCfg, secondsToNextCheck, secondsToNextExpiry } from '../../../../lib/messages';
 export const prerender = false;
@@ -512,7 +512,9 @@ export async function GET({ params, request, locals }) {
 	// Connections: YouTube, headlines, GitHub, prices, tides, UV (src/lib/connect.ts). Each is cached
 	// for everyone, and one that fails just shows a note on its widget.
 	let connect: Connected | null = null;
-	if (needs.connect && proto === '2' && customLayout) connect = await connectFor(customLayout.widgets, place, env);
+	// (a ready-made YouTube, GitHub, Headlines, Money & crypto or Beach screen fetches the same way)
+	const built = builtinLayout(style, sign);
+	if (proto === '2' && (built || (needs.connect && customLayout))) connect = await connectFor((built ?? customLayout)!.widgets, place, env);
 
 	// Dark mode (white on black), from schema-darkmode.sql. Its own query so a
 	// missing column never affects anything else.
