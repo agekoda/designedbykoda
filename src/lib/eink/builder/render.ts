@@ -949,6 +949,7 @@ function rssWidget(env: Env, w: Widget, o: Opts) {
 	if (!url) return note(env, w, 'Add a feed link');
 	const f = ctx.connect?.feeds?.[url];
 	if (!f) return note(env, w, ctx.connect ? 'Couldn’t read that feed' : 'Shows when your calendar updates');
+	if (o.look === 'paper') return newspaper(env, w, o, f);
 	const sv = vm(env, FACES.s);
 	let y = w.y;
 	if (o.title !== false && f.title) {
@@ -977,6 +978,84 @@ function rssWidget(env: Env, w: Widget, o: Opts) {
 		}
 		y += lines.length > 1 ? 4 : 1;
 	}
+}
+
+// Headlines laid out like a front page: the feed's name as a masthead between rules, a
+// dateline, the top story big across the page, then the rest in two columns.
+function clip(env: Env, role: Role, text: string, width: number, max: number): string[] {
+	let lines = wrapText(env.fam, role, text, width);
+	if (lines.length > max) {
+		lines = lines.slice(0, max);
+		lines[max - 1] = lines[max - 1].replace(/\s*\S*$/, '').replace(/[,;:]$/, '') + '...';
+	}
+	return lines;
+}
+function newspaper(env: Env, w: Widget, o: Opts, f: { title: string; items: string[] }) {
+	const { d, ctx } = env;
+	const now = tmOf(ctx.nowLocal);
+	const sv = vm(env, FACES.s);
+	const mv = vm(env, FACES.m);
+	const L = w.x, R = w.x + w.w, B = w.y + w.h;
+	let y = w.y;
+	// masthead: the biggest size the name fits at
+	const name = (o.title !== false && f.title ? f.title : 'The Daily News').replace(/\s*[-–|:].*$/, '') || f.title;
+	const face = [FACES.l, { role: 'mb' as Role, scale: 1 }].find((fc) => measure(env.fam, fc.role, name, fc.scale).w <= w.w - 8) ?? ({ role: 'mb' as Role, scale: 1 });
+	const fv = vm(env, face);
+	d.fill(L, y, w.w, 2);
+	d.fill(L, y + 4, w.w, 1);
+	y += 8;
+	d.text(L + w.w / 2, y + fv.asc, face.role, name, { align: 'center', scale: face.scale, maxW: w.w, raw: true });
+	y += fv.lh + 3;
+	d.fill(L, y, w.w, 1);
+	y += 3;
+	const date = isJa() ? `${dayMonth(now)} ${dayLong(now.wday)}` : `${DAY_NAMES[now.wday]} ${now.mday} ${monthName(now)} ${now.year}`;
+	d.text(L, y + sv.asc, 's', date, { maxW: w.w * 0.6 });
+	d.text(R, y + sv.asc, 's', `Updated ${hm(ctx.nowLocal)}`, { align: 'right', maxW: w.w * 0.38 });
+	y += sv.lh + 2;
+	d.fill(L, y, w.w, 1);
+	d.fill(L, y + 3, w.w, 2);
+	y += 10;
+	const items = f.items.slice(0, Math.max(1, Math.min(5, parseInt(String(o.count ?? '5'), 10) || 5)));
+	if (!items.length) return;
+	// the top story
+	const lead = clip(env, 'mb', items[0], w.w, 3);
+	for (const ln of lead) {
+		if (y + mv.asc > B) return;
+		d.text(L, y + mv.asc, 'mb', ln, { maxW: w.w, raw: true });
+		y += mv.lh;
+	}
+	y += 5;
+	const rest = items.slice(1);
+	if (!rest.length || y + sv.lh > B) return;
+	d.fill(L, y, w.w, 1);
+	y += 7;
+	// the rest in two columns: each story goes in whichever column has more room left, and one
+	// that would only get a single cut-off line is left out
+	const gap = 16;
+	const two = rest.length > 1;
+	const cw = two ? Math.floor((w.w - gap) / 2) : w.w;
+	const top = y;
+	const cols = two ? [{ x: L, y: top, n: 0 }, { x: L + cw + gap, y: top, n: 0 }] : [{ x: L, y: top, n: 0 }];
+	for (const it of rest) {
+		const order = [...cols].sort((p, q) => p.y - q.y);
+		const placed = order.some((c) => {
+			const role: Role = c.n === 0 ? 'sb' : 's';
+			const sep = c.n > 0 ? 7 : 0;
+			const room = Math.floor((B - c.y - sep) / sv.lh);
+			const want = wrapText(env.fam, role, it, cw).length;
+			if (room < Math.min(2, want)) return false;
+			if (c.n > 0) d.fill(c.x, c.y + 2, Math.min(cw, 40), 1);
+			c.y += sep;
+			for (const ln of clip(env, role, it, cw, room)) {
+				d.text(c.x, c.y + sv.asc, role, ln, { maxW: cw, raw: true });
+				c.y += sv.lh;
+			}
+			c.n++;
+			return true;
+		});
+		if (!placed) break;
+	}
+	if (two && cols[1].n) d.vline(L + cw + gap / 2, top, Math.min(B, Math.max(cols[0].y, cols[1].y)) - top);
 }
 
 function price(n: number): string {

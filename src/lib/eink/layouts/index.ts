@@ -65,7 +65,7 @@ export const LAYOUTS: Record<string, LayoutEntry> = {
 	coast: { render: coast, font: 'sans' },
 	youtube: { render: sign('youtube'), font: 'sans' },
 	github: { render: sign('github'), font: 'sans' },
-	headlines: { render: sign('headlines'), font: 'sans' },
+	headlines: { render: sign('headlines'), font: 'lora' },
 	markets: { render: sign('markets'), font: 'sans' },
 	messages: { render: messages, font: 'sans' },
 	reminders: { render: reminders, font: 'sans' },
