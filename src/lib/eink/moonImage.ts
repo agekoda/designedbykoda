@@ -13,12 +13,28 @@
 // for Draw.bitmapBytes. On a light screen the unlit part is solid ink, like a night
 // sky disc with the lit part showing through; on a dark screen the lit part is ink
 // (white) and the unlit edge is drawn as a faint dotted ring.
-import { MOON_B64, MOON_H, MOON_LAT, MOON_W } from './moonMap';
+import * as MAP from './moonMap';
+
+// The map is 170 KB. The server has it built in; in a browser it's fetched only when a preview
+// shows the moon (loadMoon(), from previewKit). Until then the moon is drawn as a plain disc.
+let map: { MOON_B64: string } | null = import.meta.env.SSR ? MAP : null;
+let loadingMap: Promise<void> | null = null;
+export function loadMoon(): Promise<void> {
+	if (map) return Promise.resolve();
+	loadingMap ??= import('./moonMap').then((m) => {
+		map = m;
+	});
+	return loadingMap;
+}
+const MOON_W = 512;
+const MOON_H = 235;
+const MOON_LAT = 0.46 * Math.PI; // keep in step with moonMap.ts
 
 let tex: Uint8Array | null = null;
-function texture(): Uint8Array {
+function texture(): Uint8Array | null {
+	if (!map) return null;
 	if (!tex) {
-		const bin = atob(MOON_B64);
+		const bin = atob(map.MOON_B64);
 		tex = new Uint8Array(bin.length);
 		for (let i = 0; i < bin.length; i++) tex[i] = bin.charCodeAt(i);
 	}
@@ -72,7 +88,7 @@ export function moonBits(o: MoonOptions): Uint8Array {
 			if (mu0 > 0) {
 				const ls = (2 * mu0) / (mu0 + z + 1e-6); // Lommel-Seeliger: flat at full, soft at the terminator
 				const lit = Math.pow(Math.min(1, ls * 1.3), 0.8);
-				const alb = 0.16 + 0.84 * Math.pow(sample(t, Math.atan2(x, z), Math.asin(-y)), 1.05);
+				const alb = 0.16 + 0.84 * Math.pow((t ? sample(t, Math.atan2(x, z), Math.asin(-y)) : 0.62), 1.05);
 				b = alb * lit * 1.1;
 				// a touch more contrast, so the dark seas and bright highlands separate cleanly
 				b = Math.max(0, Math.min(1, (b - 0.5) * 1.45 + 0.54));

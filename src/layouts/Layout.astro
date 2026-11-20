@@ -10,10 +10,11 @@ interface Props {
 	description: string;
 	image?: string;
 	noindex?: boolean; // keep the page out of search engines (private pages such as message links)
+	previews?: boolean; // the page draws screen previews: start fetching the screen fonts straight away
 	bodyClass?: string; // a page-wide look, e.g. 'paper-theme' on /e-ink
 }
 
-const { title, description, image, noindex, bodyClass } = Astro.props;
+const { title, description, image, noindex, bodyClass, previews } = Astro.props;
 
 // Project list for the command palette (title + url), ordered like the site.
 const paletteProjects = (await getCollection('projects'))
@@ -25,7 +26,9 @@ const paletteProjects = (await getCollection('projects'))
 	<head>
 		<BaseHead title={title} description={description} image={image} />
 		<link rel="stylesheet" href="/styles/extras.css" />
+		<script is:inline>/* ?timing on any page: a readout of what it waited on (scripts/timing.js) */ if (/[?&]timing\b/.test(location.search)) { var t = document.createElement('script'); t.src = '/scripts/timing.js'; t.defer = true; document.head.appendChild(t); }</script>
 		{noindex && <meta name="robots" content="noindex, nofollow" />}
+		{previews && <link rel="preload" href="/eink/fonts.json" as="fetch" crossorigin="anonymous" />}
 	</head>
 	<body class={bodyClass}>
 		<a class="x-skip" href="#main">Skip to content</a>
