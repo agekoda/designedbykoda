@@ -876,7 +876,8 @@ function note(env: Env, w: Widget, text: string) {
 
 function youtubeWidget(env: Env, w: Widget, o: Opts) {
 	const { d, ctx } = env;
-	const ref = youtubeRef(o.channel);
+	// an example preview (the screen picker) shows example numbers until a channel is filled in
+	const ref = youtubeRef(o.channel) || (ctx.connect?.sample ? '@example' : '');
 	if (!ref) return note(env, w, 'Add your YouTube channel');
 	const s = ctx.connect?.youtube?.[ref];
 	if (!s) return note(env, w, !ctx.connect ? 'Shows when your calendar updates' : ctx.connect.youtubeKey === false ? 'YouTube isn’t set up on the site yet' : 'Couldn’t find that channel');
@@ -900,8 +901,8 @@ function youtubeWidget(env: Env, w: Widget, o: Opts) {
 // GitHub's squares in black and white: darker pattern, more contributions. Drawn as one picture.
 function githubWidget(env: Env, w: Widget, o: Opts) {
 	const { d, ctx } = env;
-	const user = githubUser(o.user);
-	if (!user) return note(env, w, 'Add a GitHub username');
+	const user = githubUser(o.user) || (ctx.connect?.sample ? 'example' : '');
+	if (!user) return note(env, w, 'Add your GitHub username');
 	const g: GitHubDays | null | undefined = ctx.connect?.github?.[user];
 	if (!g) return note(env, w, ctx.connect ? 'Couldn’t reach GitHub' : 'Shows when your calendar updates');
 	const sv = vm(env, FACES.s);

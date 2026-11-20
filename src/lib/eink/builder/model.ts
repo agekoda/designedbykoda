@@ -388,7 +388,7 @@ export const WIDGETS: Record<string, WidgetDef> = {
 		h: 110,
 		min: { w: 100, h: 40 },
 		opts: [
-			{ key: 'channel', label: 'Channel', kind: 'text', def: '@designedbykoda', max: 120, rows: 1, ph: '@yourchannel or a youtube.com link' },
+			{ key: 'channel', label: 'Channel', kind: 'text', def: '', max: 120, rows: 1, ph: '@yourchannel or a youtube.com link' },
 			{ key: 'short', label: 'Short number (12.4K)', kind: 'toggle', def: false },
 			{ key: 'name', label: 'Channel name', kind: 'toggle', def: true },
 			ALIGN,
@@ -403,7 +403,7 @@ export const WIDGETS: Record<string, WidgetDef> = {
 		h: 90,
 		min: { w: 120, h: 40 },
 		opts: [
-			{ key: 'user', label: 'GitHub username', kind: 'text', def: 'agekoda', max: 80, rows: 1, ph: 'username or github.com link' },
+			{ key: 'user', label: 'GitHub username', kind: 'text', def: '', max: 80, rows: 1, ph: 'username or github.com link' },
 			{ key: 'total', label: 'Contributions this year', kind: 'toggle', def: true },
 		],
 	},
@@ -894,8 +894,8 @@ export const SIGN_DEFAULTS: SignCfg = {
 	},
 	nameplate: { name: 'Alex Koda', role: 'Hardware Engineer' },
 	waiting: { title: 'Riverside Physio', note: 'Please let reception know you\'re here', cals: [] },
-	youtube: { channel: '@designedbykoda' },
-	github: { user: 'agekoda' },
+	youtube: { channel: '' },
+	github: { user: '' },
 	headlines: { url: 'https://www.abc.net.au/news/feed/51120/rss.xml' },
 	markets: { list: 'USD, EUR, GBP, BTC, ETH, SOL', base: 'AUD' },
 };

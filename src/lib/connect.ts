@@ -15,6 +15,7 @@ export interface Marine { tides: { at: number; h: number; high: boolean }[]; wav
 export interface Air { uvNow: number | null; uvMax: number | null; uvMaxAt: number | null; aqi: number | null }
 
 export interface Connected {
+	sample?: boolean; // example data for a preview, not the real thing
 	youtube?: Record<string, YouTubeStats | null>;
 	youtubeKey?: boolean; // false: the site has no YOUTUBE_API_KEY yet
 	feeds?: Record<string, FeedItems | null>;

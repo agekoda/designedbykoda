@@ -65,12 +65,12 @@ export function sampleAppointments(nowLocal: number): CalEvent[] {
 // Example data for the connection widgets' previews (the real thing comes when the calendar updates).
 export function sampleConnect(custom: CustomLayout | null | undefined, nowLocal: number) {
 	if (!custom?.widgets?.some((w) => ['youtube', 'rss', 'github', 'markets', 'tides', 'uvair'].includes(w.t))) return null;
-	const out: any = { youtube: {}, feeds: {}, github: {}, markets: {} };
+	const out: any = { sample: true, youtube: {}, feeds: {}, github: {}, markets: {} };
 	let seed = 7;
 	const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
 	for (const w of custom.widgets) {
 		const o = withDefaults(w) as any;
-		if (w.t === 'youtube') out.youtube[youtubeRef(o.channel)] = { name: 'designedbykoda', subs: 12480 };
+		if (w.t === 'youtube') out.youtube[youtubeRef(o.channel) || '@example'] = { name: 'Your channel', subs: 12480 };
 		if (w.t === 'rss')
 			out.feeds[feedUrl(o.url)] = {
 				title: 'ABC News',
@@ -81,7 +81,7 @@ export function sampleConnect(custom: CustomLayout | null | undefined, nowLocal:
 				const r = rnd() * (i % 7 === 0 || i % 7 === 6 ? 0.45 : 1);
 				return r < 0.3 ? 0 : r < 0.55 ? 1 : r < 0.75 ? 2 : r < 0.9 ? 3 : 4;
 			}).join('');
-			out.github[githubUser(o.user)] = { total: 1234, first: '2025-11-23', levels };
+			out.github[githubUser(o.user) || 'example'] = { total: 1234, first: '2025-11-23', levels };
 		}
 		if (w.t === 'markets') {
 			const base = marketBase(o.base);
