@@ -1569,7 +1569,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 					layout = sanitizeLayout(seed.layout);
 					commit();
 					banner.hidden = false;
-					banner.textContent = `Started from your ${seed.label || 'layout'}. Save to make it your own design.`;
+					banner.textContent = `This is a copy of your ${seed.label || 'layout'} screen that only you can see, and saving it adds it to your designs without changing the original.`;
 				}
 			} catch {}
 			history.replaceState(null, '', '/dashboard/builder?device=' + encodeURIComponent(deviceId));
