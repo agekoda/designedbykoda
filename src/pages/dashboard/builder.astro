@@ -208,6 +208,36 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	// ---------------------------------------------------------------- drawing the preview
+	// Real data for the connection widgets (YouTube, headlines, GitHub, prices, tides, UV): fetched for
+	// what's on the canvas, a moment after their settings stop changing. Until it comes, the preview
+	// shows example numbers.
+	const CONNECT = ['youtube', 'rss', 'github', 'markets', 'tides', 'uvair'];
+	let connectData: any = null;
+	let connectKey = '';
+	let connectT: any;
+	let connectFor = '';
+	function liveConnect(l: CustomLayout) {
+		if (l !== layout) return null; // the palette's and templates' little pictures use examples
+		const ws = l.widgets.filter((w) => CONNECT.includes(w.t)).map((w) => ({ t: w.t, o: w.o }));
+		if (!ws.length) return null;
+		const key = JSON.stringify(ws);
+		if (key !== connectKey) {
+			connectKey = key;
+			clearTimeout(connectT);
+			connectT = setTimeout(async () => {
+				try {
+					const r = await fetch('/api/dashboard/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceId, widgets: ws }) });
+					const j = await r.json();
+					if (j.ok && key === connectKey) {
+						connectData = j.connect;
+						connectFor = key;
+						redraw();
+					}
+				} catch {}
+			}, 700);
+		}
+		return key === connectFor ? connectData : null; // only data for what's on the canvas now
+	}
 	function previewOpts(l: CustomLayout): PreviewOptions {
 		const d = new Date(Date.now() + 25 * 86400000).toISOString().slice(0, 10);
 		return {
@@ -220,6 +250,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			hasWeather: info.hasWeather,
 			vbat: 4.0,
 			loc: info.loc,
+			connect: liveConnect(l),
 			countdown: info.countdown ?? { title: 'Japan trip', date: d },
 			cornerImage: decodePic(info.cornerBits)?.bytes ?? null,
 			cornerSize: ((p) => (p ? { w: p.w, h: p.h } : null))(decodePic(info.cornerBits)),

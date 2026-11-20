@@ -22,6 +22,7 @@ import { NO_GOOGLE } from '../../../../lib/googleCals';
 import { sanitizeDeco, type FrameDeco } from '../../../../lib/eink/festive';
 import { getStatus, activeStatus } from '../../../../lib/deskStatus';
 import { fetchBirthdays, mergeBirthdays, type Birthday } from '../../../../lib/birthdays';
+import { connectFor, type Connected } from '../../../../lib/connect';
 
 function getCookielessAuthSecret(request: Request): string | null {
 	const header = request.headers.get('Authorization') || '';
@@ -508,6 +509,11 @@ export async function GET({ params, request, locals }) {
 		birthdays = mergeBirthdays(g, allEvents);
 	}
 
+	// Connections: YouTube, headlines, GitHub, prices, tides, UV (src/lib/connect.ts). Each is cached
+	// for everyone, and one that fails just shows a note on its widget.
+	let connect: Connected | null = null;
+	if (needs.connect && proto === '2' && customLayout) connect = await connectFor(customLayout.widgets, place, env);
+
 	// Dark mode (white on black), from schema-darkmode.sql. Its own query so a
 	// missing column never affects anything else.
 	let dark = false;
@@ -660,6 +666,7 @@ export async function GET({ params, request, locals }) {
 			reminders,
 			habits,
 			birthdays,
+			connect,
 		}, fontChoice ?? undefined);
 		// How long to sleep: the layout's own answer, but wake sooner for a scheduled screen change,
 		// and (for a "Free or busy" widget) when a meeting starts or ends.
