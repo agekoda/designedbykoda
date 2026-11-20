@@ -265,9 +265,10 @@ html.has-custom-cursor .x-chip { cursor: none; }
 .prose h2 { scroll-margin-top: 90px; }
 html.has-custom-cursor .x-toc-a { cursor: none; }
 
-/* smooth page-to-page fade where the browser supports it */
+/* Smooth page-to-page fade. It's switched on from the page head (Layout.astro), for Chromium
+   browsers only: Safari holds a tapped link until the next page is completely ready before
+   fading, which made tapping a link take seconds while typing the address was instant. */
 @media (prefers-reduced-motion: no-preference) {
-	@view-transition { navigation: auto; }
 	::view-transition-old(root) { animation: 0.18s ease-in both x-vt-out; }
 	::view-transition-new(root) { animation: 0.28s ease-out both x-vt-in; }
 	@keyframes x-vt-out { to { opacity: 0; } }
