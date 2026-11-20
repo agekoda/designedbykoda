@@ -1,7 +1,7 @@
 // A calendar's extra calendars (school timetables and other .ics links or files): list, add a
 // link, upload a file, remove. Only the owner of the calendar can touch them. Links are never sent
 // back to the browser in full (they're private), only the website they're on.
-import { MAX_FEEDS, MAX_FEED_NAME, cleanFeedUrl, ensureTables, fetchFeed, listFeeds, parseFile, statusOf, storeEvents, type Feed } from '../../../lib/feeds';
+import { MAX_FEEDS, MAX_FEED_NAME, cleanFeedUrl, ensureTables, fetchFeed, listFeeds, setFeedOff, parseFile, statusOf, storeEvents, type Feed } from '../../../lib/feeds';
 import { cleanText } from '../../../lib/eink/draw';
 export const prerender = false;
 
@@ -62,6 +62,17 @@ export async function POST({ request, locals }: any) {
 			await db.prepare('DELETE FROM device_feeds WHERE device_id = ? AND id = ?').bind(deviceId, id).run();
 			await db.prepare('DELETE FROM ics_cache WHERE key = ?').bind(`f:${deviceId}:${id}`).run();
 		} catch {}
+		return json({ ok: true });
+	}
+
+	if (action === 'switch') {
+		const id = String(body.id ?? '');
+		if (!(await listFeeds(db, deviceId)).some((x) => x.id === id)) return json({ error: 'That calendar isn’t there any more.' }, 404);
+		try {
+			await setFeedOff(db, deviceId, id, body.on === false);
+		} catch {
+			return json({ error: 'Could not save that.' }, 500);
+		}
 		return json({ ok: true });
 	}
 

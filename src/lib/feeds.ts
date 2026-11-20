@@ -20,10 +20,12 @@ export interface Feed {
 	name: string;
 	url: string | null; // null = an uploaded file
 	createdAt: number;
+	off?: boolean; // switched off: kept, but not on the screens
 }
 export interface FeedStatus {
 	id: string;
 	name: string;
+	off: boolean;
 	kind: 'link' | 'file';
 	host: string | null;
 	count: number; // events coming up
@@ -40,15 +42,33 @@ export async function ensureTables(db: any) {
 }
 
 export async function listFeeds(db: any, deviceId: string): Promise<Feed[]> {
+	let rows: any[];
 	try {
-		const r = await db.prepare('SELECT id, name, url, created_at FROM device_feeds WHERE device_id = ? ORDER BY created_at').bind(deviceId).all();
-		// An early version saved uploaded files with the name in the url column: those are files.
-		return (r.results ?? []).map((x: any) => {
-			const bad = x.url && !/^https?:\/\//i.test(x.url);
-			return { id: x.id, name: (bad ? x.url : x.name) || 'Calendar', url: bad ? null : x.url ?? null, createdAt: x.created_at ?? 0 };
-		});
+		rows = (await db.prepare('SELECT id, name, url, created_at, off FROM device_feeds WHERE device_id = ? ORDER BY created_at').bind(deviceId).all()).results ?? [];
 	} catch {
-		return []; // no feeds have ever been added
+		try {
+			// before the "off" column (added the first time a calendar is switched off)
+			rows = (await db.prepare('SELECT id, name, url, created_at FROM device_feeds WHERE device_id = ? ORDER BY created_at').bind(deviceId).all()).results ?? [];
+		} catch {
+			return []; // no feeds have ever been added
+		}
+	}
+	// An early version saved uploaded files with the name in the url column: those are files.
+	return rows.map((x: any) => {
+		const bad = x.url && !/^https?:\/\//i.test(x.url);
+		return { id: x.id, name: (bad ? x.url : x.name) || 'Calendar', url: bad ? null : x.url ?? null, createdAt: x.created_at ?? 0, off: x.off === 1 };
+	});
+}
+
+// Switched off: kept (link, file, class names and all) but left off the screens. A Meeting room or
+// Waiting room can still use it, chosen with the sign.
+export async function setFeedOff(db: any, deviceId: string, id: string, off: boolean) {
+	const run = () => db.prepare('UPDATE device_feeds SET off = ? WHERE device_id = ? AND id = ?').bind(off ? 1 : 0, deviceId, id).run();
+	try {
+		await run();
+	} catch {
+		await db.prepare('ALTER TABLE device_feeds ADD COLUMN off INTEGER NOT NULL DEFAULT 0').run();
+		await run();
 	}
 }
 
@@ -142,7 +162,7 @@ export async function feedEvents(db: any, deviceId: string, f: Feed, tz: string,
 // Google's events in.
 export async function allFeedEvents(db: any, deviceId: string, tz: string, nowMs: number, fromMs: number, only?: string[] | null): Promise<NamedEvent[]> {
 	// `only`: just these feeds (a sign with its own calendars); otherwise all of them
-	const feeds = (await listFeeds(db, deviceId)).filter((f) => !only || only.includes(f.id));
+	const feeds = (await listFeeds(db, deviceId)).filter((f) => (only ? only.includes(f.id) : !f.off));
 	if (!feeds.length) return [];
 	const lists = await Promise.all(feeds.map((f) => feedEvents(db, deviceId, f, tz, nowMs).catch(() => ({ events: [] as IcsEvent[] }))));
 	// class names, rooms and room changes (src/lib/classes.ts), worked out over everything we have
@@ -175,7 +195,7 @@ export async function statusOf(db: any, deviceId: string, f: Feed, tz: string, n
 		} catch {}
 	}
 	const n = upcoming[0];
-	return { id: f.id, name: f.name, kind: f.url ? 'link' : 'file', host, count: upcoming.length, next: n ? { title: n.title, ms: n.ms, allDay: n.allDay } : null, error: r.error, checkedAt: r.at };
+	return { id: f.id, name: f.name, off: !!f.off, kind: f.url ? 'link' : 'file', host, count: upcoming.length, next: n ? { title: n.title, ms: n.ms, allDay: n.allDay } : null, error: r.error, checkedAt: r.at };
 }
 
 export { cleanFeedUrl };

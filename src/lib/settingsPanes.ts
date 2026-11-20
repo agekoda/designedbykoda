@@ -101,22 +101,26 @@ export function mountCalendars(box: HTMLElement, d: any, all: any[] | null, toas
 	// none ticked is allowed: saved as ["-"], so only timetables and other calendar links show
 	const sel: string[] = d.calendarIds?.length ? d.calendarIds : all.filter((c) => c.primary).map((c) => c.id);
 	box.innerHTML = `<div class="sp-list">${all
-		.map((c) => `<label class="sp-row sp-check"><input type="checkbox" value="${esc(c.id)}" ${sel.includes(c.id) ? 'checked' : ''} /><span class="sp-box" aria-hidden="true"></span><span class="sp-t sp-inline"><span>${esc(c.summary)}</span>${c.primary ? '<span class="sp-tag">Primary</span>' : ''}</span></label>`)
-		.join('')}</div><p class="muted small sp-hint" data-none>${sel.includes('-') ? 'No Google calendars on this calendar. Tick one to add it.' : 'Untick them all to show only your timetables and other calendars below.'}</p>`;
+		.map(
+			(c) =>
+				`<label class="sp-row sp-onoff${sel.includes(c.id) ? '' : ' is-off'}"><span class="sp-ico sp-g" aria-hidden="true">G</span><span class="sp-t"><span class="sp-inline"><span>${esc(c.summary)}</span>${c.primary ? '<span class="sp-tag">Primary</span>' : ''}</span><span class="sp-sub">Google Calendar</span></span><input type="checkbox" role="switch" value="${esc(c.id)}" ${sel.includes(c.id) ? 'checked' : ''} aria-label="Show ${esc(c.summary)}" /><span class="sp-sw" aria-hidden="true"></span></label>`
+		)
+		.join('')}</div><p class="muted small sp-hint" data-none>${sel.includes('-') ? 'All your Google calendars are off. Switch one on to show it.' : ''}</p>`;
 	const noneHint = box.querySelector('[data-none]') as HTMLElement;
 	let timer: any;
 	box.addEventListener('change', (e) => {
 		const cb = e.target as HTMLInputElement;
 		if (!cb.matches('input[type=checkbox]')) return;
+		cb.closest('.sp-onoff')?.classList.toggle('is-off', !cb.checked);
 		const picked = Array.from(box.querySelectorAll<HTMLInputElement>('input:checked')).map((x) => x.value);
 		const ids = picked.length ? picked : ['-'];
-		noneHint.textContent = picked.length ? 'Untick them all to show only your timetables and other calendars below.' : 'No Google calendars on this calendar. Tick one to add it.';
+		noneHint.textContent = picked.length ? '' : 'All your Google calendars are off. Switch one on to show it.';
 		clearTimeout(timer);
 		timer = setTimeout(async () => {
 			const r = await post('/api/dashboard/devices', { deviceId: d.id, calendarIds: ids });
 			if (r.ok) {
 				d.calendarIds = ids;
-				toast(picked.length ? 'Saved' : 'Saved. Only your timetables and other calendars will show.');
+				toast(cb.checked ? 'On. It shows on your screens.' : 'Off. It\u2019s kept here, just not shown.');
 			} else toast(r.error || 'Could not save.', true);
 		}, 500);
 	});
@@ -139,7 +143,7 @@ export function mountFeeds(box: HTMLElement, d: any, toast: Toast, hooks: { onAd
 	const draw = () => {
 		listEl.innerHTML = feeds
 			.map(
-				(f) => `<div class="sp-row sp-item" data-id="${esc(f.id)}"><span class="sp-ico" aria-hidden="true">${f.kind === 'file' ? '▤' : '↻'}</span><span class="sp-t"><b>${esc(f.name)}</b><span class="sp-sub">${f.kind === 'file' ? 'File' : esc(f.host || 'Link')} · ${line(f)}</span><span class="sp-acts"><button type="button" class="sp-pill" data-names>Name classes</button>${f.kind === 'link' ? '<button type="button" class="sp-pill" data-refresh>Refresh</button>' : ''}</span></span><button type="button" class="sp-x" data-del aria-label="Remove ${esc(f.name)}">&times;</button></div>`
+				(f) => `<div class="sp-row sp-item${f.off ? ' is-off' : ''}" data-id="${esc(f.id)}"><span class="sp-ico" aria-hidden="true">${f.kind === 'file' ? '▤' : '↻'}</span><span class="sp-t"><b>${esc(f.name)}</b><span class="sp-sub">${f.kind === 'file' ? 'File' : esc(f.host || 'Link')} · ${line(f)}</span><span class="sp-acts"><button type="button" class="sp-pill" data-names>Name classes</button>${f.kind === 'link' ? '<button type="button" class="sp-pill" data-refresh>Refresh</button>' : ''}<button type="button" class="sp-pill" data-del>Remove</button></span></span><label class="sp-onoff sp-onoff-only"><input type="checkbox" role="switch" data-switch ${f.off ? '' : 'checked'} aria-label="Show ${esc(f.name)}" /><span class="sp-sw" aria-hidden="true"></span></label></div>`
 			)
 			.join('');
 		addBtn.hidden = feeds.length >= max;
@@ -160,6 +164,21 @@ export function mountFeeds(box: HTMLElement, d: any, toast: Toast, hooks: { onAd
 		const f = feeds.find((x) => x.id === row.dataset.id);
 		if (!f) return;
 		if (t.closest('[data-names]')) return hooks.onNames();
+		if (t.matches('[data-switch]')) {
+			const on = (t as HTMLInputElement).checked;
+			row.classList.toggle('is-off', !on);
+			const r = await post('/api/dashboard/feeds', { deviceId: d.id, action: 'switch', id: f.id, on });
+			if (r.ok) {
+				f.off = !on;
+				hooks.onChange?.(feeds);
+				toast(on ? 'On. It shows on your screens.' : 'Off. It\u2019s kept here, just not shown.');
+			} else {
+				(t as HTMLInputElement).checked = !on;
+				row.classList.toggle('is-off', on);
+				toast(r.error || 'Could not save that.', true);
+			}
+			return;
+		}
 		if (t.closest('[data-refresh]')) {
 			toast('Reading it again…');
 			const r = await post('/api/dashboard/feeds', { deviceId: d.id, action: 'refresh', id: f.id });
