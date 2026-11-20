@@ -2265,7 +2265,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.sp-onoff input:focus-visible + .sp-sw { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.sp-onoff-only { display: flex; align-items: center; align-self: flex-start; margin-top: 0.2em; }
 	.sp-row.is-off .sp-t, .sp-row.is-off .sp-ico { opacity: 0.45; }
-	.sp-g { font-weight: 800; }
+	/* Google calendars: one line each, the heading above already says where they're from */
+	.sp-row.sp-slim { padding: 0.55em 0.9em; }
+	.sp-list:has(> .sp-slim) { gap: 0.4em; }
 	.cal-note { margin-top: 1.8em; }
 	.sp-add { margin-top: 0.9em; }
 	.sp-adds { display: flex; gap: 0.6em; flex-wrap: wrap; margin-top: 0.9em; }
