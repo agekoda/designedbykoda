@@ -418,6 +418,7 @@ export const WIDGETS: Record<string, WidgetDef> = {
 			{ key: 'url', label: 'Feed link', kind: 'text', def: 'https://www.abc.net.au/news/feed/51120/rss.xml', max: 400, rows: 2, ph: 'https://… (RSS or Atom)' },
 			{ key: 'count', label: 'How many', kind: 'choice', choices: [['2', '2'], ['3', '3'], ['4', '4'], ['5', '5']], def: '3' },
 			{ key: 'title', label: 'Feed name', kind: 'toggle', def: true },
+			{ key: 'look', label: 'Look', kind: 'choice', choices: [['list', 'List'], ['paper', 'Newspaper']], def: 'list' },
 		],
 	},
 	markets: {
@@ -973,15 +974,8 @@ export function signLayout(sign: SignStyle, cfg: SignCfg): CustomLayout {
 		};
 	}
 	if (sign === 'headlines') {
-		return {
-			v: 1,
-			widgets: [
-				W('box', 0, 0, 400, 30, { fill: 'solid' }),
-				W('text', 10, 2, 180, 26, { text: 'HEADLINES', light: true, bold: true, size: 's', valign: 'middle' }),
-				W('updated', 190, 2, 200, 26, { light: true, size: 's', align: 'right', valign: 'middle' }),
-				W('rss', 12, 40, 376, 254, { url: cfg.headlines.url, count: '5', title: true }),
-			],
-		};
+		// a front page: the feed's name as the masthead, the top story big, then as many more as fit in two columns
+		return { v: 1, widgets: [W('rss', 12, 8, 376, 286, { url: cfg.headlines.url, count: '5', title: true, look: 'paper' })] };
 	}
 	if (sign === 'markets') {
 		return {
