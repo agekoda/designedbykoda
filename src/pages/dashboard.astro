@@ -310,7 +310,7 @@ if (!userId) return Astro.redirect('/signin?return=' + encodeURIComponent(Astro.
 		fetch('/api/dashboard/feeds?deviceId=' + encodeURIComponent(d.id))
 			.then((r) => r.json())
 			.then((j) => {
-				feedNames = (j.feeds ?? []).map((f: any) => f.name);
+				feedNames = (j.feeds ?? []).filter((f: any) => !f.off).map((f: any) => f.name); // switched-off ones aren't shown
 				drawSummary(feedNames);
 			})
 			.catch(() => {});
