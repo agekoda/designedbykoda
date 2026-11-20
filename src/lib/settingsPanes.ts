@@ -103,7 +103,7 @@ export function mountCalendars(box: HTMLElement, d: any, all: any[] | null, toas
 	box.innerHTML = `<div class="sp-list">${all
 		.map(
 			(c) =>
-				`<label class="sp-row sp-onoff${sel.includes(c.id) ? '' : ' is-off'}"><span class="sp-ico sp-g" aria-hidden="true">G</span><span class="sp-t"><span class="sp-inline"><span>${esc(c.summary)}</span>${c.primary ? '<span class="sp-tag">Primary</span>' : ''}</span><span class="sp-sub">Google Calendar</span></span><input type="checkbox" role="switch" value="${esc(c.id)}" ${sel.includes(c.id) ? 'checked' : ''} aria-label="Show ${esc(c.summary)}" /><span class="sp-sw" aria-hidden="true"></span></label>`
+				`<label class="sp-row sp-onoff sp-slim${sel.includes(c.id) ? '' : ' is-off'}"><span class="sp-t"><span class="sp-inline"><span>${esc(c.summary)}</span>${c.primary ? '<span class="sp-tag">Primary</span>' : ''}</span></span><input type="checkbox" role="switch" value="${esc(c.id)}" ${sel.includes(c.id) ? 'checked' : ''} aria-label="Show ${esc(c.summary)}" /><span class="sp-sw" aria-hidden="true"></span></label>`
 		)
 		.join('')}</div><p class="muted small sp-hint" data-none>${sel.includes('-') ? 'All your Google calendars are off. Switch one on to show it.' : ''}</p>`;
 	const noneHint = box.querySelector('[data-none]') as HTMLElement;
