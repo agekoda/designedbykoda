@@ -1,5 +1,7 @@
 // Browser helpers for the dashboard's live previews: loads the font data, builds
 // sample events, and paints the 1-bit screen onto a canvas.
+import { loadJp } from './jp';
+import { loadMoon } from './moonImage';
 import { renderEink } from './render';
 import { sanitizeReminders } from './reminders';
 import { sanitizeHabits } from './habits';
@@ -198,8 +200,28 @@ export function drawListFor(o: PreviewOptions): string {
 	);
 }
 
+// The Japanese glyphs and the moon map are big, so a browser fetches them only for a preview that
+// shows them (see jp.ts and moonImage.ts). This says which this preview needs, and waits for them.
+const CJK = /[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]/;
+export function needsFor(o: PreviewOptions): { jp: boolean; moon: boolean } {
+	const types = new Set((o.custom?.widgets ?? []).map((w) => w.t));
+	let text = '';
+	try {
+		text = JSON.stringify({ c: o.custom, e: o.events, m: (o as any).messages, r: o.reminders, h: o.habits, s: o.sign, cd: o.countdown }, (_k, v) => (v instanceof Uint8Array ? undefined : v));
+	} catch {}
+	return {
+		jp: o.lang === 'ja' || types.has('jpword') || CJK.test(text),
+		moon: o.style === 'moon' || types.has('moon'),
+	};
+}
+export async function loadAssetsFor(o: PreviewOptions) {
+	const n = needsFor(o);
+	await Promise.all([n.jp ? loadJp() : null, n.moon ? loadMoon() : null]);
+}
+export { loadJp, loadMoon };
+
 export async function renderPreview(o: PreviewOptions): Promise<Rendered> {
-	const fonts = await loadFonts();
+	const [fonts] = await Promise.all([loadFonts(), loadAssetsFor(o)]);
 	return renderDrawList(drawListFor(o), fonts);
 }
 

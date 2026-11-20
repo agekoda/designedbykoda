@@ -13,7 +13,7 @@ if (!deviceId) return Astro.redirect('/dashboard');
 const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 ---
 
-<Layout title="Layout builder — designedbykoda" description="Design your own E-Ink Calendar screen by dragging, dropping and resizing widgets.">
+<Layout title="Layout builder — designedbykoda" description="Design your own E-Ink Calendar screen by dragging, dropping and resizing widgets." previews>
 	<div class="bld-mobile">
 		<div class="bld-mobile-t">Use a computer for this</div>
 		<p>The layout builder needs a bigger screen and a mouse. Open this page on a desktop or laptop to design your own screen.</p>
@@ -98,7 +98,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 
 <script>
 	import { WIDGETS, GROUPS, TEMPLATES, makeWidget, clampWidget, sanitizeLayout, withDefaults, newId, SCREEN, MAX_WIDGETS, layoutNeeds, type CustomLayout, type Widget, type OptDef } from '../../lib/eink/builder/model';
-	import { loadFonts, drawListFor, paint, type PreviewOptions } from '../../lib/eink/previewKit';
+	import { loadFonts, drawListFor, paint, loadJp, loadMoon, type PreviewOptions } from '../../lib/eink/previewKit';
 	import { sampleReminders } from '../../lib/eink/reminders';
 	import { sampleHabits } from '../../lib/eink/habits';
 	import { renderDrawList } from '../../lib/eink/preview';
@@ -1549,6 +1549,14 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		redraw();
 		paintThumbs();
 		paintPalette();
+		// the Japanese glyphs and the moon map come separately (they're big); draw again once they're here
+		Promise.all([loadJp(), loadMoon()])
+			.then(() => {
+				redraw();
+				paintThumbs();
+				paintPalette();
+			})
+			.catch(() => {});
 	}
 
 	let leaving = false;

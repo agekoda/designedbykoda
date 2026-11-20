@@ -6,7 +6,27 @@
 //   16 px  DotGothic16        for body text  (roles s, sb)
 //   12 px  Fusion Pixel 12px  drawn at 2x (24 px) for headings (m, mb) and 3x (36 px) for big text (bb)
 // Both are SIL Open Font License 1.1; see public/eink/JP-FONT-LICENSE.txt.
-import { JP12_ASCENT, JP12_B64, JP16_ASCENT, JP16_B64 } from './jpGlyphs';
+import * as GLYPHS from './jpGlyphs';
+
+// The glyphs are over half a megabyte. The server has them built in (it draws every calendar's
+// screen). In a browser they're a separate file, fetched only when a preview needs Japanese
+// (loadJp(), from previewKit); until then nothing counts as Japanese, so English is unaffected.
+type GlyphData = { JP16_B64: string; JP12_B64: string };
+let glyphs: GlyphData | null = import.meta.env.SSR ? GLYPHS : null;
+let loading: Promise<void> | null = null;
+export function jpReady(): boolean {
+	return !!glyphs;
+}
+export function loadJp(): Promise<void> {
+	if (glyphs) return Promise.resolve();
+	loading ??= import('./jpGlyphs').then((m) => {
+		glyphs = m;
+		for (const k of Object.keys(tables)) delete tables[k as unknown as 16 | 12]; // read again with the glyphs
+	});
+	return loading;
+}
+const JP16_ASCENT = 14;
+const JP12_ASCENT = 10;
 import type { Role } from './fonts';
 
 interface Table {
@@ -28,10 +48,10 @@ const tables: Partial<Record<16 | 12, Table>> = {};
 function table(size: 16 | 12): Table {
 	let t = tables[size];
 	if (!t) {
-		const data = unb64(size === 16 ? JP16_B64 : JP12_B64);
+		const data = glyphs ? unb64(size === 16 ? glyphs.JP16_B64 : glyphs.JP12_B64) : new Uint8Array(0);
 		const rec = size === 16 ? 34 : 26;
 		t = { size, rec, data, n: data.length / rec, asc: size === 16 ? JP16_ASCENT : JP12_ASCENT };
-		tables[size] = t;
+		if (glyphs) tables[size] = t; // don't keep the empty table from before they arrive
 	}
 	return t;
 }
