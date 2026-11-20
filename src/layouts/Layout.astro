@@ -26,6 +26,7 @@ const paletteProjects = (await getCollection('projects'))
 	<head>
 		<BaseHead title={title} description={description} image={image} />
 		<link rel="stylesheet" href="/styles/extras.css" />
+		<script is:inline>/* the page-to-page fade, for Chromium browsers only (see extras.css) */ if (navigator.userAgentData && matchMedia('(prefers-reduced-motion: no-preference)').matches) { var v = document.createElement('style'); v.textContent = '@view-transition { navigation: auto; }'; document.head.appendChild(v); }</script>
 		<script is:inline>/* ?timing on any page: a readout of what it waited on (scripts/timing.js) */ if (/[?&]timing\b/.test(location.search)) { var t = document.createElement('script'); t.src = '/scripts/timing.js'; t.defer = true; document.head.appendChild(t); }</script>
 		{noindex && <meta name="robots" content="noindex, nofollow" />}
 		{previews && <link rel="preload" href="/eink/fonts.json" as="fetch" crossorigin="anonymous" />}
