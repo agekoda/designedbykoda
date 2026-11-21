@@ -289,6 +289,6 @@ export function paint(canvas: HTMLCanvasElement, px: Uint8Array, scale = 1, w = 
 // Full-screen previews (400x300 buffers) go through the shared e-paper renderer.
 // "screen" = just the panel, "device" = the panel inside the device mockup.
 // The draw-list renderer already bakes dark mode into the pixels, so dark is never passed on.
-export function paintScreen(canvas: HTMLCanvasElement, px: Uint8Array, opts: { mode?: 'screen' | 'device'; scale?: number; width?: number; bare?: boolean } = {}) {
-	renderEink(canvas as any, px, { mode: opts.mode ?? 'screen', scale: opts.scale ?? 1, width: opts.width, texture: 1, bare: opts.bare });
+export function paintScreen(canvas: HTMLCanvasElement, px: Uint8Array, opts: { mode?: 'screen' | 'device'; scale?: number; width?: number; bare?: boolean; tight?: boolean } = {}) {
+	renderEink(canvas as any, px, { mode: opts.mode ?? 'screen', scale: opts.scale ?? 1, width: opts.width, texture: 1, bare: opts.bare, tight: opts.tight });
 }

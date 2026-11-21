@@ -352,7 +352,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 					<button type="button" class="link" id="view-back">Show the main layout</button>
 				</div>
 				<div class="screen-wrap" id="screen-wrap">
-					<canvas id="screen" width="675" height="506" aria-label="Preview of your calendar screen"></canvas>
+					<canvas id="screen" width="557" height="477" aria-label="Preview of your calendar screen"></canvas>
 				</div>
 				<div class="batt-line" id="batt-line" aria-live="polite"></div>
 			</div>
@@ -758,9 +758,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			// Fill the column whatever the screen size or zoom: draw at the next whole-number scale up
 			// (each dot = k x k pixels, so the dithering stays crisp) and let the browser shrink it to fit.
 			// as wide as the column, but never taller than the window (leave room for the header and the battery line)
-			const availCss = Math.floor(Math.min((screen.parentElement as HTMLElement).clientWidth, Math.max(320, (window.innerHeight - 280) * (675 / 506))));
-			const k = Math.max(1, Math.ceil((availCss * dpr) / 675));
-			paintScreen(screen, r.px, { mode: 'device', scale: k });
+			// (the tight crop: 557 x 477 per panel-dot size, closer in on the device than the 4:3 view)
+			const availCss = Math.floor(Math.min((screen.parentElement as HTMLElement).clientWidth, Math.max(320, (window.innerHeight - 280) * (557 / 477))));
+			const k = Math.max(1, Math.ceil((availCss * dpr) / 557));
+			paintScreen(screen, r.px, { mode: 'device', scale: k, tight: true });
 			screen.style.width = availCss + 'px';
 			if (thumbsDirty) {
 				stylesDirty = fontsDirty = true;
@@ -2540,7 +2541,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	@container (max-width: 480px) { .cust .fonts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 	.cust .fnt-name { overflow-wrap: anywhere; }
 	/* Choose a screen: as many cards to a row as fit, the chosen one marked */
-	.cust .picker-inline .layouts { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.7em; }
+	/* always 3 to a row whatever the zoom, so the pictures stay big enough to read; 2 on a phone */
+	.cust .picker-inline .layouts { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8em; }
+	@media (max-width: 560px) { .cust .picker-inline .layouts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 	.cust .picker-inline .lay-card { position: relative; }
 	.cust .picker-inline input:checked + .lay-card::before { content: '✓ Chosen'; position: absolute; top: 0.9em; left: 0.9em; z-index: 1; padding: 0.2em 0.6em; border-radius: 999px; background: var(--accent); color: var(--bg); font-size: 0.7em; font-weight: 800; }
 	.cust .picker-inline .lay-note { font-size: 0.72em; }
