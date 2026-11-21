@@ -49,9 +49,9 @@ async function getJson(url: string): Promise<any> {
 // A JPEG, made greyscale and cropped to fill 400 x 300 (the middle of it).
 async function toGray(url: string): Promise<Uint8Array> {
 	const r = await fetch(url, { headers: { 'User-Agent': UA } });
-	if (!r.ok) throw new Error(`picture: ${r.status}`);
+	if (!r.ok) throw new Error(`picture ${r.status} from ${new URL(url).host}`);
 	const buf = new Uint8Array(await r.arrayBuffer());
-	if (buf[0] !== 0xff || buf[1] !== 0xd8) throw new Error('not a JPEG');
+	if (buf[0] !== 0xff || buf[1] !== 0xd8) throw new Error(`not a JPEG from ${new URL(url).host}`);
 	const img = jpeg.decode(buf, { useTArray: true, formatAsRGBA: true, maxResolutionInMP: 40, maxMemoryUsageInMB: 256 });
 	const { width: sw, height: sh, data } = img;
 	const scale = Math.max(POTD_W / sw, POTD_H / sh);
@@ -114,9 +114,9 @@ async function fetchPhoto(day: string): Promise<Omit<Potd, 'day'>> {
 			const im = j?.image;
 			const src: string | undefined = im?.thumbnail?.source || im?.image?.source;
 			if (!src) throw new Error('no picture today');
-			// a 960 px copy (one of Wikimedia's standard thumbnail sizes) when it's a thumbnail; the
+			// a 500 px copy (one of Wikimedia's standard thumbnail sizes) when it's a thumbnail; the
 			// copy the feed gives if that doesn't work (say the original is smaller than that)
-			const big = src.replace(/\/(\d+)px-([^/]+)$/, (_m: string, _w: string, f: string) => `/960px-${f}`);
+			const big = src.replace(/\/(\d+)px-([^/]+)$/, (_m: string, _w: string, f: string) => `/500px-${f}`);
 			let gray: Uint8Array;
 			try {
 				gray = await toGray(big);
@@ -168,12 +168,16 @@ const FETCH: Record<PotdCat, (day: string) => Promise<Omit<Potd, 'day'>>> = { ar
 async function ensureTable(db: any) {
 	await db.prepare('CREATE TABLE IF NOT EXISTS potd (cat TEXT NOT NULL, day TEXT NOT NULL, title TEXT, credit TEXT, gray BLOB, PRIMARY KEY (cat, day))').run();
 }
+// The picture is kept as base64 text: D1 won't take a Uint8Array as a value.
 const rowToPotd = (r: any): Potd | null => {
 	if (!r?.gray) return null;
-	const gray = r.gray instanceof Uint8Array ? r.gray : new Uint8Array(r.gray instanceof ArrayBuffer ? r.gray : Array.isArray(r.gray) ? r.gray : []);
-	if (gray.length !== POTD_W * POTD_H) return null;
+	const gray = typeof r.gray === 'string' ? b64ToGray(r.gray) : r.gray instanceof ArrayBuffer ? new Uint8Array(r.gray) : Array.isArray(r.gray) ? new Uint8Array(r.gray) : null;
+	if (!gray || gray.length !== POTD_W * POTD_H) return null;
 	return { day: r.day, title: r.title ?? '', credit: r.credit ?? '', gray };
 };
+
+// What went wrong last time, by category, so /api/dashboard/potd can say (this worker only)
+export const lastError: Record<string, string> = {};
 
 // Today's picture for a category: from the database, or fetched now if nobody has yet today.
 // If the source is down, yesterday's (or the newest there is) stays up.
@@ -184,17 +188,20 @@ export async function getPotd(db: any, catRaw: unknown): Promise<Potd | null> {
 		await ensureTable(db);
 		const have = rowToPotd(await db.prepare('SELECT day, title, credit, gray FROM potd WHERE cat = ? AND day = ?').bind(cat, day).first());
 		if (have) return have;
-	} catch {
+	} catch (e) {
+		lastError[cat] = 'database: ' + String((e as Error)?.message ?? e);
 		return null;
 	}
 	try {
 		const p = await FETCH[cat](day);
-		await db.prepare('INSERT OR REPLACE INTO potd (cat, day, title, credit, gray) VALUES (?, ?, ?, ?, ?)').bind(cat, day, p.title, p.credit, p.gray).run();
+		await db.prepare('INSERT OR REPLACE INTO potd (cat, day, title, credit, gray) VALUES (?, ?, ?, ?, ?)').bind(cat, day, p.title, p.credit, grayToB64(p.gray)).run();
+		delete lastError[cat];
 		// keep a week
 		await db.prepare('DELETE FROM potd WHERE cat = ? AND day < ?').bind(cat, utcDay(Date.now() - 7 * 86400000)).run();
 		return { day, ...p };
 	} catch (e) {
-		console.log('potd', cat, String(e));
+		lastError[cat] = String((e as Error)?.message ?? e);
+		console.log('potd', cat, lastError[cat]);
 		try {
 			return rowToPotd(await db.prepare('SELECT day, title, credit, gray FROM potd WHERE cat = ? ORDER BY day DESC LIMIT 1').bind(cat).first());
 		} catch {
