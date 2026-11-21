@@ -58,6 +58,11 @@ export async function GET({ request, locals }) {
 		const lq = await db.prepare('SELECT language FROM devices WHERE id = ?').bind(deviceId).first();
 		lang = lq?.language === 'ja' ? 'ja' : 'en';
 	} catch {} // language column comes from schema-language.sql
+	let wordLang = '';
+	try {
+		const wq = await db.prepare('SELECT word_lang FROM devices WHERE id = ?').bind(deviceId).first();
+		wordLang = wq?.word_lang === 'ja' || wq?.word_lang === 'en' ? wq.word_lang : '';
+	} catch {} // added the first time it's saved
 	let unit = 'c';
 	try {
 		const uq = await db.prepare('SELECT temp_unit FROM devices WHERE id = ?').bind(deviceId).first();
@@ -151,6 +156,7 @@ export async function GET({ request, locals }) {
 			style,
 			dark: dev.dark_mode === 1,
 			lang,
+			wordLang,
 			unit,
 			clock,
 			schedule,
@@ -321,6 +327,21 @@ export async function POST({ request, locals }) {
 			await db.prepare('UPDATE devices SET schedule = ? WHERE id = ? AND user_id = ?').bind(JSON.stringify(sanitizeSchedule(body.schedule, isStyleId)), deviceId, o.userId).run();
 		} catch {
 			return json({ error: 'Schedules are not enabled on the server yet (run schema-screens.sql).' }, 500);
+		}
+	}
+	if (body.wordLang !== undefined) {
+		// which language the Word of the day teaches: its column is added the first time it's saved
+		const v = body.wordLang === 'ja' || body.wordLang === 'en' ? body.wordLang : null;
+		const save = () => db.prepare('UPDATE devices SET word_lang = ? WHERE id = ? AND user_id = ?').bind(v, deviceId, o.userId).run();
+		try {
+			await save();
+		} catch {
+			try {
+				await db.prepare('ALTER TABLE devices ADD COLUMN word_lang TEXT').run();
+				await save();
+			} catch {
+				return json({ error: 'Could not save the Word of the day language.' }, 500);
+			}
 		}
 	}
 	if (body.frameDeco !== undefined) {

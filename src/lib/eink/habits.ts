@@ -69,7 +69,8 @@ export function streakText(h: Habit, today: number): string {
 }
 
 // Examples for previews: a long streak, a short one, and a patchy one.
-export function sampleHabits(nowLocal: number): Habit[] {
+export function sampleHabits(nowLocal: number, lang?: string): Habit[] {
+	const ja = lang === 'ja';
 	const today = Math.floor(nowLocal / 86400);
 	const days = (fn: (i: number) => boolean) => {
 		const out: string[] = [];
@@ -77,8 +78,8 @@ export function sampleHabits(nowLocal: number): Habit[] {
 		return out;
 	};
 	return [
-		{ name: 'Read 20 pages', done: days((i) => i < 23 || (i > 24 && i % 3 !== 0)) },
-		{ name: 'Gym', done: days((i) => i > 0 && i % 7 !== 3 && i % 7 !== 6 && i < 40) },
-		{ name: 'Drink water', done: days((i) => i < 5 || (i > 6 && i % 2 === 0)) },
+		{ name: ja ? '読書 20ページ' : 'Read 20 pages', done: days((i) => i < 23 || (i > 24 && i % 3 !== 0)) },
+		{ name: ja ? 'ジム' : 'Gym', done: days((i) => i > 0 && i % 7 !== 3 && i % 7 !== 6 && i < 40) },
+		{ name: ja ? '水を飲む' : 'Drink water', done: days((i) => i < 5 || (i > 6 && i % 2 === 0)) },
 	];
 }

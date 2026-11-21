@@ -530,6 +530,12 @@ export async function GET({ params, request, locals }) {
 		const lq = await db.prepare('SELECT language FROM devices WHERE id = ?').bind(deviceId).first();
 		lang = lq?.language === 'ja' ? 'ja' : 'en';
 	} catch {}
+	// Which language the Word of the day teaches (added the first time it's saved).
+	let wordLang: 'ja' | 'en' | undefined;
+	try {
+		const wq = await db.prepare('SELECT word_lang FROM devices WHERE id = ?').bind(deviceId).first();
+		wordLang = wq?.word_lang === 'ja' || wq?.word_lang === 'en' ? wq.word_lang : undefined;
+	} catch {}
 	// Celsius or Fahrenheit (schema-screens.sql).
 	let unit: 'c' | 'f' = 'c';
 	try {
@@ -649,6 +655,7 @@ export async function GET({ params, request, locals }) {
 			vbat,
 			dark,
 			lang,
+			wordLang,
 			unit,
 			clock,
 			cornerImage,

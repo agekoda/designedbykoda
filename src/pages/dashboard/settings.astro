@@ -213,6 +213,12 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 						<label><input type="radio" name="lang" value="ja" /><span>日本語</span></label>
 					</div>
 					<p class="muted small hint">Changes the screen's labels. Event names stay as they are.</p>
+					<div class="label sub" style="margin-top:1.6em">Word of the day</div>
+					<div class="seg" id="wordlang" role="radiogroup" aria-label="Word of the day language">
+						<label><input type="radio" name="wordlang" value="ja" /><span>Japanese words</span></label>
+						<label><input type="radio" name="wordlang" value="en" /><span>English words</span></label>
+					</div>
+					<p class="muted small hint">Which language the Word of the day teaches. Japanese words come with how to read them and their meaning in English; English words come with a short meaning, in Japanese if the screen is in Japanese.</p>
 					<div class="label sub" style="margin-top:1.6em">Temperature</div>
 					<div class="seg" id="unit" role="radiogroup" aria-label="Temperature unit">
 						<label><input type="radio" name="unit" value="c" /><span>°C Celsius</span></label>
@@ -430,6 +436,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const fontsEl = $('fonts');
 	const darkBox = $<HTMLInputElement>('dark');
 	const langEl = $('lang');
+	const wordLangEl = $('wordlang');
+	const effWordLang = (): 'ja' | 'en' => st.wordLang || (st.lang === 'ja' ? 'en' : 'ja');
 	const unitEl = $('unit');
 	const clockEl = $('clock');
 	const picBox = $('pic-box');
@@ -515,6 +523,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		font: string | null; // null = the layout's own font
 		dark: boolean;
 		lang: 'en' | 'ja';
+		wordLang: '' | 'en' | 'ja'; // '' = not chosen yet: the other language from the screen's
 		unit: 'c' | 'f';
 		clock: '12' | '24';
 		refreshSec: number;
@@ -553,6 +562,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		font: null,
 		dark: false,
 		lang: 'en',
+		wordLang: '',
 		unit: 'c',
 		clock: '24',
 		refreshSec: 86400,
@@ -608,6 +618,13 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	let liveMsgs: { author: string; body: string; atLocal: number }[] = [];
 	function sampleMsgs() {
 		const now = Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60;
+		if (st.lang === 'ja')
+			return [
+				{ author: 'お母さん', body: '今夜ゴミ出しお願い！', atLocal: now - 1500 },
+				{ author: 'お父さん', body: '今日の試験がんばってね', atLocal: now - 9000 },
+				{ author: '健', body: '6時に帰るね。夕飯は冷蔵庫にあるよ', atLocal: now - 30000 },
+				{ author: '由美', body: '牛乳とパン', atLocal: now - 90000 },
+			];
 		return [
 			{ author: 'Mum', body: 'Bins out tonight please!', atLocal: now - 1500 },
 			{ author: 'Dad', body: 'Good luck on your exam today', atLocal: now - 9000 },
@@ -618,7 +635,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	// Everything beyond the plain calendar a layout needs, for the big preview and for the layout cards.
 	function extras(styleId: string, thumb: boolean) {
 		const s = styles.find((x) => x.id === styleId);
-		const cd = st.countdown.title.trim() && st.countdown.date ? st.countdown : thumb ? { title: 'Japan trip', date: sampleDate() } : null;
+		// The cards in Choose a screen always show examples (so you can see what each one looks like);
+		// the big preview always shows yours.
+		const sampleCd = { title: st.lang === 'ja' ? 'ハワイ旅行' : 'Japan trip', date: sampleDate() };
+		const cd = thumb ? sampleCd : st.countdown.title.trim() && st.countdown.date ? st.countdown : null;
+		const nowL = Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60;
 		return {
 			cornerImage: s?.corner && st.cornerMode === 'image' ? pics.corner.bytes : null,
 			frameImage: s?.frame ? (pics.frame.bytes ?? (thumb || st.deco.when !== 'off' ? sampleFrameBytes() : null)) : null,
@@ -628,10 +649,10 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			countdown: styleId === 'countdown' ? cd : null,
 			custom: styleId === 'custom' ? (thumb && !customLayout?.widgets?.length ? sanitizeLayout(TEMPLATES.find((x) => x.id === 'sky')!.build()) : customLayout) : isDesign(styleId) ? layoutOf(styleId) : null,
 			tasksState: (thumb || tasksGranted ? 'ok' : 'needs_permission') as 'ok' | 'needs_permission',
-			sign: st.sign,
-			reminders: st.reminders.some((r) => r.text.trim()) ? st.reminders : thumb ? sampleReminders(Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60) : [],
-			messages: liveMsgs.length ? liveMsgs : thumb ? sampleMsgs() : [],
-			habits: st.habits.some((h) => h.name.trim()) ? st.habits : thumb ? sampleHabits(Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60) : [],
+			sign: thumb ? null : st.sign,
+			reminders: thumb ? sampleReminders(nowL, st.lang) : st.reminders.filter((r) => r.text.trim()),
+			messages: thumb ? sampleMsgs() : liveMsgs,
+			habits: thumb ? sampleHabits(nowL, st.lang) : st.habits.filter((h) => h.name.trim()),
 		};
 	}
 
@@ -750,7 +771,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 
 	async function redraw() {
-		const common = { font: effFont(), dark: st.dark, lang: st.lang, unit: st.unit, clock: st.clock, hasWeather, vbat: vbat ?? 4.12, refreshSec: st.refreshSec };
+		const common = { font: effFont(), dark: st.dark, lang: st.lang, wordLang: effWordLang(), unit: st.unit, clock: st.clock, hasWeather, vbat: vbat ?? 4.12, refreshSec: st.refreshSec };
 		try {
 			const r = await renderPreview({ ...common, style: renderId(fs()), ...extras(fs(), false), refreshSec: fs() === 'timeline' || fs() === 'timetable' ? st.refreshSec : 86400 });
 			paintScreen($<HTMLCanvasElement>('cur-thumb'), r.px, { mode: 'screen', scale: 1 });
@@ -887,7 +908,15 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		});
 		langEl.addEventListener('change', (e) => {
 			st.lang = (e.target as HTMLInputElement).value === 'ja' ? 'ja' : 'en';
+			wordLangEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === effWordLang()));
 			syncSums();
+			thumbsDirty = true;
+			schedule();
+			changed();
+		});
+		wordLangEl.addEventListener('change', (e) => {
+			st.wordLang = (e.target as HTMLInputElement).value === 'en' ? 'en' : 'ja';
+			thumbsDirty = true;
 			schedule();
 			changed();
 		});
@@ -1027,7 +1056,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		const sid = isFrame() ? 'frame' : 'agenda';
 		const cv = picker.querySelector<HTMLCanvasElement>(`canvas[data-sid="${sid}"]`);
 		if (cv)
-			renderPreview({ style: sid, font: effFont(), dark: st.dark, lang: st.lang, unit: st.unit, clock: st.clock, hasWeather, vbat: vbat ?? 4.12, ...extras(sid, true) }).then((r) => paintScreen(cv, r.px, { mode: 'screen', scale: 1 }));
+			renderPreview({ style: sid, font: effFont(), dark: st.dark, lang: st.lang, wordLang: effWordLang(), unit: st.unit, clock: st.clock, hasWeather, vbat: vbat ?? 4.12, ...extras(sid, true) }).then((r) => paintScreen(cv, r.px, { mode: 'screen', scale: 1 }));
 		changed();
 	}
 
@@ -1053,6 +1082,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		fontsEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === effFont()));
 		darkBox.checked = st.dark;
 		langEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.lang));
+		wordLangEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === effWordLang()));
 		unitEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.unit));
 		clockEl.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === st.clock));
 		refreshBox.hidden = !usedStyles().some((x) => x === 'timeline' || x === 'timetable');
@@ -1824,7 +1854,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		}
 		saveBtn.disabled = true;
 		flash('Saving…');
-		const body: any = { deviceId, style: st.style, font: st.font, dark: st.dark, lang: st.lang, refreshSec: st.refreshSec, countdown: st.countdown };
+		const body: any = { deviceId, style: st.style, font: st.font, dark: st.dark, lang: st.lang, wordLang: st.wordLang, refreshSec: st.refreshSec, countdown: st.countdown };
 		const baseState = JSON.parse(base);
 		if (JSON.stringify(st.sch) !== JSON.stringify(baseState.sch)) body.schedule = st.sch;
 		if (JSON.stringify(st.sign) !== JSON.stringify(baseState.sign)) body.sign = st.sign;
@@ -2067,6 +2097,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				font: info.font,
 				dark: !!info.dark,
 				lang: info.lang === 'ja' ? 'ja' : 'en',
+				wordLang: info.wordLang === 'ja' || info.wordLang === 'en' ? info.wordLang : '',
 				unit: info.unit === 'f' ? 'f' : 'c',
 				clock: info.clock === '12' ? '12' : '24',
 				refreshSec: info.refreshSec || 86400,

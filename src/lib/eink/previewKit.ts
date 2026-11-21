@@ -97,13 +97,14 @@ export function sampleConnect(custom: CustomLayout | null | undefined, nowLocal:
 }
 
 // Example birthdays for the Birthdays widget's preview.
-export function sampleBirthdays(nowLocal: number) {
+export function sampleBirthdays(nowLocal: number, lang?: string) {
 	const day = Math.floor(nowLocal / 86400) * 86400;
+	const ja = lang === 'ja';
 	return [
-		{ name: 'Mum', dayLocal: day + 86400 },
-		{ name: 'Sam Kowalski', dayLocal: day + 5 * 86400 },
-		{ name: 'Grandpa', dayLocal: day + 12 * 86400 },
-		{ name: 'Priya', dayLocal: day + 26 * 86400 },
+		{ name: ja ? 'お母さん' : 'Mum', dayLocal: day + 86400 },
+		{ name: ja ? '佐藤 健' : 'Sam Kowalski', dayLocal: day + 5 * 86400 },
+		{ name: ja ? 'おじいちゃん' : 'Grandpa', dayLocal: day + 12 * 86400 },
+		{ name: ja ? '由美' : 'Priya', dayLocal: day + 26 * 86400 },
 	];
 }
 
@@ -174,6 +175,7 @@ export interface PreviewOptions {
 	font?: string | null;
 	dark: boolean;
 	lang?: 'en' | 'ja';
+	wordLang?: 'en' | 'ja';
 	unit?: 'c' | 'f';
 	clock?: '12' | '24';
 	hasWeather: boolean;
@@ -212,6 +214,7 @@ export function drawListFor(o: PreviewOptions): string {
 			vbat: o.vbat ?? null,
 			dark: o.dark,
 			lang: o.lang ?? 'en',
+			wordLang: o.wordLang,
 			unit: o.unit ?? 'c',
 			clock: o.clock ?? '24',
 			cornerImage: o.cornerImage ?? null,
@@ -223,7 +226,7 @@ export function drawListFor(o: PreviewOptions): string {
 			countdown: o.countdown ?? null,
 			frameImage: o.frameImage ?? null,
 			frameDeco: o.frameDeco ?? null,
-			birthdays: sampleBirthdays(nowLocal),
+			birthdays: sampleBirthdays(nowLocal, o.lang),
 			connect: o.connect ?? sampleConnect(builtinLayout(o.style, o.sign) ?? o.custom, nowLocal),
 			tasks: o.tasksState === 'needs_permission' ? null : sampleTasks(nowLocal),
 			tasksState: o.tasksState ?? 'ok',

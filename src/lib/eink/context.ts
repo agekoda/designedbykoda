@@ -59,6 +59,8 @@ export interface LayoutCtx {
 	tasksState?: 'ok' | 'needs_permission' | 'error';
 	// Which language the screen is written in (default English). See i18n.ts.
 	lang?: Lang;
+	// Which language the Word of the day teaches (Language and units). Unset: the other one.
+	wordLang?: 'ja' | 'en';
 	// Celsius (default) or Fahrenheit. See units.ts.
 	unit?: import('./units').TempUnit;
 	// 24-hour (default) or 12-hour times. See clock.ts.

@@ -86,11 +86,12 @@ export function repeatText(r: Reminder): string {
 export { isoOf as reminderIso };
 
 // Examples for previews when none are set yet: bins tomorrow, recycling in three days.
-export function sampleReminders(nowLocal: number): Reminder[] {
+export function sampleReminders(nowLocal: number, lang?: string): Reminder[] {
 	const wd = (n: number) => 1 << ((Math.floor(nowLocal / 86400) + 4 + n) % 7);
+	const ja = lang === 'ja';
 	return [
-		{ text: 'Bins out', kind: 'week', days: wd(1), every: 1, start: '', mday: 1 },
-		{ text: 'Recycling', kind: 'week', days: wd(3), every: 1, start: '', mday: 1 },
-		{ text: 'Water the plants', kind: 'week', days: wd(0) | wd(5), every: 1, start: '', mday: 1 },
+		{ text: ja ? 'ゴミ出し' : 'Bins out', kind: 'week', days: wd(1), every: 1, start: '', mday: 1 },
+		{ text: ja ? '資源ごみ' : 'Recycling', kind: 'week', days: wd(3), every: 1, start: '', mday: 1 },
+		{ text: ja ? '植物に水やり' : 'Water the plants', kind: 'week', days: wd(0) | wd(5), every: 1, start: '', mday: 1 },
 	];
 }
