@@ -1,11 +1,11 @@
 {
   "channels": {
     "stable": {
-      "version": "1.1.3",
+      "version": "1.1.4",
       "auto": true
     },
     "beta": {
-      "version": "1.1.3",
+      "version": "1.1.4",
       "auto": true
     }
   },
@@ -73,6 +73,14 @@
       "sig": "MEUCIQCj7UdA7Fz1k3My0aFjyWZJ9jsgJ4G2auufrbNs9IDqHQIgVVHJWzEnRbijM2g5lEpSKrPZeANkM54hhcTKNLQM+8A=",
       "date": "2026-11-21",
       "notes": "Further improve ghosting after the button pop-up"
+    },
+    {
+      "version": "1.1.4",
+      "size": 1500800,
+      "sha256": "2139056b91413e8567e6874285279f3c741f10b4714f2e6d2fb3247c12a62632",
+      "sig": "MEUCIGKkioD0uZ1C6SxjkS/bBC5gqLA+aU2n74/IvOJ7mww4AiEAqiQsS9xcWE0kESmUqoFABtXLf/8sXDizzjZA6mJ68g4=",
+      "date": "2026-11-21",
+      "notes": "Full refresh after pressing the button"
     }
   ]
 }
