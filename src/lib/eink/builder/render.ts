@@ -8,7 +8,7 @@ import { Draw, PAPER, INK, type Align, type Color } from '../draw';
 import { fontId, type Family, type Role } from '../fonts';
 import { advanceOf, measure, wrapText } from '../measure';
 import { VMETRICS } from '../vmetrics';
-import { CORNER, fitBits } from '../image';
+import { CORNER, fitBits, ditherGray, packBits, DEFAULT_IMAGE_SETTINGS } from '../image';
 import { batteryIcon } from '../batteryIcon';
 import { moonBits } from '../moonImage';
 import { weatherBits, wxKind, wxLabel } from '../weatherIcon';
@@ -672,6 +672,46 @@ function pictureWidget(env: Env, w: Widget) {
 	let bytes = fitBits(img, sw, sh, w.w, w.h);
 	if (env.ctx.dark) bytes = bytes.map((b) => ~b & 0xff);
 	env.d.bitmapBytes(w.x, w.y, w.w, w.h, bytes);
+}
+
+// Picture of the day (src/lib/potd.ts): today's picture for the chosen category, cropped to fill
+// the box and turned into dots at exactly the box's size, with its title along the bottom.
+function potdWidget(env: Env, w: Widget, o: Opts) {
+	const { d, ctx } = env;
+	const cat = o.cat === 'photo' || o.cat === 'space' ? o.cat : 'art';
+	const p = ctx.potd?.[cat];
+	if (!p || p.gray.length !== 400 * 300) return note(env, w, 'Today\'s picture is on its way');
+	const sv = vm(env, FACES.s);
+	const cap = o.caption === true && w.h >= 90;
+	const capH = cap ? (p.credit ? 2 : 1) * sv.lh + 10 : 0;
+	const pw = Math.max(1, Math.round(w.w));
+	const ph = Math.max(1, Math.round(w.h - capH));
+	// cover-crop the 400 x 300 picture to pw x ph, averaging when shrinking
+	const scale = Math.max(pw / 400, ph / 300);
+	const ox = (400 - pw / scale) / 2;
+	const oy = (300 - ph / scale) / 2;
+	const span = Math.max(1, Math.floor(1 / scale));
+	const g = new Float32Array(pw * ph);
+	for (let y = 0; y < ph; y++) {
+		const sy = Math.min(299, Math.floor(oy + y / scale));
+		for (let x = 0; x < pw; x++) {
+			const sx = Math.min(399, Math.floor(ox + x / scale));
+			let sum = 0;
+			let n = 0;
+			for (let yy = sy; yy < Math.min(300, sy + span); yy++) for (let xx = sx; xx < Math.min(400, sx + span); xx++) (sum += p.gray[yy * 400 + xx]), n++;
+			g[y * pw + x] = sum / n;
+		}
+	}
+	let bytes = packBits(ditherGray(g, pw, ph, { ...DEFAULT_IMAGE_SETTINGS, dither: 'floyd' }), pw, ph);
+	// the picture stays a picture in dark mode (not a negative)
+	if (ctx.dark) bytes = bytes.map((b) => ~b & 0xff);
+	d.bitmapBytes(w.x, w.y, pw, ph, bytes);
+	if (cap) {
+		let y = w.y + ph + 5;
+		d.text(w.x + 8, y + sv.asc, 'sb', p.title, { maxW: w.w - 16, raw: true });
+		y += sv.lh;
+		if (p.credit) d.text(w.x + 8, y + sv.asc, 's', p.credit, { maxW: w.w - 16, raw: true });
+	}
 }
 
 function batteryWidget(env: Env, w: Widget, o: Opts) {
@@ -1359,6 +1399,8 @@ function drawWidget(env: Env, w: Widget) {
 			return batteryWidget(env, w, o);
 		case 'picture':
 			return pictureWidget(env, w);
+		case 'potd':
+			return potdWidget(env, w, o);
 		case 'box':
 			return boxWidget(env, w, o);
 		case 'line':
