@@ -98,7 +98,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 
 <script>
 	import { WIDGETS, GROUPS, TEMPLATES, makeWidget, clampWidget, sanitizeLayout, withDefaults, newId, SCREEN, MAX_WIDGETS, layoutNeeds, type CustomLayout, type Widget, type OptDef } from '../../lib/eink/builder/model';
-	import { loadFonts, drawListFor, paint, loadJp, loadMoon, type PreviewOptions } from '../../lib/eink/previewKit';
+	import { loadFonts, drawListFor, paint, loadJp, loadMoon, loadPotds, potdCatsFor, type PreviewOptions } from '../../lib/eink/previewKit';
 	import { sampleReminders } from '../../lib/eink/reminders';
 	import { sampleHabits } from '../../lib/eink/habits';
 	import { renderDrawList } from '../../lib/eink/preview';
@@ -263,12 +263,16 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	}
 	let picHook: (() => void) | null = null;
 	let raf = 0;
+	let potdDrawn = '';
 	function redraw() {
 		if (raf) return;
 		raf = requestAnimationFrame(() => {
 			raf = 0;
 			if (!fonts) return;
 			picHook?.();
+			// a Picture of the day widget: fetch today's real picture, then draw again
+			const cats = potdCatsFor({ style: 'custom', custom: layout } as any);
+			if (cats.length) loadPotds(cats).then(() => potdDrawn !== cats.join() && ((potdDrawn = cats.join()), redraw()));
 			const dl = drawListFor(previewOpts(layout));
 			const r = renderDrawList(dl, fonts);
 			paint(canvas, r.px, 2);

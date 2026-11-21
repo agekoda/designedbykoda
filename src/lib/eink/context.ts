@@ -52,6 +52,7 @@ export interface LayoutCtx {
 	frameImage?: Uint8Array | null;
 	frameDeco?: import('./festive').FrameDeco | null; // a festive border round the photo
 	birthdays?: import('../birthdays').Birthday[]; // for the Birthdays widget
+	potd?: Record<string, { title: string; credit: string; gray: Uint8Array }> | null; // Picture of the day, by category (src/lib/potd.ts)
 	connect?: import('../connect').Connected | null; // YouTube, feeds, GitHub, prices, tides, UV (src/lib/connect.ts)
 	deskStatus?: { text: string; untilLocal: number | null } | null; // set from a phone: shows in place of free or busy
 	// The To-do layout: tasks from Google Tasks, and whether we were allowed to read them.

@@ -176,6 +176,7 @@ export interface PreviewOptions {
 	dark: boolean;
 	lang?: 'en' | 'ja';
 	wordLang?: 'en' | 'ja';
+	potd?: Record<string, { title: string; credit: string; gray: Uint8Array }> | null;
 	unit?: 'c' | 'f';
 	clock?: '12' | '24';
 	hasWeather: boolean;
@@ -227,6 +228,10 @@ export function drawListFor(o: PreviewOptions): string {
 			frameImage: o.frameImage ?? null,
 			frameDeco: o.frameDeco ?? null,
 			birthdays: sampleBirthdays(nowLocal, o.lang),
+			potd: o.potd ?? (() => {
+				const cats = potdCatsFor(o);
+				return cats.length ? Object.fromEntries(cats.map((c) => [c, potdCache[c] ?? potdSample()])) : null;
+			})(),
 			connect: o.connect ?? sampleConnect(builtinLayout(o.style, o.sign) ?? o.custom, nowLocal),
 			tasks: o.tasksState === 'needs_permission' ? null : sampleTasks(nowLocal),
 			tasksState: o.tasksState ?? 'ok',
@@ -256,7 +261,57 @@ export function needsFor(o: PreviewOptions): { jp: boolean; moon: boolean } {
 }
 export async function loadAssetsFor(o: PreviewOptions) {
 	const n = needsFor(o);
-	await Promise.all([n.jp ? loadJp() : null, n.moon ? loadMoon() : null]);
+	await Promise.all([n.jp ? loadJp() : null, n.moon ? loadMoon() : null, loadPotds(potdCatsFor(o))]);
+}
+
+// ---- Picture of the day: today's real pictures from /api/dashboard/potd, kept for the session ----
+type PotdPic = { title: string; credit: string; gray: Uint8Array };
+const potdCache: Record<string, PotdPic> = {};
+const potdLoading: Record<string, Promise<void>> = {};
+export function potdCatsFor(o: Pick<PreviewOptions, 'style' | 'sign' | 'custom'>): string[] {
+	const lay = builtinLayout(o.style, o.sign) ?? o.custom;
+	const cats = (lay?.widgets ?? []).filter((w) => w.t === 'potd').map((w) => (w.o?.cat === 'photo' || w.o?.cat === 'space' ? String(w.o.cat) : 'art'));
+	return [...new Set(cats)];
+}
+export function loadPotds(cats: string[]): Promise<void> {
+	if (typeof window === 'undefined' || typeof fetch === 'undefined') return Promise.resolve();
+	return Promise.all(
+		cats
+			.filter((c) => !potdCache[c])
+			.map(
+				(c) =>
+					(potdLoading[c] ??= fetch('/api/dashboard/potd?cat=' + encodeURIComponent(c))
+						.then((r) => r.json())
+						.then((j) => {
+							if (!j?.ok || typeof j.gray !== 'string') return;
+							const bin = atob(j.gray);
+							const gray = new Uint8Array(bin.length);
+							for (let i = 0; i < bin.length; i++) gray[i] = bin.charCodeAt(i);
+							if (gray.length === 400 * 300) potdCache[c] = { title: String(j.title ?? ''), credit: String(j.credit ?? ''), gray };
+						})
+						.catch(() => {})),
+			),
+	).then(() => {});
+}
+// Until the real one arrives (or with no server, in tests): a made-up landscape, sun over hills.
+let potdSampleGray: Uint8Array | null = null;
+function potdSample(): PotdPic {
+	if (!potdSampleGray) {
+		const g = new Uint8Array(400 * 300);
+		for (let y = 0; y < 300; y++)
+			for (let x = 0; x < 400; x++) {
+				const hill1 = 190 + 30 * Math.sin(x / 55) + 12 * Math.sin(x / 17);
+				const hill2 = 235 + 18 * Math.sin(x / 40 + 2);
+				const sun = Math.hypot(x - 290, y - 95) < 38;
+				let v = 235 - y * 0.35; // the sky, darker towards the top
+				if (sun) v = 250;
+				if (y > hill1) v = 120 - (y - hill1) * 0.3;
+				if (y > hill2) v = 60;
+				g[y * 400 + x] = Math.max(0, Math.min(255, v));
+			}
+		potdSampleGray = g;
+	}
+	return { title: 'Picture of the day', credit: 'A new one every day', gray: potdSampleGray };
 }
 export { loadJp, loadMoon };
 

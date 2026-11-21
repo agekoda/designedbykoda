@@ -21,6 +21,7 @@ export const prerender = false;
 import { NO_GOOGLE } from '../../../../lib/googleCals';
 import { sanitizeDeco, type FrameDeco } from '../../../../lib/eink/festive';
 import { getStatus, activeStatus } from '../../../../lib/deskStatus';
+import { getPotd, potdCat } from '../../../../lib/potd';
 import { fetchBirthdays, mergeBirthdays, type Birthday } from '../../../../lib/birthdays';
 import { connectFor, type Connected } from '../../../../lib/connect';
 
@@ -515,6 +516,16 @@ export async function GET({ params, request, locals }) {
 	// (a ready-made YouTube, GitHub, Headlines, Money & crypto or Beach screen fetches the same way)
 	const built = builtinLayout(style, sign);
 	if (proto === '2' && (built || (needs.connect && customLayout))) connect = await connectFor((built ?? customLayout)!.widgets, place, env);
+	// Picture of the day: today's picture for each category the screen shows (src/lib/potd.ts)
+	let potd: Record<string, { title: string; credit: string; gray: Uint8Array }> | null = null;
+	const potdCats = [...new Set(((built ?? customLayout)?.widgets ?? []).filter((w) => w.t === 'potd').map((w) => potdCat(w.o?.cat)))];
+	if (proto === '2' && potdCats.length) {
+		potd = {};
+		for (const c of potdCats) {
+			const p = await getPotd(db, c);
+			if (p) potd[c] = p;
+		}
+	}
 
 	// Dark mode (white on black), from schema-darkmode.sql. Its own query so a
 	// missing column never affects anything else.
@@ -676,6 +687,7 @@ export async function GET({ params, request, locals }) {
 			habits,
 			birthdays,
 			connect,
+			potd,
 		}, fontChoice ?? undefined);
 		// How long to sleep: the layout's own answer, but wake sooner for a scheduled screen change,
 		// and (for a "Free or busy" widget) when a meeting starts or ends.

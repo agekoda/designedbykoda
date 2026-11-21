@@ -568,6 +568,18 @@ export const WIDGETS: Record<string, WidgetDef> = {
 			{ key: 'invert', label: 'White (for use on black)', kind: 'toggle', def: false },
 		],
 	},
+	potd: {
+		label: 'Picture of the day',
+		group: 'Extras',
+		blurb: 'A new picture every day, the same for everyone: art, photography or space',
+		w: 200,
+		h: 150,
+		min: { w: 60, h: 45 },
+		opts: [
+			{ key: 'cat', label: 'Pictures of', kind: 'choice', choices: [['art', 'Art'], ['photo', 'Photography'], ['space', 'Space']], def: 'art' },
+			{ key: 'caption', label: 'Title', kind: 'toggle', def: false },
+		],
+	},
 	picture: {
 		label: 'Picture',
 		group: 'Extras',
@@ -711,6 +723,7 @@ export function layoutNeeds(layout: CustomLayout | null | undefined) {
 		birthdays: types.has('birthdays'),
 		jpword: types.has('jpword'),
 		connect: ['youtube', 'rss', 'github', 'markets', 'tides', 'uvair'].some((t) => types.has(t)),
+		potd: types.has('potd'),
 	};
 }
 
@@ -868,10 +881,10 @@ export function templateById(id: string): Template {
 // ---- signs: Meeting room, Guest welcome and Desk name plate ----
 // These are ready-made layouts (pick one, fill in a few boxes on Customize display) and also
 // builder templates. Both are built here from the same few words, so they always match.
-export type SignStyle = 'room' | 'guest' | 'nameplate' | 'waiting' | 'youtube' | 'github' | 'headlines' | 'markets';
-export const SIGN_STYLES: SignStyle[] = ['room', 'guest', 'nameplate', 'waiting', 'youtube', 'github', 'headlines', 'markets'];
+export type SignStyle = 'room' | 'guest' | 'nameplate' | 'waiting' | 'youtube' | 'github' | 'headlines' | 'markets' | 'potd';
+export const SIGN_STYLES: SignStyle[] = ['room', 'guest', 'nameplate', 'waiting', 'youtube', 'github', 'headlines', 'markets', 'potd'];
 // ready-made screens built from the connection widgets (they pick their data, like a sign's words)
-export const CONNECT_SIGNS = ['youtube', 'github', 'headlines', 'markets'];
+export const CONNECT_SIGNS = ['youtube', 'github', 'headlines', 'markets', 'potd'];
 // signs that redraw when an appointment or meeting starts or ends
 export const LIVE_SIGNS = ['room', 'nameplate', 'waiting'];
 export const isSignStyle = (s: unknown): s is SignStyle => SIGN_STYLES.includes(s as SignStyle);
@@ -885,6 +898,7 @@ export interface SignCfg {
 	github: { user: string };
 	headlines: { url: string };
 	markets: { list: string; base: string };
+	potd: { cat: string };
 }
 export const SIGN_DEFAULTS: SignCfg = {
 	room: { name: 'Boardroom', cals: [] },
@@ -902,6 +916,7 @@ export const SIGN_DEFAULTS: SignCfg = {
 	github: { user: '' },
 	headlines: { url: 'https://www.abc.net.au/news/feed/51120/rss.xml' },
 	markets: { list: 'USD, EUR, GBP, BTC, ETH, SOL', base: 'AUD' },
+	potd: { cat: 'art' },
 };
 // The same examples in Japanese. A sign still on the example wording shows these when the screen
 // is in Japanese; anything the person typed stays exactly as they typed it.
@@ -930,7 +945,7 @@ export function localSign(cfg: SignCfg, lang: string | undefined): SignCfg {
 const SIGN_LIMITS: Record<string, { max: number; raw?: boolean; multiline?: boolean }> = {
 	name: { max: 40 }, title: { max: 40 }, role: { max: 40 }, checkout: { max: 30 }, contact: { max: 60 }, note: { max: 60 },
 	ssid: { max: 32, raw: true }, pass: { max: 63, raw: true }, rules: { max: 300, multiline: true },
-	channel: { max: 120, raw: true }, user: { max: 80, raw: true }, url: { max: 400, raw: true }, list: { max: 60 }, base: { max: 3 },
+	channel: { max: 120, raw: true }, user: { max: 80, raw: true }, url: { max: 400, raw: true }, list: { max: 60 }, base: { max: 3 }, cat: { max: 8, raw: true },
 };
 
 // The calendars a Meeting room or Waiting room reads, instead of the ones picked in Calendars and
@@ -1003,6 +1018,10 @@ export function signLayout(sign: SignStyle, cfg: SignCfg): CustomLayout {
 	if (sign === 'headlines') {
 		// a front page: the feed's name as the masthead, the top story big, then as many more as fit in two columns
 		return { v: 1, widgets: [W('rss', 12, 8, 376, 286, { url: cfg.headlines.url, count: '5', title: true, look: 'paper' })] };
+	}
+	if (sign === 'potd') {
+		// the picture fills the screen, with its title along the bottom
+		return { v: 1, widgets: [W('potd', 0, 0, 400, 300, { cat: cfg.potd.cat, caption: true })] };
 	}
 	if (sign === 'markets') {
 		return {

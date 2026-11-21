@@ -426,7 +426,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	const layoutOf = (id: string) => (id === 'custom' ? customLayout : designOf(id)?.layout ?? null);
 	const renderId = (id: string) => (isDesign(id) ? 'custom' : id);
 	// which group each ready-made screen sits in, for the picker's filters
-	const GROUP: Record<string, string> = { agenda: 'cal', month: 'cal', week: 'cal', bigdate: 'cal', timeline: 'cal', tomorrow: 'cal', timetable: 'cal', nextup: 'cal', planner: 'cal', room: 'sign', guest: 'sign', nameplate: 'sign', waiting: 'sign', messages: 'glance', notes: 'glance', habits: 'glance', reminders: 'glance', moon: 'glance', forecast: 'glance', coast: 'glance', word: 'glance', birthdays: 'glance', youtube: 'glance', github: 'glance', headlines: 'glance', markets: 'glance', quote: 'glance', countdown: 'glance', todo: 'glance', frame: 'glance', custom: 'mine' };
+	const GROUP: Record<string, string> = { agenda: 'cal', month: 'cal', week: 'cal', bigdate: 'cal', timeline: 'cal', tomorrow: 'cal', timetable: 'cal', nextup: 'cal', planner: 'cal', room: 'sign', guest: 'sign', nameplate: 'sign', waiting: 'sign', messages: 'glance', notes: 'glance', habits: 'glance', reminders: 'glance', moon: 'glance', forecast: 'glance', potd: 'glance', coast: 'glance', word: 'glance', birthdays: 'glance', youtube: 'glance', github: 'glance', headlines: 'glance', markets: 'glance', quote: 'glance', countdown: 'glance', todo: 'glance', frame: 'glance', custom: 'mine' };
 	const families: { id: string; label: string }[] = JSON.parse(root.dataset.families!);
 	const dithers: { id: string; label: string; note: string }[] = JSON.parse(root.dataset.dithers!);
 	const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -1313,7 +1313,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	});
 
 	// ---------------------------------------------------------------- signs (Meeting room, Guest welcome, Desk name plate)
-	const SIGN_FIELDS: Record<string, { key: string; label: string; max: number; rows?: number; ph?: string }[]> = {
+	const SIGN_FIELDS: Record<string, { key: string; label: string; max: number; rows?: number; ph?: string; choices?: [string, string][] }[]> = {
 		room: [{ key: 'name', label: 'Room name', max: 40 }],
 		guest: [
 			{ key: 'title', label: 'Welcome message', max: 40 },
@@ -1334,6 +1334,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		youtube: [{ key: 'channel', label: 'YouTube channel', max: 120, ph: '@yourchannel, or a link to it' }],
 		github: [{ key: 'user', label: 'GitHub username', max: 80 }],
 		headlines: [{ key: 'url', label: 'News site or feed link', max: 400, ph: 'abc.net.au/news, or any RSS feed' }],
+		potd: [{ key: 'cat', label: 'Pictures of', max: 8, choices: [['art', 'Art (paintings from the Art Institute of Chicago)'], ['photo', 'Photography (Wikimedia Commons)'], ['space', 'Space (NASA)']] }],
 		markets: [
 			{ key: 'list', label: 'Show', max: 60, ph: 'USD, EUR, BTC, ETH' },
 			{ key: 'base', label: 'Prices in', max: 3, ph: 'AUD' },
@@ -1350,7 +1351,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				.map((f) => {
 					const v = (vals[f.key] ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 					const ph = f.ph ? ` placeholder="${f.ph}"` : '';
-					const inp = f.rows ? `<textarea class="txt" data-k="${f.key}" rows="${f.rows}" maxlength="${f.max}"${ph}>${v}</textarea>` : `<input class="txt" data-k="${f.key}" type="text" maxlength="${f.max}" value="${v}"${ph} autocomplete="off" spellcheck="${f.key === 'ssid' || f.key === 'pass' ? 'false' : 'true'}" />`;
+					const inp = f.choices
+						? `<select class="txt" data-k="${f.key}">${f.choices.map(([cv, cl]) => `<option value="${cv}"${cv === (vals[f.key] || f.choices![0][0]) ? ' selected' : ''}>${cl}</option>`).join('')}</select>`
+						: f.rows ? `<textarea class="txt" data-k="${f.key}" rows="${f.rows}" maxlength="${f.max}"${ph}>${v}</textarea>` : `<input class="txt" data-k="${f.key}" type="text" maxlength="${f.max}" value="${v}"${ph} autocomplete="off" spellcheck="${f.key === 'ssid' || f.key === 'pass' ? 'false' : 'true'}" />`;
 					return `<label class="sign-f"><span class="label sub">${f.label}</span>${inp}</label>`;
 				})
 				.join('');
