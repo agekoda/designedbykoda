@@ -16,6 +16,7 @@ export const CHANGELOG: Month[] = [
 	{
 		month: 'November 2026',
 		changes: [
+			{ kind: 'screens', title: 'Word of the day and Birthdays', text: 'Two new ready-made screens. Word of the day shows a new Japanese word each day with how to read it and what it means, plus how far through the year you are, and if your calendar is set to Japanese it teaches you an English word instead. Birthdays shows the next birthday big, the ones after it, the month and the weather.' },
 			{ kind: 'screens', title: 'Headlines like a newspaper', text: 'The Headlines screen now looks like a front page, with the news site’s name as the masthead, the top story in big type and the next ones in two columns. The headlines widget in the layout builder has the same Newspaper look as an option.' },
 			{ kind: 'screens', title: 'Five new ready-made screens', text: 'YouTube, GitHub, Headlines, Money & crypto and Beach are now in Choose a screen under At a glance, so you can show your subscriber count, your contributions, the news, prices or the tides and surf without building anything. Just pick one and fill in your channel, username, feed or currencies.' },
 			{ kind: 'screens', title: 'Connections', text: 'New widgets for the layout builder: your YouTube subscriber count, your GitHub contributions graph, headlines from any news site or blog, and exchange rates and crypto prices in your own currency.' },

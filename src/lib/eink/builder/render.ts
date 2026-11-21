@@ -15,7 +15,7 @@ import { weatherBits, wxKind, wxLabel } from '../weatherIcon';
 import { moonInfo, sunTimes } from '../astro';
 import { quoteFor } from '../../../data/quotes';
 import {
-	dateShort, dayAbbr, dayIdx, dayLetter, dayLong, dayShort, daysInMonth, dayMonth, evTimeStr, monthLong, monthName, monthShort, monthYear, round0, tmOf, weekLetters, type CalEvent, type LayoutCtx,
+	dateShort, dayAbbr, dayIdx, dayLetter, dayLong, dayShort, daysInMonth, dayMonth, evTimeStr, monthLong, monthName, monthShort, monthYear, round0, tmOf, tmFromDayIdx, weekLetters, type CalEvent, type LayoutCtx,
 } from '../context';
 import { isJa, tr } from '../i18n';
 import { DAY_NAMES } from '../context';
@@ -27,6 +27,7 @@ import { reminderList } from '../layouts/reminders';
 import { habitGrid } from '../layouts/habits';
 import { birthdayList } from '../layouts/birthdays';
 import { wordOfDay } from '../jpWords';
+import { englishWordOfDay } from '../enWords';
 import { feedUrl, githubUser, marketBase, marketList, youtubeRef, type GitHubDays } from '../../connect';
 import { personName, type NameStyle } from '../waiting';
 
@@ -79,7 +80,9 @@ function fitText(env: Env, text: string, w: number, h: number, sizes: string[], 
 		const face = withBold(FACES[key], bold);
 		const lines = wrapText(env.fam, face.role, text, w, face.scale);
 		last = { face, lines };
-		if (lines.length && lines.every((l) => measure(env.fam, face.role, l, face.scale).w <= w) && blockH(env, face, lines.length) <= h) return last;
+		// (the right edge, not just the ink width: a big letter's left bearing counts too, and the
+		// calendar cuts text whose right edge passes the box)
+		if (lines.length && lines.every((l) => Math.max(0, measure(env.fam, face.role, l, face.scale).right) <= w) && blockH(env, face, lines.length) <= h) return last;
 	}
 	// nothing fit: use the smallest size and keep only the lines that fit the height
 	const face = last!.face;
@@ -88,13 +91,13 @@ function fitText(env: Env, text: string, w: number, h: number, sizes: string[], 
 	return { face, lines: last!.lines.slice(0, max) };
 }
 
-function drawLines(env: Env, box: Box, lines: string[], face: Face, align: unknown, valign: unknown, color: Color) {
+function drawLines(env: Env, box: Box, lines: string[], face: Face, align: unknown, valign: unknown, color: Color, raw = false) {
 	const v = vm(env, face);
 	const bh = blockH(env, face, lines.length);
 	const top = valign === 'top' ? box.y : valign === 'bottom' ? box.y + box.h - bh : box.y + (box.h - bh) / 2;
 	const a: Align = align === 'center' ? 'center' : align === 'right' ? 'right' : 'left';
 	const x = a === 'center' ? box.x + box.w / 2 : a === 'right' ? box.x + box.w : box.x;
-	lines.forEach((ln, i) => env.d.text(x, top + v.asc + i * v.lh, face.role, ln, { align: a, scale: face.scale, color, maxW: box.w }));
+	lines.forEach((ln, i) => env.d.text(x, top + v.asc + i * v.lh, face.role, ln, { align: a, scale: face.scale, color, maxW: box.w, raw }));
 }
 
 // Draws the box's own black fill / outline (if chosen) and returns the area left for content.
@@ -1155,8 +1158,11 @@ function uvAirWidget(env: Env, w: Widget, o: Opts) {
 }
 
 // Japanese word of the day: the word big, its reading in kana under it, then romaji and the meaning.
+// Word of the day: a Japanese word, or, when the screen is in Japanese, an English one (the
+// language you're learning is the other one), with its meaning in the screen's language.
 function jpWordWidget(env: Env, w: Widget, o: Opts) {
 	const { d, ctx } = env;
+	if (isJa()) return enWordWidget(env, w, o);
 	const [word, kana, romaji, meaning] = wordOfDay(dayIdx(ctx.nowLocal));
 	const a: Align = o.align === 'center' ? 'center' : o.align === 'right' ? 'right' : 'left';
 	const x = a === 'center' ? w.x + w.w / 2 : a === 'right' ? w.x + w.w : w.x;
@@ -1179,6 +1185,62 @@ function jpWordWidget(env: Env, w: Widget, o: Opts) {
 	let y = bigBox.y + bigBox.h + sv.asc - sv.desc + 4;
 	for (const ln of under) {
 		// the meaning stays English: it's what the word means, not a label to translate
+		d.text(x, y, ln.role, ln.text, { align: a, maxW: w.w, raw: true });
+		y += sv.lh;
+	}
+}
+
+// Birthdays with the next one big: "in 5 days" over the name, filling the space, then the rest
+// as the usual list underneath.
+function birthdaysBig(env: Env, w: Widget, o: Opts) {
+	const { d, ctx } = env;
+	const today = dayIdx(ctx.nowLocal);
+	const days = Number(o.days) || 31;
+	const list = (ctx.birthdays ?? []).filter((b) => dayIdx(b.dayLocal) >= today && dayIdx(b.dayLocal) < today + days);
+	if (!list.length) return birthdayList(d, ctx, w, { count: 1, days, label: o.label !== false });
+	const sv = vm(env, FACES.s);
+	const mv = vm(env, FACES.m);
+	const first = list[0];
+	const gap = dayIdx(first.dayLocal) - today;
+	const when = gap === 0 ? 'Today' : gap === 1 ? 'Tomorrow' : `in ${gap} days`;
+	const rest = list.slice(1, Math.max(1, Number(o.count) || 4));
+	const restH = rest.length ? Math.min(rest.length, 3) * (sv.lh + 6) + 12 : 0;
+	let y = w.y;
+	d.text(w.x, y + mv.asc, 'mb', when, { maxW: w.w });
+	y += mv.lh;
+	d.text(w.x, y + sv.asc, 's', dateShort(tmFromDayIdx(dayIdx(first.dayLocal))), { maxW: w.w });
+	y += sv.lh + 2;
+	const nameBox: Box = { x: w.x, y, w: w.w, h: Math.max(20, w.y + w.h - y - restH) };
+	const fit = fitText(env, first.name, nameBox.w, nameBox.h, ['xl', 'l', 'm', 's'], true);
+	drawLines(env, nameBox, fit.lines.slice(0, 2), fit.face, 'left', 'middle', INK, true);
+	if (rest.length) {
+		const ry = nameBox.y + nameBox.h + 4;
+		d.dots(w.x, ry, w.w, 3);
+		birthdayList(d, { ...ctx, birthdays: rest }, { x: w.x, y: ry + 8, w: w.w, h: w.y + w.h - ry - 8 }, { count: 3, days, label: false });
+	}
+}
+
+function enWordWidget(env: Env, w: Widget, o: Opts) {
+	const { d, ctx } = env;
+	const [word, meaning, example] = englishWordOfDay(dayIdx(ctx.nowLocal));
+	const a: Align = o.align === 'center' ? 'center' : o.align === 'right' ? 'right' : 'left';
+	const x = a === 'center' ? w.x + w.w / 2 : a === 'right' ? w.x + w.w : w.x;
+	const sv = vm(env, FACES.s);
+	let top = w.y;
+	if (o.label !== false) {
+		d.text(x, top + sv.asc, 'sb', 'Word of the day', { align: a, maxW: w.w });
+		top += sv.lh + 4;
+	}
+	const under: { text: string; role: 's' | 'sb' }[] = [];
+	if (o.meaning !== false) under.push({ text: meaning, role: 'sb' });
+	// the example sentence takes the romaji's place (same switch)
+	if (o.romaji !== false) under.push({ text: example, role: 's' });
+	const underH = under.length * sv.lh;
+	const bigBox: Box = { x: w.x, y: top, w: w.w, h: Math.max(16, w.y + w.h - top - underH - 2) };
+	const fit = fitText(env, word, bigBox.w, bigBox.h, ['xl', 'l', 'm', 's'], false);
+	drawLines(env, bigBox, fit.lines.slice(0, 1), fit.face, a, 'middle', INK, true);
+	let y = bigBox.y + bigBox.h + sv.asc - sv.desc + 4;
+	for (const ln of under) {
 		d.text(x, y, ln.role, ln.text, { align: a, maxW: w.w, raw: true });
 		y += sv.lh;
 	}
@@ -1303,6 +1365,7 @@ function drawWidget(env: Env, w: Widget) {
 		case 'jpword':
 			return jpWordWidget(env, w, o);
 		case 'birthdays':
+			if (o.look === 'big') return birthdaysBig(env, w, o);
 			return birthdayList(env.d, env.ctx, w, { count: Number(o.count) || 4, days: Number(o.days) || 31, label: o.label !== false });
 		case 'habits':
 			return habitGrid(env.d, env.ctx, w, { days: Number(o.days) || 0, streak: o.streak !== false, letters: o.letters === true });

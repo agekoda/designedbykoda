@@ -33,7 +33,7 @@ import { away } from './away';
 import { renderCustom } from '../builder/render';
 import { forecast } from './forecast';
 import { coast } from './coast';
-import { sanitizeLayout, sanitizeSign, signLayout, type SignStyle } from '../builder/model';
+import { sanitizeLayout, sanitizeSign, signLayout, type SignStyle, WORD_LAYOUT, BIRTHDAYS_LAYOUT } from '../builder/model';
 
 // Meeting room, Guest welcome and Desk name plate: a builder design filled in from a few words.
 const sign = (s: SignStyle) => (ctx: LayoutCtx) => renderCustom({ ...ctx, custom: sanitizeLayout(signLayout(s, sanitizeSign(ctx.sign))) });
@@ -63,6 +63,8 @@ export const LAYOUTS: Record<string, LayoutEntry> = {
 	waiting: { render: sign('waiting'), font: 'sans' },
 	forecast: { render: forecast, font: 'sans' },
 	coast: { render: coast, font: 'sans' },
+	word: { render: (ctx: LayoutCtx) => renderCustom({ ...ctx, custom: WORD_LAYOUT }), font: 'sans' },
+	birthdays: { render: (ctx: LayoutCtx) => renderCustom({ ...ctx, custom: BIRTHDAYS_LAYOUT }), font: 'sans' },
 	youtube: { render: sign('youtube'), font: 'sans' },
 	github: { render: sign('github'), font: 'sans' },
 	headlines: { render: sign('headlines'), font: 'lora' },

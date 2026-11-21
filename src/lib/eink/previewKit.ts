@@ -247,7 +247,7 @@ export function needsFor(o: PreviewOptions): { jp: boolean; moon: boolean } {
 		text = JSON.stringify({ c: o.custom, e: o.events, m: (o as any).messages, r: o.reminders, h: o.habits, s: o.sign, cd: o.countdown }, (_k, v) => (v instanceof Uint8Array ? undefined : v));
 	} catch {}
 	return {
-		jp: o.lang === 'ja' || types.has('jpword') || CJK.test(text),
+		jp: o.lang === 'ja' || o.style === 'word' || types.has('jpword') || CJK.test(text),
 		moon: o.style === 'moon' || types.has('moon'),
 	};
 }
