@@ -5,7 +5,7 @@
 // size (the Picture of the day widget, src/lib/eink/builder/render.ts).
 //
 // Sources (all free, no key):
-//   art     Art Institute of Chicago, public domain (CC0) paintings
+//   art     Cleveland Museum of Art (or the Art Institute of Chicago), public domain (CC0) paintings
 //   photo   Wikimedia Commons' Picture of the Day (freely licensed; the photographer is credited)
 //   space   NASA's image library (NASA's own pictures are public domain)
 import jpeg from 'jpeg-js';
@@ -82,7 +82,49 @@ async function toGray(url: string): Promise<Uint8Array> {
 }
 
 // ---- the three sources ----
+// Art: a public domain (CC0) painting from the Cleveland Museum of Art, or from the Art Institute
+// of Chicago if Cleveland is down (Chicago turns away requests from Cloudflare's servers).
 async function fetchArt(day: string): Promise<Omit<Potd, 'day'>> {
+	try {
+		return await fetchCleveland(day);
+	} catch (e) {
+		try {
+			return await fetchChicago(day);
+		} catch {
+			throw e; // Cleveland's error is the useful one
+		}
+	}
+}
+
+async function fetchCleveland(day: string): Promise<Omit<Potd, 'day'>> {
+	const n = dayNum(day);
+	const base = 'https://openaccess-api.clevelandart.org/api/artworks/?cc0=1&has_image=1&type=Painting&limit=1';
+	let lastErr: unknown;
+	for (let t = 0; t < 3; t++) {
+		try {
+			let skip = (n * 37 + t * 101) % 2000;
+			let j = await getJson(`${base}&skip=${skip}`);
+			const total = Number(j?.info?.total) || 0;
+			if (!j?.data?.length && total > 0) {
+				skip = skip % total;
+				j = await getJson(`${base}&skip=${skip}`);
+			}
+			const a = j?.data?.[0];
+			const img: string | undefined = a?.images?.web?.url;
+			if (!a || !img) continue;
+			const gray = await toGray(img);
+			// "Claude Monet (French, 1840–1926)" -> "Claude Monet"
+			const who = clean(a.creators?.[0]?.description, 80).replace(/\s*\(.*$/, '');
+			const by = [who, clean(a.creation_date, 30)].filter(Boolean).join(', ');
+			return { title: clean(a.title, 90) || 'Untitled', credit: by ? `${by}, Cleveland Museum of Art` : 'Cleveland Museum of Art', gray };
+		} catch (e) {
+			lastErr = e;
+		}
+	}
+	throw lastErr ?? new Error('no painting found at Cleveland');
+}
+
+async function fetchChicago(day: string): Promise<Omit<Potd, 'day'>> {
 	const n = dayNum(day);
 	let lastErr: unknown;
 	for (let t = 0; t < 4; t++) {
