@@ -279,6 +279,11 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	// The screen always takes the biggest 4:3 size that fits in the middle, so it never needs scrolling,
 	// at any browser zoom or window size.
 	function fit() {
+		// the middle column: as wide as the biggest 4:3 screen the height allows
+		const want = Math.floor((stageWrap.clientHeight * 4) / 3);
+		const grid = stageWrap.closest('.grid') as HTMLElement | null;
+		const had = parseFloat(grid?.style.getPropertyValue('--mid') || '0');
+		if (grid && want > 0 && !(Math.abs(had - want) <= 2)) grid.style.setProperty('--mid', want + 'px');
 		const w = stageWrap.clientWidth;
 		const h = stageWrap.clientHeight;
 		const k = Math.max(120, Math.min(w, (h * 4) / 3));
@@ -1373,9 +1378,8 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 				b.title = d.blurb;
 				const c = document.createElement('canvas');
 				c.className = 'pthumb';
-				const k = Math.min(132 / d.w, 78 / d.h, 2);
-				c.width = Math.max(8, Math.round(d.w * k));
-				c.height = Math.max(8, Math.round(d.h * k));
+				c.width = Math.max(8, d.w * 3);
+				c.height = Math.max(8, d.h * 3);
 				palThumbs.push({ type, c });
 				const pn = document.createElement('span');
 				pn.className = 'pn';
@@ -1794,7 +1798,9 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	.bld .save-msg.is-dirty { color: #d9a441; }
 	.bld .save-msg.is-error { color: #e08a8a; }
 
-	.bld .grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr) 300px; gap: 1em; align-items: stretch; }
+	/* the middle is exactly as wide as the screen at its biggest (fit() sets --mid); the widgets and
+	   the settings share whatever is left, so there's no empty space either side of the screen */
+	.bld .grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(300px, 1.1fr) minmax(0, var(--mid, 1fr)) minmax(300px, 1fr); gap: 1em; align-items: stretch; }
 	.bld .col { min-height: 0; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; padding: 1em; overflow: auto; overscroll-behavior: contain; }
 	.bld .col.mid { background: transparent; border: 0; padding: 0; overflow: visible; display: flex; flex-direction: column; gap: 0.6em; }
 	.bld .label { font-size: 0.72em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.7em; }
@@ -1802,12 +1808,14 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	/* widget palette: every card shows the real widget */
 	.bld .pgroup { font-size: 0.74em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 1.2em 0 0.5em; }
 	.bld .pgroup:first-of-type { margin-top: 0.8em; }
-	.bld .pitems { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5em; }
-	.bld .pitem { min-width: 0; display: grid; grid-template-rows: 88px auto; gap: 0.4em; padding: 0.4em; background: var(--bg); border: 2px solid var(--border); border-radius: 12px; color: var(--fg); font: inherit; text-align: center; touch-action: none; user-select: none; -webkit-user-select: none; transition: border-color 0.15s, transform 0.15s; }
+	.bld .pitems { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.6em; }
+	.bld .pitem { min-width: 0; display: grid; grid-template-rows: 118px auto; gap: 0.4em; padding: 0.4em; background: var(--bg); border: 2px solid var(--border); border-radius: 12px; color: var(--fg); font: inherit; text-align: center; touch-action: none; user-select: none; -webkit-user-select: none; transition: border-color 0.15s, transform 0.15s; }
 	.bld .pitem:hover { border-color: var(--accent); transform: translateY(-1px); }
 	.bld .pitem:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.bld .pbox { display: grid; place-items: center; background: #dfdbd0; border-radius: 7px; overflow: hidden; }
-	.bld .pthumb { display: block; max-width: 100%; max-height: 100%; image-rendering: pixelated; pointer-events: none; }
+	/* drawn at 3x and scaled smoothly to the card, so pixel fonts stay readable at any zoom */
+	.bld .pbox { position: relative; }
+	.bld .pthumb { position: absolute; inset: 6px; width: calc(100% - 12px); height: calc(100% - 12px); object-fit: contain; pointer-events: none; }
 	.bld .pn { font-size: 0.84em; font-weight: 700; line-height: 1.15; padding-bottom: 0.15em; overflow-wrap: anywhere; }
 	.bld .dragghost { position: fixed; z-index: 100; pointer-events: none; padding: 0.4em 0.8em; background: var(--accent); color: var(--bg); border-radius: 999px; font-size: 0.85em; font-weight: 700; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
 
@@ -1917,6 +1925,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	@media (max-width: 1180px) {
 		.bld .grid { grid-template-columns: 250px minmax(0, 1fr) 270px; }
 		.bld .pitems { grid-template-columns: 1fr; }
+		.bld .pitem { grid-template-rows: 96px auto; }
 		.bld .empty-tpls { grid-template-columns: repeat(3, 1fr); }
 	}
 	@media (max-width: 860px) {
