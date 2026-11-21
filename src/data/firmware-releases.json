@@ -1,11 +1,11 @@
 {
   "channels": {
     "stable": {
-      "version": "1.0.5",
+      "version": "1.1.0",
       "auto": true
     },
     "beta": {
-      "version": "1.0.5",
+      "version": "1.1.0",
       "auto": true
     }
   },
@@ -41,6 +41,14 @@
       "sig": "MEUCIHt2pPvOCH84ILMh6WwTvtsoiEUDX5n4pFKJpWn1a2IVAiEA7SOB+k2TeLA0lE1p/LkDaUaTlIuelHACukRN4E/+Wik=",
       "date": "2026-11-14",
       "notes": ""
+    },
+    {
+      "version": "1.1.0",
+      "size": 1500656,
+      "sha256": "6bccb8a59b597ab8c3f912faaa31af21d77c1081e14d1035bdef813f8c8390cf",
+      "sig": "MEYCIQCNVHJRTX1eEzS0ppKzYxSoYt6cLu0PleQf7vAhz9fr1gIhAMFDoj8lV6AXLAsK4bQUmMGAYNkSDk4I34ZytF2Ia0ms",
+      "date": "2026-11-21",
+      "notes": "\"Refreshing...\" pop-up when you press the button"
     }
   ]
 }
