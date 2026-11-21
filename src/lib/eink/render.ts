@@ -58,6 +58,8 @@ export interface EinkOptions {
    * cropped to the device (transparent corners). For putting it on your own background.
    */
   bare?: boolean;
+  /** Device mode: crop in close around the device (less backdrop), 6:5 instead of 4:3. */
+  tight?: boolean;
 }
 
 /** Any array-like of 120000 numbers: Uint8Array, Uint8ClampedArray, number[]. */
@@ -255,33 +257,33 @@ const REF_W = 2000;
 const REF_H = 1500;
 // The part of the reference view that is drawn: cropped in around the device so the
 // screen fills more of the picture (4:3, centred on the device).
-const VIEW_W = 1600;
-const VIEW_H = 1200;
-const VIEW_X = 198;
-const VIEW_Y = 151;
+const VIEW = { w: 1600, h: 1200, x: 198, y: 151 };
+// The tight crop: just enough backdrop around the device for its shadow.
+const VIEW_TIGHT = { w: 1320, h: 1130, x: 338, y: 186 };
 const DEV = { x: 462, y: 232, w: 1535 - 462, h: 1270 - 232 };
 const WIN = { x0: 513, y0: 350, x1: 1485, y1: 1082 };
 /** Blank paper border between the glass edge and the picture, in reference px. */
 const WIN_MARGIN = 12;
 
 function drawDevice(canvas: CanvasLike, px: Pixels, opts: EinkOptions, dark: boolean, texture: number): void {
+  const V = opts.tight ? VIEW_TIGHT : VIEW;
   // Pick the scale factor f (reference px -> output px).
   let f: number;
   let k: number | null = null; // integer panel-pixel size when exact blocks are wanted
   if (opts.width !== undefined) {
     if (!(opts.width >= 16)) throw new RangeError("width must be a number >= 16");
-    f = opts.width / VIEW_W;
+    f = opts.width / V.w;
   } else {
     k = integerScale(opts.scale ?? 2);
     f = (W * k) / (WIN.x1 - WIN.x0 - 2 * WIN_MARGIN); // picture becomes exactly 400k wide
   }
-  const outW = Math.round(VIEW_W * f);
-  const outH = Math.round(VIEW_H * f);
+  const outW = Math.round(V.w * f);
+  const outH = Math.round(V.h * f);
   canvas.width = outW;
   canvas.height = outH;
   const ctx = need2d(canvas);
-  const Rx = (v: number): number => Math.round((v - VIEW_X) * f);
-  const Ry = (v: number): number => Math.round((v - VIEW_Y) * f);
+  const Rx = (v: number): number => Math.round((v - V.x) * f);
+  const Ry = (v: number): number => Math.round((v - V.y) * f);
 
   const dx = Rx(DEV.x);
   const dy = Ry(DEV.y);
