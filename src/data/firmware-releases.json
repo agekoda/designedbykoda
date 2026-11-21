@@ -1,11 +1,11 @@
 {
   "channels": {
     "stable": {
-      "version": "1.1.0",
+      "version": "1.1.1",
       "auto": true
     },
     "beta": {
-      "version": "1.1.0",
+      "version": "1.1.1",
       "auto": true
     }
   },
@@ -49,6 +49,14 @@
       "sig": "MEYCIQCNVHJRTX1eEzS0ppKzYxSoYt6cLu0PleQf7vAhz9fr1gIhAMFDoj8lV6AXLAsK4bQUmMGAYNkSDk4I34ZytF2Ia0ms",
       "date": "2026-11-21",
       "notes": "\"Refreshing...\" pop-up when you press the button"
+    },
+    {
+      "version": "1.1.1",
+      "size": 1501264,
+      "sha256": "1c771dd4c13dc337f362943dce0bb76f6c0251ac29820d4e0f3f64b4e9d17e06",
+      "sig": "MEUCIQDvycUrPfSJoN5h+hwbWJ+vtW+p2nVBqEq5Ju/WyZdz6AIgCMNm2lFiXvBncOZsxa+v95m2tpjrhnN6Uk/4z3v1k7E=",
+      "date": "2026-11-21",
+      "notes": "Clearer button pop-up, and \"Up to date\" when nothing changed"
     }
   ]
 }
