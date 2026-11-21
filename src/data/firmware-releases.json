@@ -1,11 +1,11 @@
 {
   "channels": {
     "stable": {
-      "version": "1.1.1",
+      "version": "1.1.2",
       "auto": true
     },
     "beta": {
-      "version": "1.1.1",
+      "version": "1.1.2",
       "auto": true
     }
   },
@@ -57,6 +57,14 @@
       "sig": "MEUCIQDvycUrPfSJoN5h+hwbWJ+vtW+p2nVBqEq5Ju/WyZdz6AIgCMNm2lFiXvBncOZsxa+v95m2tpjrhnN6Uk/4z3v1k7E=",
       "date": "2026-11-21",
       "notes": "Clearer button pop-up, and \"Up to date\" when nothing changed"
+    },
+    {
+      "version": "1.1.2",
+      "size": 1501312,
+      "sha256": "01c8274e5c2ff5a7633cc44e000e087d5da30555af6bb9016d9a71a7eec037fc",
+      "sig": "MEUCIAc9sGt2U8jCq6Oofh7QHoHfiqlXU20HABVNbZTL801kAiEA0v1WeuTE/ltH3Zn9m7XjwtPbQbjWPLIULWxvyermeGo=",
+      "date": "2026-11-21",
+      "notes": "Less ghosting after the button pop-up"
     }
   ]
 }
