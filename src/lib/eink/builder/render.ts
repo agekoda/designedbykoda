@@ -28,6 +28,7 @@ import { habitGrid } from '../layouts/habits';
 import { birthdayList } from '../layouts/birthdays';
 import { wordOfDay } from '../jpWords';
 import { englishWordOfDay } from '../enWords';
+import { vocabOfDay } from '../enVocab';
 import { feedUrl, githubUser, marketBase, marketList, youtubeRef, type GitHubDays } from '../../connect';
 import { personName, type NameStyle } from '../waiting';
 
@@ -1162,7 +1163,9 @@ function uvAirWidget(env: Env, w: Widget, o: Opts) {
 // language you're learning is the other one), with its meaning in the screen's language.
 function jpWordWidget(env: Env, w: Widget, o: Opts) {
 	const { d, ctx } = env;
-	if (isJa()) return enWordWidget(env, w, o);
+	// which language it teaches: the widget's own choice, else Language and units, else the other one
+	const learn = o.learn === 'ja' || o.learn === 'en' ? o.learn : (ctx.wordLang ?? (isJa() ? 'en' : 'ja'));
+	if (learn === 'en') return enWordWidget(env, w, o);
 	const [word, kana, romaji, meaning] = wordOfDay(dayIdx(ctx.nowLocal));
 	const a: Align = o.align === 'center' ? 'center' : o.align === 'right' ? 'right' : 'left';
 	const x = a === 'center' ? w.x + w.w / 2 : a === 'right' ? w.x + w.w : w.x;
@@ -1222,7 +1225,8 @@ function birthdaysBig(env: Env, w: Widget, o: Opts) {
 
 function enWordWidget(env: Env, w: Widget, o: Opts) {
 	const { d, ctx } = env;
-	const [word, meaning, example] = englishWordOfDay(dayIdx(ctx.nowLocal));
+	// an English word, explained in Japanese when the screen is in Japanese, in English otherwise
+	const [word, meaning, example] = isJa() ? englishWordOfDay(dayIdx(ctx.nowLocal)) : (([w0, kind, def]) => [w0, def, kind])(vocabOfDay(dayIdx(ctx.nowLocal)));
 	const a: Align = o.align === 'center' ? 'center' : o.align === 'right' ? 'right' : 'left';
 	const x = a === 'center' ? w.x + w.w / 2 : a === 'right' ? w.x + w.w : w.x;
 	const sv = vm(env, FACES.s);
@@ -1232,9 +1236,20 @@ function enWordWidget(env: Env, w: Widget, o: Opts) {
 		top += sv.lh + 4;
 	}
 	const under: { text: string; role: 's' | 'sb' }[] = [];
-	if (o.meaning !== false) under.push({ text: meaning, role: 'sb' });
-	// the example sentence takes the romaji's place (same switch)
-	if (o.romaji !== false) under.push({ text: example, role: 's' });
+	if (isJa()) {
+		if (o.meaning !== false) under.push({ text: meaning, role: 'sb' });
+		// the example sentence takes the romaji's place (same switch)
+		if (o.romaji !== false) under.push({ text: example, role: 's' });
+	} else {
+		// (here "example" is the kind of word: noun, verb...)
+		if (o.romaji !== false) under.push({ text: example, role: 's' });
+		if (o.meaning !== false) under.push({ text: meaning, role: 'sb' });
+	}
+	// a long meaning wraps onto a second line rather than being cut off
+	for (let i = under.length - 1; i >= 0; i--) {
+		const lines = wrapText(env.fam, under[i].role, under[i].text, w.w).slice(0, 2);
+		if (lines.length > 1) under.splice(i, 1, ...lines.map((t) => ({ text: t, role: under[i].role })));
+	}
 	const underH = under.length * sv.lh;
 	const bigBox: Box = { x: w.x, y: top, w: w.w, h: Math.max(16, w.y + w.h - top - underH - 2) };
 	const fit = fitText(env, word, bigBox.w, bigBox.h, ['xl', 'l', 'm', 's'], false);

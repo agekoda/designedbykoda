@@ -161,6 +161,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 	let hi = -1;
 	let fonts: any = null;
 	let lang: 'en' | 'ja' = 'en';
+	let wordLang: 'en' | 'ja' | undefined;
 	let unit: 'c' | 'f' = 'c';
 	let clock: '12' | '24' = '24';
 
@@ -245,18 +246,19 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 			font,
 			dark,
 			lang,
+			wordLang,
 			unit,
 			clock,
 			hasWeather: info.hasWeather,
 			vbat: 4.0,
 			loc: info.loc,
 			connect: liveConnect(l),
-			countdown: info.countdown ?? { title: 'Japan trip', date: d },
+			countdown: info.countdown ?? { title: lang === 'ja' ? 'ハワイ旅行' : 'Japan trip', date: d },
 			cornerImage: decodePic(info.cornerBits)?.bytes ?? null,
 			cornerSize: ((p) => (p ? { w: p.w, h: p.h } : null))(decodePic(info.cornerBits)),
 			custom: l,
-			reminders: info.reminders?.length ? info.reminders : sampleReminders(Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60),
-			habits: info.habits?.some((h: any) => h.name) ? info.habits : sampleHabits(Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60),
+			reminders: info.reminders?.length ? info.reminders : sampleReminders(Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60, lang),
+			habits: info.habits?.some((h: any) => h.name) ? info.habits : sampleHabits(Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60, lang),
 		};
 	}
 	let picHook: (() => void) | null = null;
@@ -1514,6 +1516,7 @@ const families = FAMILIES.map((id) => ({ id, label: FAMILY_LABELS[id] }));
 		font = d.font;
 		dark = !!d.dark;
 		lang = d.lang === 'ja' ? 'ja' : 'en';
+		wordLang = d.wordLang === 'ja' || d.wordLang === 'en' ? d.wordLang : undefined;
 		unit = d.unit === 'f' ? 'f' : 'c';
 		clock = d.clock === '12' ? '12' : '24';
 		layout = sanitizeLayout(d.custom);

@@ -33,10 +33,11 @@ import { away } from './away';
 import { renderCustom } from '../builder/render';
 import { forecast } from './forecast';
 import { coast } from './coast';
-import { sanitizeLayout, sanitizeSign, signLayout, type SignStyle, WORD_LAYOUT, BIRTHDAYS_LAYOUT } from '../builder/model';
+import { sanitizeLayout, sanitizeSign, signLayout, localSign, type SignStyle, WORD_LAYOUT, BIRTHDAYS_LAYOUT } from '../builder/model';
 
 // Meeting room, Guest welcome and Desk name plate: a builder design filled in from a few words.
-const sign = (s: SignStyle) => (ctx: LayoutCtx) => renderCustom({ ...ctx, custom: sanitizeLayout(signLayout(s, sanitizeSign(ctx.sign))) });
+// (a sign still on its example wording shows it in Japanese when the screen is in Japanese)
+const sign = (s: SignStyle) => (ctx: LayoutCtx) => renderCustom({ ...ctx, custom: sanitizeLayout(signLayout(s, localSign(sanitizeSign(ctx.sign), ctx.lang))) });
 
 interface LayoutEntry {
 	render: (ctx: LayoutCtx) => string;

@@ -464,13 +464,14 @@ export const WIDGETS: Record<string, WidgetDef> = {
 	jpword: {
 		label: 'Word of the day',
 		group: 'Extras',
-		blurb: 'A Japanese word each day: the kanji, how to read it, and what it means. With the screen in Japanese, it\'s an English word instead, with its meaning in Japanese',
+		blurb: 'A word to learn each day, in Japanese or English (pick which in Language and units): the word, how to say it, and what it means',
 		w: 220,
 		h: 150,
 		min: { w: 90, h: 60 },
 		opts: [
 			{ key: 'label', label: 'Heading', kind: 'toggle', def: true },
-			{ key: 'romaji', label: 'Romaji (or the example, in Japanese)', kind: 'toggle', def: true },
+			{ key: 'learn', label: 'Language', kind: 'choice', choices: [['auto', 'As in Language and units'], ['ja', 'Japanese'], ['en', 'English']], def: 'auto' },
+			{ key: 'romaji', label: 'Romaji, or the example', kind: 'toggle', def: true },
 			{ key: 'meaning', label: 'Meaning', kind: 'toggle', def: true },
 			ALIGN,
 		],
@@ -902,6 +903,29 @@ export const SIGN_DEFAULTS: SignCfg = {
 	headlines: { url: 'https://www.abc.net.au/news/feed/51120/rss.xml' },
 	markets: { list: 'USD, EUR, GBP, BTC, ETH, SOL', base: 'AUD' },
 };
+// The same examples in Japanese. A sign still on the example wording shows these when the screen
+// is in Japanese; anything the person typed stays exactly as they typed it.
+const SIGN_DEFAULTS_JA: Partial<Record<keyof SignCfg, Record<string, string>>> = {
+	room: { name: '会議室' },
+	guest: {
+		title: 'ようこそ、さくらさん！',
+		rules: '室内は禁煙です\n夜10時以降はお静かに\nゴミ出しは火曜日です\n鍵はテーブルに置いてください',
+		checkout: 'チェックアウト 10時',
+		contact: 'ご質問は 0400 000 000 まで',
+	},
+	nameplate: { name: '山田 アレックス', role: 'ハードウェアエンジニア' },
+	waiting: { title: 'さくら整骨院', note: '受付にお声がけください' },
+};
+export function localSign(cfg: SignCfg, lang: string | undefined): SignCfg {
+	if (lang !== 'ja') return cfg;
+	const out: any = JSON.parse(JSON.stringify(cfg));
+	for (const [style, fields] of Object.entries(SIGN_DEFAULTS_JA)) {
+		for (const [k, v] of Object.entries(fields!)) {
+			if ((cfg as any)[style]?.[k] === (SIGN_DEFAULTS as any)[style][k]) out[style][k] = v;
+		}
+	}
+	return out;
+}
 // How long each box may be, and which ones are kept exactly as typed (Wi-Fi details).
 const SIGN_LIMITS: Record<string, { max: number; raw?: boolean; multiline?: boolean }> = {
 	name: { max: 40 }, title: { max: 40 }, role: { max: 40 }, checkout: { max: 30 }, contact: { max: 60 }, note: { max: 60 },
