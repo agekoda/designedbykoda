@@ -462,15 +462,15 @@ export const WIDGETS: Record<string, WidgetDef> = {
 		],
 	},
 	jpword: {
-		label: 'Japanese word',
+		label: 'Word of the day',
 		group: 'Extras',
-		blurb: 'A Japanese word of the day: the kanji, how to read it, and what it means. A new one each day',
+		blurb: 'A Japanese word each day: the kanji, how to read it, and what it means. With the screen in Japanese, it\'s an English word instead, with its meaning in Japanese',
 		w: 220,
 		h: 150,
 		min: { w: 90, h: 60 },
 		opts: [
 			{ key: 'label', label: 'Heading', kind: 'toggle', def: true },
-			{ key: 'romaji', label: 'Romaji (mizu)', kind: 'toggle', def: true },
+			{ key: 'romaji', label: 'Romaji (or the example, in Japanese)', kind: 'toggle', def: true },
 			{ key: 'meaning', label: 'Meaning', kind: 'toggle', def: true },
 			ALIGN,
 		],
@@ -487,6 +487,7 @@ export const WIDGETS: Record<string, WidgetDef> = {
 			{ key: 'count', label: 'How many', kind: 'choice', choices: [['2', '2'], ['3', '3'], ['4', '4'], ['6', '6']], def: '4' },
 			{ key: 'days', label: 'Looks ahead', kind: 'choice', choices: [['7', 'A week'], ['31', 'A month'], ['60', '2 months']], def: '31' },
 			{ key: 'label', label: 'Heading', kind: 'toggle', def: true },
+			{ key: 'look', label: 'Look', kind: 'choice', choices: [['list', 'List'], ['big', 'Next one big']], def: 'list' },
 		],
 	},
 	habits: {
@@ -855,6 +856,8 @@ export const TEMPLATES: Template[] = [
 	{ id: 'headlines', label: 'Headlines', note: 'The latest from any news site or blog', build: () => signLayout('headlines', SIGN_DEFAULTS) },
 	{ id: 'markets', label: 'Money & crypto', note: 'Exchange rates and crypto prices, with the day\'s change', build: () => signLayout('markets', SIGN_DEFAULTS) },
 	{ id: 'coast', label: 'Beach', note: 'Tides, surf, UV and the weather', build: () => COAST_LAYOUT },
+	{ id: 'word', label: 'Word of the day', note: 'A new Japanese word each day, and how far through the year you are', build: () => WORD_LAYOUT },
+	{ id: 'birthdays', label: 'Birthdays', note: 'The next birthday big, the ones after it, and the month', build: () => BIRTHDAYS_LAYOUT },
 ];
 
 export function templateById(id: string): Template {
@@ -1065,10 +1068,41 @@ export const COAST_LAYOUT = sanitizeLayout({
 });
 
 
+// ---- Word of the day and Birthdays: two more ready-made screens built from widgets ----
+export const WORD_LAYOUT = sanitizeLayout({
+	v: 1,
+	widgets: [
+		CW('box', 0, 0, 400, 30, { fill: 'solid' }),
+		CW('text', 10, 2, 200, 26, { text: 'WORD OF THE DAY', light: true, bold: true, size: 's', valign: 'middle' }),
+		CW('date_full', 210, 2, 180, 26, { fmt: 'med', light: true, size: 's', align: 'right', valign: 'middle' }),
+		CW('jpword', 20, 42, 360, 182, { label: false, romaji: true, meaning: true, align: 'center' }),
+		CW('line', 20, 234, 360, 1, { dotted: true }),
+		CW('progress', 20, 246, 360, 44, { span: 'year', label: true }),
+	],
+});
+
+export const BIRTHDAYS_LAYOUT = sanitizeLayout({
+	v: 1,
+	widgets: [
+		CW('box', 0, 0, 400, 30, { fill: 'solid' }),
+		CW('text', 10, 2, 180, 26, { text: 'BIRTHDAYS', light: true, bold: true, size: 's', valign: 'middle' }),
+		CW('date_full', 190, 2, 200, 26, { fmt: 'med', light: true, size: 's', align: 'right', valign: 'middle' }),
+		CW('birthdays', 12, 42, 212, 248, { look: 'big', count: '4', days: '60', label: false }),
+		CW('line', 234, 42, 1, 248),
+		CW('mini_month', 244, 40, 148, 140),
+		CW('line', 244, 188, 148, 1, { dotted: true }),
+		CW('weather_icon', 244, 196, 54, 54),
+		CW('weather', 302, 198, 90, 50, { size: 'auto', valign: 'middle' }),
+		CW('progress', 244, 258, 148, 34, { span: 'month', label: true }),
+	],
+});
+
 // The widgets a ready-made connections screen draws, so the device and the preview know which
 // YouTube channel, feed, GitHub user, prices or tides to fetch for it.
 export function builtinLayout(style: string, signRaw: unknown): CustomLayout | null {
 	if (style === 'coast') return COAST_LAYOUT;
+	if (style === 'word') return WORD_LAYOUT;
+	if (style === 'birthdays') return BIRTHDAYS_LAYOUT;
 	if (CONNECT_SIGNS.includes(style)) return signLayout(style as SignStyle, sanitizeSign(signRaw));
 	return null;
 }

@@ -466,7 +466,7 @@ export async function GET({ params, request, locals }) {
 	// One of Your designs (schema-designs.sql): "design:<id>".
 	const designId = designIdOf(style);
 	if (designId && proto === '2') customLayout = (await getDesign(db, deviceId, designId))?.layout ?? null;
-	const needs = style === 'planner' ? { ...layoutNeeds(null), tasks: true } : layoutNeeds(customLayout);
+	const needs = style === 'planner' ? { ...layoutNeeds(null), tasks: true } : layoutNeeds(builtinLayout(style, null) ?? customLayout);
 	// Meeting room and Desk name plate show free / busy, so they wake when meetings start and end.
 	if (LIVE_SIGNS.includes(style)) needs.live = true;
 	// The words on a sign (schema-screens.sql).
